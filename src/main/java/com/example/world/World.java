@@ -1,0 +1,155 @@
+package com.example.world;
+
+import java.io.File;
+import java.util.HashMap;
+import java.util.Map;
+
+public class World {
+    public final long seed;
+    private final Map<Long, Chunk> chunks = new HashMap<>();
+    private final WorldGenerator generator;
+    /** Null means this world is never persisted (shouldn't normally happen once a world exists on disk). */
+    private File saveDir;
+
+    public World(long seed, WorldGenerator generator) {
+        this.seed = seed;
+        this.generator = generator;
+    }
+
+    public void setSaveDir(File saveDir) {
+        this.saveDir = saveDir;
+    }
+
+    public File getSaveDir() {
+        return saveDir;
+    }
+
+    /** Climate at a world column for the debug overlay; null for generators with no climate model. */
+    public ClimateSample climateAt(int worldX, int worldZ) {
+        return generator.climateAt(worldX, worldZ);
+    }
+
+    public static int worldToChunk(int worldCoord) {
+        return Math.floorDiv(worldCoord, Chunk.SIZE_X);
+    }
+
+    public static int worldToLocal(int worldCoord) {
+        return Math.floorMod(worldCoord, Chunk.SIZE_X);
+    }
+
+    public Chunk getChunk(int cx, int cz) {
+        return chunks.get(Chunk.key(cx, cz));
+    }
+
+    public Chunk getOrCreateChunk(int cx, int cz) {
+        long key = Chunk.key(cx, cz);
+        Chunk c = chunks.get(key);
+        if (c == null) {
+            c = new Chunk(cx, cz);
+            chunks.put(key, c);
+        }
+        return c;
+    }
+
+    public boolean hasChunk(int cx, int cz) {
+        return chunks.containsKey(Chunk.key(cx, cz));
+    }
+
+    public void removeChunk(int cx, int cz) {
+        chunks.remove(Chunk.key(cx, cz));
+    }
+
+    /** Generates a fresh chunk, or restores it from disk if it was previously saved. */
+    public void generateChunk(Chunk chunk) {
+        byte[] saved = saveDir != null ? WorldIO.loadChunk(saveDir, chunk.chunkX, chunk.chunkZ) : null;
+        if (saved != null) {
+            chunk.importBlocks(saved);
+        } else {
+            generator.generate(chunk, this);
+        }
+        generator.computeTint(chunk); // not persisted, so this runs on both the load and generate paths
+        chunk.markGenerated();
+        chunk.markMeshDirty();
+        // Neighbors may have already been meshed while this chunk was still unloaded (their
+        // border faces were drawn against "air"). Now that real terrain exists here, those
+        // neighbor meshes are stale and must be rebuilt or they'll show phantom/z-fighting faces.
+        markNeighborChunksDirty(chunk.chunkX, chunk.chunkZ);
+    }
+
+    /** Marks the 4 orthogonally-adjacent chunks (if loaded) mesh-dirty so their border faces get rebuilt. */
+    public void markNeighborChunksDirty(int cx, int cz) {
+        markNeighborDirty(cx - 1, cz);
+        markNeighborDirty(cx + 1, cz);
+        markNeighborDirty(cx, cz - 1);
+        markNeighborDirty(cx, cz + 1);
+    }
+
+    /** Returns AIR for unloaded chunks so chunk-edge faces still render while neighbors stream in. */
+    public BlockType getBlock(int x, int y, int z) {
+        if (y < 0 || y >= Chunk.SIZE_Y) return BlockType.AIR;
+        int cx = worldToChunk(x);
+        int cz = worldToChunk(z);
+        Chunk c = getChunk(cx, cz);
+        if (c == null || !c.isGenerated()) return BlockType.AIR;
+        return c.getLocal(worldToLocal(x), y, worldToLocal(z));
+    }
+
+    /** Highest solid block's Y at this column, or 0 if the chunk isn't loaded (used by rain particles). */
+    public int getColumnHeightAt(int worldX, int worldZ) {
+        Chunk c = getChunk(worldToChunk(worldX), worldToChunk(worldZ));
+        if (c == null || !c.isGenerated()) return 0;
+        return c.getColumnHeight(worldToLocal(worldX), worldToLocal(worldZ));
+    }
+
+    /**
+     * Returns full brightness for unloaded/not-yet-lit chunks so streaming-in terrain doesn't
+     * flash dark. Gating on {@link Chunk#isLightComputed} (not just {@link Chunk#isGenerated})
+     * matters: a chunk's blocks can exist for one or more frames before {@link LightEngine} has
+     * actually run on it (generation and meshing are time-budgeted separately), and during that
+     * window its skyLight/blockLight arrays are still all-zero. A neighbor chunk meshed in that
+     * window would otherwise sample real zeros across the border - a permanently black seam,
+     * since nothing revisits that neighbor once the border chunk's real light is later computed.
+     */
+    public int getSkyLight(int x, int y, int z) {
+        if (y < 0 || y >= Chunk.SIZE_Y) return 15;
+        Chunk c = getChunk(worldToChunk(x), worldToChunk(z));
+        if (c == null || !c.isGenerated() || !c.isLightComputed()) return 15;
+        return c.getSkyLight(worldToLocal(x), y, worldToLocal(z));
+    }
+
+    public int getBlockLight(int x, int y, int z) {
+        if (y < 0 || y >= Chunk.SIZE_Y) return 0;
+        Chunk c = getChunk(worldToChunk(x), worldToChunk(z));
+        if (c == null || !c.isGenerated() || !c.isLightComputed()) return 0;
+        return c.getBlockLight(worldToLocal(x), y, worldToLocal(z));
+    }
+
+    public void setBlock(int x, int y, int z, BlockType type) {
+        if (y < 0 || y >= Chunk.SIZE_Y) return;
+        int cx = worldToChunk(x);
+        int cz = worldToChunk(z);
+        Chunk c = getOrCreateChunk(cx, cz);
+        int lx = worldToLocal(x);
+        int lz = worldToLocal(z);
+        c.setLocal(lx, y, lz, type);
+        c.markMeshDirty();
+        // If the edit is on a chunk border, the neighboring chunk's mesh must be rebuilt too.
+        if (lx == 0) markNeighborDirty(cx - 1, cz);
+        if (lx == Chunk.SIZE_X - 1) markNeighborDirty(cx + 1, cz);
+        if (lz == 0) markNeighborDirty(cx, cz - 1);
+        if (lz == Chunk.SIZE_Z - 1) markNeighborDirty(cx, cz + 1);
+    }
+
+    private void markNeighborDirty(int cx, int cz) {
+        Chunk c = getChunk(cx, cz);
+        if (c != null) c.markMeshDirty();
+    }
+
+    public boolean isSolidCollision(int x, int y, int z) {
+        return getBlock(x, y, z).isSolidCollision();
+    }
+
+    public Map<Long, Chunk> chunkMap() {
+        return chunks;
+    }
+}

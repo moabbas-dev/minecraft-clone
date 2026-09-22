@@ -14,6 +14,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <lwjgl.version>3.3.4</lwjgl.version>
         <joml.version>1.10.5</joml.version>
+        <exec.mainClass>com.example.Main</exec.mainClass>
     </properties>
 
     <profiles>
@@ -97,5 +98,51 @@
             <artifactId>joml</artifactId>
             <version>${joml.version}</version>
         </dependency>
+
+        <!-- Logging: @Slf4j (Lombok) generates the `log` field; slf4j-simple gives it a
+             working console backend without needing a separate config file. -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>1.18.48</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>2.0.16</version>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-simple</artifactId>
+            <version>2.0.16</version>
+        </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.13.0</version>
+                <configuration>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                            <version>1.18.48</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.2.0</version>
+                <configuration>
+                    <mainClass>com.example.Main</mainClass>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 </project>

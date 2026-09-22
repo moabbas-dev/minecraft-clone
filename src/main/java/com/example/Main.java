@@ -1,9 +1,9 @@
 package com.example;
 
-import org.lwjgl.Version;
+import com.example.game.Game;
 
 public class Main {
     public static void main(String[] args) {
-        System.out.println("LWJGL version: " + Version.getVersion());
+        new Game().run();
     }
 }
