@@ -1,6 +1,6 @@
 package com.example.physics;
 
-import com.example.engine.Input;
+import com.example.engine.InputState;
 import com.example.world.BlockType;
 import com.example.world.World;
 import org.joml.Matrix4f;
@@ -133,7 +133,7 @@ public class Player {
         return base;
     }
 
-    public void update(float dt, Input input, World world, double now) {
+    public void update(float dt, InputState input, World world, double now) {
         if (input.consumeKeyPressed(GLFW_KEY_SPACE)) {
             if (now - lastSpacePressTime < DOUBLE_TAP_WINDOW) {
                 flying = !flying;

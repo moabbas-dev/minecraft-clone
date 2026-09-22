@@ -7,7 +7,7 @@ import java.nio.IntBuffer;
 
 import static org.lwjgl.glfw.GLFW.*;
 
-public class Input {
+public class Input implements InputState {
     private final long window;
     private final boolean[] keysDown = new boolean[GLFW_KEY_LAST + 1];
     private final boolean[] keysPressedEdge = new boolean[GLFW_KEY_LAST + 1];
@@ -71,11 +71,12 @@ public class Input {
         glfwSetCharCallback(window, (win, codepoint) -> typedChars.appendCodePoint(codepoint));
     }
 
+    @Override
     public boolean isKeyDown(int key) {
         return keysDown[key];
     }
 
-    /** True only on the frame the key transitioned to pressed; consumes the edge. */
+    @Override
     public boolean consumeKeyPressed(int key) {
         boolean v = keysPressedEdge[key];
         keysPressedEdge[key] = false;

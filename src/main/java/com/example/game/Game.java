@@ -851,7 +851,9 @@ public class Game {
         sunMoonMesh.draw();
     }
 
-    private static Vector3f sunDirection(float dayTime) {
+    // Package-private (not private): pure functions of primitives/Vector3f with no GL/GLFW
+    // dependency, exercised directly by tests in this package (see com.example.game.unit).
+    static Vector3f sunDirection(float dayTime) {
         float angle = dayTime * (float) (2 * Math.PI) - (float) (Math.PI / 2);
         return new Vector3f((float) Math.cos(angle), (float) Math.sin(angle), 0f).normalize();
     }
@@ -866,14 +868,14 @@ public class Game {
      * at night, ramping smoothly (same continuous linear sunDir.y curve as before) up to full
      * daylight at noon.
      */
-    private static final float MIN_NIGHT_DAYLIGHT = 0.2f;
+    static final float MIN_NIGHT_DAYLIGHT = 0.2f;
 
-    private static float computeDaylightFactor(Vector3f sunDir) {
+    static float computeDaylightFactor(Vector3f sunDir) {
         float raw = Math.max(0f, Math.min(1f, sunDir.y * 2.5f + 0.35f));
         return MIN_NIGHT_DAYLIGHT + raw * (1f - MIN_NIGHT_DAYLIGHT);
     }
 
-    private static Vector3f computeSkyColor(float dayTime) {
+    static Vector3f computeSkyColor(float dayTime) {
         Vector3f night = new Vector3f(0.02f, 0.02f, 0.10f);
         Vector3f dawn = new Vector3f(0.90f, 0.55f, 0.40f);
         Vector3f day = new Vector3f(SKY_R, SKY_G, SKY_B);
