@@ -46,9 +46,19 @@ public class Colormap {
      * humidity * temperature, sampled at pixel ((1-temperature)*255, (1-adjHumidity)*255)).
      */
     public float[] sample(double temperature, double humidity) {
+        return sampleDefinition(clamp01((temperature + 1.0) / 2.0), clamp01((humidity + 1.0) / 2.0));
+    }
+
+    /**
+     * Same vanilla sampling formula as {@link #sample}, but for values already in vanilla's own
+     * [0, 1] convention - used by {@link BiomeColors} with a biome's real temperature/downfall
+     * definition (temp01 = clamp(temperature/2, 0, 1), downfall01 = downfall) rather than with
+     * raw climate-selection noise.
+     */
+    public float[] sampleDefinition(double temp01, double downfall01) {
         if (image == null) return fallback;
-        double t = clamp01((temperature + 1.0) / 2.0);
-        double h = clamp01((humidity + 1.0) / 2.0);
+        double t = clamp01(temp01);
+        double h = clamp01(downfall01);
         double adjHumidity = h * t;
         int x = (int) clamp((1.0 - t) * 255.0, 0, image.getWidth() - 1);
         int y = (int) clamp((1.0 - adjHumidity) * 255.0, 0, image.getHeight() - 1);
