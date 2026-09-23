@@ -656,7 +656,7 @@ public class Game {
             rd.transparentMesh.draw();
         }
 
-        renderSunAndMoon(eye, sunDir);
+        renderSunAndMoon(eye, sunDir, weather.isRaining(), weather.isThundering());
         renderRain();
         renderHeldItem();
 
@@ -801,18 +801,33 @@ public class Game {
         return idx;
     }
 
-    private void renderSunAndMoon(Vector3f eye, Vector3f sunDir) {
+    /**
+     * Vanilla doesn't actually remove the sun/moon sprite during rain - the whole atmosphere
+     * (sky color, fog, ambient light) darkens together so it reads as washed out behind storm
+     * clouds rather than deleted. Previously this engine darkened the sky and terrain lighting
+     * for a storm (see renderWorld) but drew the sun/moon at a hardcoded full alpha regardless -
+     * a bright, fully-lit disc sitting on top of a dark stormy sky, which is the actual bug: not
+     * that the sun was "visible" (it should be), but that it wasn't dimmed with everything else.
+     */
+    private static final float CELESTIAL_ALPHA_RAIN = 0.35f;
+    private static final float CELESTIAL_ALPHA_THUNDER = 0.12f;
+
+    private void renderSunAndMoon(Vector3f eye, Vector3f sunDir, boolean raining, boolean thundering) {
         Vector3f right = new Vector3f(-sunDir.z, 0, sunDir.x);
         if (right.lengthSquared() < 1e-6f) right.set(1, 0, 0);
         right.normalize();
         Vector3f up = new Vector3f(right).cross(sunDir).normalize();
 
+        float celestialAlpha = celestialAlpha(raining, thundering);
+
         Matrix4f identity = new Matrix4f();
         chunkShader.setUniform("uModel", identity);
-        // Celestial bodies aren't part of the terrain - keep them fully lit and unfogged.
+        // Celestial bodies aren't part of the terrain - keep them unfogged (their dimming for
+        // weather is handled by uAlpha below instead, so they still blend into the storm sky
+        // color rather than the distance-fog color).
         chunkShader.setUniform("uFogStart", 1_000_000f);
         chunkShader.setUniform("uFogEnd", 2_000_000f);
-        chunkShader.setUniform("uAlpha", 1f);
+        chunkShader.setUniform("uAlpha", celestialAlpha);
 
         Vector3f sunCenter = new Vector3f(eye).add(new Vector3f(sunDir).mul(CELESTIAL_DISTANCE));
         renderCelestialBody(Tile.SUN, sunCenter, right, up);
@@ -820,6 +835,13 @@ public class Game {
         Vector3f moonDir = new Vector3f(sunDir).negate();
         Vector3f moonCenter = new Vector3f(eye).add(new Vector3f(moonDir).mul(CELESTIAL_DISTANCE));
         renderCelestialBody(Tile.MOON, moonCenter, right, up);
+    }
+
+    /** Pure formula, exercised directly by tests in this package - see com.example.game.unit. */
+    static float celestialAlpha(boolean raining, boolean thundering) {
+        if (thundering) return CELESTIAL_ALPHA_THUNDER;
+        if (raining) return CELESTIAL_ALPHA_RAIN;
+        return 1f;
     }
 
     private void renderCelestialBody(Tile tile, Vector3f center, Vector3f right, Vector3f up) {
