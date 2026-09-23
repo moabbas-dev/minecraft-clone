@@ -523,14 +523,10 @@ public class Game {
 
     private void rebuildMesh(Chunk chunk) {
         long key = Chunk.key(chunk.chunkX, chunk.chunkZ);
-        boolean firstLight = !chunk.isLightComputed();
-        LightEngine.compute(chunk);
-        if (firstLight) {
-            // Neighbors may already have been meshed while this chunk's own light was still
-            // unknown (all-zero) at the shared border - see World.getSkyLight. Now that real
-            // light values exist here, those neighbor meshes are stale and need to resample them.
-            world.markNeighborChunksDirty(chunk.chunkX, chunk.chunkZ);
-        }
+        // LightEngine now imports light across borders from loaded neighbors itself, and marks
+        // those neighbors dirty again if this chunk's own edge values changed as a result - see
+        // LightEngine.compute for why that subsumes the old "first light computed" special case.
+        LightEngine.compute(chunk, world);
         ChunkMeshBuilder.MeshData data = meshBuilder.build(chunk, world);
         ChunkRenderData rd = renderData.computeIfAbsent(key, k -> new ChunkRenderData(chunk.chunkX, chunk.chunkZ));
         rd.opaqueMesh.upload(data.opaque());
