@@ -17,57 +17,92 @@ import java.util.Random;
  * branch) - a real, verifiable vanilla special case, not an invented one.
  */
 public enum TreeSpecies {
-    /** Unchanged from before this round - the original shape, now one of several. */
-    OAK(BlockType.OAK_LOG, BlockType.OAK_LEAVES, 4, 6, 2, 5),
-    /** Taller and slimmer than oak - a narrower canopy, no wide base layer. */
-    BIRCH(BlockType.BIRCH_LOG, BlockType.BIRCH_LEAVES, 5, 8, 1, 4),
+    /** Unchanged from before this round - the original shape, now one of several.
+     *  maxBlockCount 80: measured max 59 across 200 seeded trials, padded for margin. */
+    OAK(BlockType.OAK_LOG, BlockType.OAK_LEAVES, 4, 6, 1, 2, 4, CanopyShape.ROUND_LAYERED, 5, 80),
+    /** Taller and slimmer than oak - a narrower canopy, no wide base layer.
+     *  maxBlockCount 35: measured max 24 across 200 seeded trials. */
+    BIRCH(BlockType.BIRCH_LOG, BlockType.BIRCH_LEAVES, 5, 8, 1, 1, 3, CanopyShape.ROUND_LAYERED, 4, 35),
     /** Conical: tapers from a wide base ring to a single point at the top - never a broad
-     *  oak-like canopy, matching the request's explicit "avoid broad canopies for spruce." */
-    SPRUCE(BlockType.SPRUCE_LOG, BlockType.SPRUCE_LEAVES, 6, 10, 2, 6),
-    /** Tall trunk, large canopy - needs the widest chunk-interior margin of any species. */
-    JUNGLE(BlockType.JUNGLE_LOG, BlockType.JUNGLE_LEAVES, 8, 13, 3, 10),
-    /** Short trunk, wide flat umbrella canopy sitting only at the very top. */
-    ACACIA(BlockType.ACACIA_LOG, BlockType.ACACIA_LEAVES, 3, 5, 3, 9),
+     *  oak-like canopy, matching the request's explicit "avoid broad canopies for spruce."
+     *  maxBlockCount 90: measured max 67 across 200 seeded trials. */
+    SPRUCE(BlockType.SPRUCE_LOG, BlockType.SPRUCE_LEAVES, 6, 10, 1, 2, 5, CanopyShape.CONICAL, 6, 90),
+    /** Tall trunk, large canopy - needs the widest chunk-interior margin of any species.
+     *  maxBlockCount 110: measured max 85 across 200 seeded trials. */
+    JUNGLE(BlockType.JUNGLE_LOG, BlockType.JUNGLE_LEAVES, 8, 13, 1, 3, 3, CanopyShape.BROAD_FLAT, 10, 110),
+    /** Short trunk, wide flat umbrella canopy sitting only at the very top.
+     *  maxBlockCount 60: measured max 42 across 200 seeded trials. */
+    ACACIA(BlockType.ACACIA_LOG, BlockType.ACACIA_LEAVES, 3, 5, 1, 3, 1, CanopyShape.UMBRELLA_TOP, 9, 60),
     /** Short and wide with an irregular, asymmetric canopy - a shape variant of oak, not a new
-     *  species/block pair (see class docs). */
-    SWAMP_OAK(BlockType.OAK_LOG, BlockType.OAK_LEAVES, 3, 5, 3, 7),
+     *  species/block pair (see class docs). maxBlockCount 130: measured max 101 across 200
+     *  seeded trials. */
+    SWAMP_OAK(BlockType.OAK_LOG, BlockType.OAK_LEAVES, 3, 5, 1, 3, 2, CanopyShape.IRREGULAR_LOW, 7, 130),
     /** Same low, wide, irregular canopy as SWAMP_OAK, with real mangrove blocks - now also grows
      *  a small root skirt toward any adjacent shoreline water (see {@link #placeMangrove}), this
      *  round's initial version of the request's "roots"/"water-adjacent placement" requirement.
      *  Full over-water placement (relaxing the shared height&lt;=SEA_LEVEL suitability gate every
-     *  species uses) is explicitly deferred - documented in the round's final report. */
-    MANGROVE(BlockType.MANGROVE_LOG, BlockType.MANGROVE_LEAVES, 3, 5, 3, 7),
+     *  species uses) is explicitly deferred - documented in the round's final report.
+     *  maxBlockCount 140 (canopy+roots): measured max 107 across 200 seeded trials with an
+     *  adjacent shoreline present on every side. */
+    MANGROVE(BlockType.MANGROVE_LOG, BlockType.MANGROVE_LEAVES, 3, 5, 1, 3, 2, CanopyShape.IRREGULAR_LOW, 7, 140),
     /** Real vanilla's one 2x2-trunk species - the actual structural differentiator that makes a
      *  "thick trunk, broad canopy" reading distinct from just a wider single-block oak. The 2x2
      *  footprint is safe within the shared TerrainGenerator suitability check unchanged: canopyRadius
-     *  4 already reserves far more chunk-interior margin than the 1-block trunk extension needs. */
-    DARK_OAK(BlockType.DARK_OAK_LOG, BlockType.DARK_OAK_LEAVES, 5, 7, 4, 9),
+     *  4 already reserves far more chunk-interior margin than the 1-block trunk extension needs.
+     *  maxBlockCount 190: measured max 153 across 200 seeded trials (the 2x2 trunk itself
+     *  accounts for roughly double a normal trunk's own block count). */
+    DARK_OAK(BlockType.DARK_OAK_LOG, BlockType.DARK_OAK_LEAVES, 5, 7, 2, 4, 3, CanopyShape.THICK_BROAD, 9, 190),
     /** Rounded (circular-distance, not square) canopy, real cherry blocks - foliage uses a fixed
      *  pink tint rather than the per-column biome blend (see ChunkMeshBuilder's isCherryLeaves
      *  branch), the same real vanilla special case Spruce already gets here, so cherry pink can
-     *  never be replaced by a generic biome green the way the request explicitly warns against. */
-    CHERRY(BlockType.CHERRY_LOG, BlockType.CHERRY_LEAVES, 4, 6, 3, 6);
+     *  never be replaced by a generic biome green the way the request explicitly warns against.
+     *  maxBlockCount 130: measured max 100 across 200 seeded trials. */
+    CHERRY(BlockType.CHERRY_LOG, BlockType.CHERRY_LEAVES, 4, 6, 1, 3, 3, CanopyShape.CIRCULAR, 6, 130);
 
     public final BlockType log;
     public final BlockType leaves;
     public final int minTrunkHeight;
     public final int maxTrunkHeight;
+    /** 1 for every species except DARK_OAK's real 2x2 footprint (see {@link #placeDarkOak}). */
+    public final int trunkFootprint;
     /** Horizontal reach of the widest canopy layer - used both for the shape itself and for the
      *  chunk-interior-margin / minimum-spacing checks in TerrainGenerator. */
     public final int canopyRadius;
+    /** Distinct vertical rows the canopy spans - read directly off each species' own shape
+     *  method (see each entry's javadoc derivation), not separately enforced at placement time. */
+    public final int canopyHeight;
+    public final CanopyShape canopyShape;
     /** Minimum distance (in blocks, trunk to trunk) required from any other already-placed tree
      *  in the same chunk. No "maximum spacing" constant - this architecture drives spacing from
      *  density + rejection sampling, not a grid, so an upper bound isn't a meaningful knob here
      *  (documented per the plan rather than added as an unused field). */
     public final int minSpacing;
+    /** Empirically-measured (200 seeded trials), margin-padded upper bound on how many log+leaf
+     *  (+root, for MANGROVE) blocks a single placement can ever produce - see {@link TreeProfile}
+     *  for why this is a validated invariant rather than a live-enforced cap. */
+    public final int maxBlockCount;
 
-    TreeSpecies(BlockType log, BlockType leaves, int minTrunkHeight, int maxTrunkHeight, int canopyRadius, int minSpacing) {
+    TreeSpecies(BlockType log, BlockType leaves, int minTrunkHeight, int maxTrunkHeight, int trunkFootprint,
+                int canopyRadius, int canopyHeight, CanopyShape canopyShape, int minSpacing, int maxBlockCount) {
         this.log = log;
         this.leaves = leaves;
         this.minTrunkHeight = minTrunkHeight;
         this.maxTrunkHeight = maxTrunkHeight;
+        this.trunkFootprint = trunkFootprint;
         this.canopyRadius = canopyRadius;
+        this.canopyHeight = canopyHeight;
+        this.canopyShape = canopyShape;
         this.minSpacing = minSpacing;
+        this.maxBlockCount = maxBlockCount;
+    }
+
+    /** Bundles this species' own dimensional/shape data into one queryable {@link TreeProfile} -
+     *  the reusable profile system future species (and tests/tooling) can operate on generically
+     *  instead of reading loose enum fields one at a time. See TreeProfile's class docs for why
+     *  the actual shape-generator methods below stay imperative rather than being folded into it. */
+    public TreeProfile profile() {
+        return new TreeProfile(log, leaves, minTrunkHeight, maxTrunkHeight, trunkFootprint,
+                canopyRadius, canopyHeight, canopyShape, minSpacing, maxBlockCount);
     }
 
     /** Tallest this species can ever grow - used for the headroom/world-height check before generation starts. */

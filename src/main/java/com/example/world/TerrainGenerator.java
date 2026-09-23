@@ -174,6 +174,14 @@ public class TerrainGenerator implements WorldGenerator {
                 // blended density bled in slightly from a neighboring forest biome near the
                 // border - "don't place trees merely because a neighbor is close" (request
                 // Phase 3) takes precedence over the density blend specifically for these two.
+
+                // A real, separately-configurable "small clearings" knob (Birch Forest's own
+                // request), distinct from spacing/density: an otherwise-fully-suitable candidate
+                // is still skipped with this probability, deliberately leaving open ground
+                // rather than just letting spacing/clustering incidentally produce gaps. Zero
+                // for every biome except Birch Forest this round - no behavior change elsewhere.
+                if (rnd.nextFloat() < clearingChanceFor(dominantBiome[x][z])) continue;
+
                 if (!fitsAndIsSuitable(chunk, x, z, heights, species, placed)) continue;
 
                 species.place(chunk, x, heights[x][z] + 1, z, rnd);
@@ -280,6 +288,15 @@ public class TerrainGenerator implements WorldGenerator {
             case PLAINS, SAVANNA -> 0.05f;
             case DESERT, BADLANDS, OCEAN, FROZEN_OCEAN -> 0f;
         };
+    }
+
+    /** Probability an otherwise fully-suitable candidate is skipped anyway, leaving it as open
+     *  ground - a real, separately-tunable "small clearings" knob (see placeTrees), distinct
+     *  from spacing/density. Zero for every biome except Birch Forest this round: hardening this
+     *  round is scoped to Birch Forest specifically, so every other biome's already-tuned/tested
+     *  density is left exactly as it was. */
+    static float clearingChanceFor(Biome dominant) {
+        return dominant == Biome.BIRCH_FOREST ? 0.15f : 0f;
     }
 
     @Override

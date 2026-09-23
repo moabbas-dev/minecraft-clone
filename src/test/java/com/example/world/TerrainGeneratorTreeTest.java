@@ -93,6 +93,62 @@ class TerrainGeneratorTreeTest {
     }
 
     @Test
+    void clearingChanceIsZeroForEveryBiomeExceptBirchForest() {
+        for (Biome b : Biome.values()) {
+            float c = TerrainGenerator.clearingChanceFor(b);
+            assertTrue(c >= 0f && c <= 1f, b + " clearing chance out of [0,1]: " + c);
+            if (b == Biome.BIRCH_FOREST) {
+                assertTrue(c > 0f, "Birch Forest must have a real, nonzero clearing chance");
+            } else {
+                assertEquals(0f, c, b + " must be unaffected by this round's clearing knob (scoped to Birch Forest only)");
+            }
+        }
+    }
+
+    @Test
+    void clearingChanceActuallySkipsAnOtherwiseSuitableBirchForestCandidate() {
+        // A controlled single-candidate chunk: exactly one column can ever grow a tree, so any
+        // difference in placement rate between FOREST (clearingChance=0) and BIRCH_FOREST is
+        // attributable only to the clearing knob, not density/spacing/clustering (identical for
+        // both here). This directly tests the mechanism, not an aggregate/emergent tree count -
+        // an earlier attempt at the latter found BIRCH_FOREST's aggregate count can go either way
+        // seed-to-seed, since skipping one candidate can free up minSpacing room for another one
+        // elsewhere - a real but confounding emergent effect, not what this knob itself does.
+        int surfaceY = 70;
+        int[][] heights = new int[Chunk.SIZE_X][Chunk.SIZE_Z];
+        for (int[] row : heights) java.util.Arrays.fill(row, surfaceY);
+        int trials = 300;
+
+        int forestPlaced = countPlacementsAtSoleCandidate(Biome.FOREST, heights, surfaceY, trials);
+        int birchForestPlaced = countPlacementsAtSoleCandidate(Biome.BIRCH_FOREST, heights, surfaceY, trials);
+
+        assertEquals(trials, forestPlaced, "FOREST (clearingChance=0) must place the sole candidate every time");
+        assertTrue(birchForestPlaced < trials,
+                "Birch Forest's nonzero clearing chance must skip the sole candidate at least sometimes");
+        // Expected ~85% (1 - 0.15) with sampling noise over 300 trials - a wide tolerance band,
+        // not the exact expected value, since this locks in "the knob has a real, roughly-right-
+        // sized effect," not an exact probability that would make this test brittle.
+        double fraction = birchForestPlaced / (double) trials;
+        assertTrue(fraction > 0.70 && fraction < 0.95,
+                "expected roughly 85% placement with a 0.15 clearing chance, got " + fraction);
+    }
+
+    private int countPlacementsAtSoleCandidate(Biome biome, int[][] heights, int surfaceY, int trials) {
+        Biome[][] dominant = new Biome[Chunk.SIZE_X][Chunk.SIZE_Z];
+        for (int x = 0; x < Chunk.SIZE_X; x++) for (int z = 0; z < Chunk.SIZE_Z; z++) dominant[x][z] = biome;
+        float[][] prob = new float[Chunk.SIZE_X][Chunk.SIZE_Z];
+        prob[8][8] = 1f;
+        int placed = 0;
+        for (int seed = 0; seed < trials; seed++) {
+            Chunk chunk = buildFlatGrassChunk(surfaceY);
+            TerrainGenerator.placeTrees(chunk, heights, dominant, prob, new Random(seed));
+            BlockType t = chunk.getLocal(8, surfaceY + 1, 8);
+            if (t == BlockType.OAK_LOG || t == BlockType.BIRCH_LOG) placed++;
+        }
+        return placed;
+    }
+
+    @Test
     void slopeCheckRejectsASteepCandidateButAllowsFlatTerrain() {
         int[][] flat = new int[Chunk.SIZE_X][Chunk.SIZE_Z];
         for (int[] row : flat) java.util.Arrays.fill(row, 70);
@@ -230,6 +286,43 @@ class TerrainGeneratorTreeTest {
                     BlockType t = chunk.getLocal(x, y, z);
                     assertNotEquals(BlockType.OAK_LOG, t);
                     assertNotEquals(BlockType.OAK_LEAVES, t);
+                }
+            }
+        }
+    }
+
+    @Test
+    void birchForestNeverGrowsATreeOnInvalidTerrainEvenAtFullBlendedDensity() {
+        // Same pattern as the Desert test above, named for Birch Forest specifically per the
+        // hardening round's checklist: its own dedicated species (BIRCH) must still respect
+        // suitableColumn's ground-type check, not just "some tree or other" respecting it generically.
+        int surfaceY = 70;
+        int[][] heights = new int[Chunk.SIZE_X][Chunk.SIZE_Z];
+        Biome[][] dominant = new Biome[Chunk.SIZE_X][Chunk.SIZE_Z];
+        float[][] prob = new float[Chunk.SIZE_X][Chunk.SIZE_Z];
+        for (int x = 0; x < Chunk.SIZE_X; x++) {
+            for (int z = 0; z < Chunk.SIZE_Z; z++) {
+                heights[x][z] = surfaceY;
+                dominant[x][z] = Biome.BIRCH_FOREST;
+                prob[x][z] = 1f;
+            }
+        }
+        Chunk chunk = new Chunk(0, 0);
+        // STONE surface everywhere - never a valid tree-planting surface for any species.
+        for (int x = 0; x < Chunk.SIZE_X; x++) {
+            for (int z = 0; z < Chunk.SIZE_Z; z++) {
+                for (int y = 0; y <= surfaceY; y++) {
+                    chunk.setLocal(x, y, z, y == surfaceY ? BlockType.STONE : BlockType.DIRT);
+                }
+            }
+        }
+        TerrainGenerator.placeTrees(chunk, heights, dominant, prob, new Random(2024));
+
+        for (int x = 0; x < Chunk.SIZE_X; x++) {
+            for (int y = surfaceY; y < Chunk.SIZE_Y; y++) {
+                for (int z = 0; z < Chunk.SIZE_Z; z++) {
+                    assertNotEquals(BlockType.BIRCH_LOG, chunk.getLocal(x, y, z),
+                            "no birch tree should ever grow on a stone surface");
                 }
             }
         }

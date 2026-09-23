@@ -194,6 +194,53 @@ class NewBiomesTest {
         assertTrue(countBlock(chunk, BlockType.BIRCH_LOG) > 0, "a full Birch Forest chunk should grow at least one birch tree");
     }
 
+    // --- Birch Forest hardening round: chunk-boundary consistency, reload/no-duplication, and
+    // invalid-terrain rejection, named specifically for this biome per the round's checklist -
+    // the underlying mechanisms are shared/generic (WorldGenerationTest already covers them for
+    // biomes in general), but this locks Birch Forest itself in explicitly. ---
+
+    @Test
+    void birchForestClimateIsIdenticalRegardlessOfWhichChunkGeneratesTheBoundaryColumn() {
+        long seed = 2024L;
+        TerrainGenerator gen = new TerrainGenerator(seed);
+        int[] column = findColumnWithMinWeight(gen, Biome.BIRCH_FOREST, 150, 0.35f);
+        assertNotNull(column);
+        // Re-request the exact same world column's climate from a fresh generator instance -
+        // climateAt takes only world (x,z), never chunk state, so it must agree with itself
+        // regardless of chunk load order/origin (the actual "chunk load order must not affect
+        // the result" requirement, expressed the same way WorldGenerationTest already does).
+        ClimateSample first = gen.climateAt(column[0], column[1]);
+        ClimateSample second = new TerrainGenerator(seed).climateAt(column[0], column[1]);
+        assertEquals(Biome.BIRCH_FOREST, first.dominant());
+        assertEquals(first.dominant(), second.dominant());
+        assertArrayEquals(first.grassColor(), second.grassColor());
+        assertArrayEquals(first.skyTint(), second.skyTint());
+    }
+
+    @Test
+    void reloadingABirchForestChunkNeverDuplicatesOrRemovesTrees() {
+        long seed = 2024L;
+        int[] column = findColumnWithMinWeight(new TerrainGenerator(seed), Biome.BIRCH_FOREST, 150, 0.35f);
+        assertNotNull(column);
+        int cx = World.worldToChunk(column[0]), cz = World.worldToChunk(column[1]);
+
+        World world = new World(seed, new TerrainGenerator(seed));
+        Chunk chunk = world.getOrCreateChunk(cx, cz);
+        world.generateChunk(chunk);
+        byte[] firstGeneration = chunk.exportBlocks();
+
+        // Simulates "chunk unload, then reload" without going through WorldIO's disk round-trip -
+        // regenerating the same coordinates from a fresh generator instance must be byte-identical,
+        // the actual guarantee that prevents duplicate/missing trees on a real reload.
+        World reloadedWorld = new World(seed, new TerrainGenerator(seed));
+        Chunk reloadedChunk = reloadedWorld.getOrCreateChunk(cx, cz);
+        reloadedWorld.generateChunk(reloadedChunk);
+        byte[] secondGeneration = reloadedChunk.exportBlocks();
+
+        assertArrayEquals(firstGeneration, secondGeneration,
+                "reloading the same Birch Forest chunk coordinates must reproduce identical blocks, not duplicate or drop trees");
+    }
+
     @Test
     void darkForestGrowsDarkOakTreesWithRealTwoByTwoTrunksOnRealGeneratedTerrain() {
         long seed = 2024L;
