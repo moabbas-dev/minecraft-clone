@@ -17,12 +17,23 @@ public class Weather {
     private static final float LIGHTNING_MIN_INTERVAL = 4f;
     private static final float LIGHTNING_MAX_INTERVAL = 18f;
     private static final float FLASH_DECAY_PER_SECOND = 2.5f;
+    /** How fast stormIntensity eases toward its target - same X += (target-X)*min(1,RATE*dt)
+     *  idiom used everywhere else in this codebase (Player's speed/eye-height/bob easing,
+     *  Game's FOV easing). Reaches ~86% of the way in about 5 seconds. */
+    private static final float STORM_INTENSITY_RATE = 0.4f;
 
     private final Random random;
     private State state = State.CLEAR;
     private float timeRemaining;
     private float lightningTimer;
     private float lightningFlash = 0f;
+    /**
+     * 0..1, eased toward 1 while raining/thundering and toward 0 otherwise - unlike
+     * {@link #isRaining()} (an instant flag flip the moment the state timer expires), this fades
+     * smoothly, so anything driven by it (sky/fog blending in Game.renderWorld) doesn't snap the
+     * instant a storm starts or ends.
+     */
+    private float stormIntensity = 0f;
 
     public Weather(long seed) {
         this.random = new Random(seed ^ 0x5DEECE66DL);
@@ -43,6 +54,9 @@ public class Weather {
             }
         }
         lightningFlash = Math.max(0f, lightningFlash - dt * FLASH_DECAY_PER_SECOND);
+
+        float targetIntensity = isRaining() ? 1f : 0f;
+        stormIntensity += (targetIntensity - stormIntensity) * Math.min(1f, STORM_INTENSITY_RATE * dt);
     }
 
     private void advanceState() {
@@ -74,5 +88,10 @@ public class Weather {
     /** 0..1, spikes to 1 on a lightning strike and decays back to 0 - drive a screen flash with it. */
     public float getLightningFlash() {
         return lightningFlash;
+    }
+
+    /** 0..1, eased - see the field javadoc. Use this instead of isRaining() for anything visual. */
+    public float getStormIntensity() {
+        return stormIntensity;
     }
 }

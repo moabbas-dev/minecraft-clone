@@ -44,9 +44,73 @@ public class BiomeColors {
     private static final float[] BADLANDS_GRASS = unpackHex(0x90814D);
     private static final float[] BADLANDS_FOLIAGE = unpackHex(0x9E814D);
 
+    // --- Water / fog / underwater-fog: fixed per-biome constants, not colormap-sampled (real
+    // vanilla water color isn't climate-noise-driven either - it's a flat per-biome value in the
+    // biome registry). Sourcing honesty, biome by biome:
+    //   - DEFAULT_WATER (0x3F76E4) and SWAMP's own water (0x617B64) are long-standing,
+    //     well-documented vanilla biome-registry constants, used directly - same confidence
+    //     tier as the Badlands/Swamp grass colors above. Most vanilla biomes (including every
+    //     other one in this project's roster) simply use the default water color, which is
+    //     exactly what's applied to them here too - not a gap, that IS the verified behavior.
+    //   - SNOWY_TUNDRA's cooler water tint is ADAPTED for this project (this roster has no
+    //     "frozen ocean" biome to draw a verified value from) - explicitly not a vanilla claim.
+    //   - Every fog and underwater-fog value below is ADAPTED/artistic, not extracted from any
+    //     verified source: vanilla's overworld surface fog is essentially just the sky color
+    //     with no real per-biome variation, so biome-tinted surface fog is this project's own
+    //     visual choice inspired by the request, not a reproduction of a vanilla mechanic. The
+    //     underwater fog values take the request's reference hexes only as a starting point
+    //     (as instructed) and are re-picked per this project's own 10-biome roster rather than
+    //     mapped from ocean/mangrove biomes this project doesn't have.
+    private static final int DEFAULT_WATER = 0x3F76E4;
+    private static final int DEFAULT_UNDERWATER_FOG = 0x051A33;
+
+    private static final int[] WATER_BY_ORDINAL = {
+            DEFAULT_WATER,   // PLAINS
+            DEFAULT_WATER,   // FOREST
+            DEFAULT_WATER,   // DESERT
+            DEFAULT_WATER,   // SAVANNA
+            DEFAULT_WATER,   // TAIGA
+            0x3D57D6,        // SNOWY_TUNDRA - adapted cooler tint, not a verified vanilla value
+            DEFAULT_WATER,   // JUNGLE
+            0x617B64,        // SWAMP - verified vanilla swamp water color
+            DEFAULT_WATER,   // MOUNTAINS
+            DEFAULT_WATER,   // BADLANDS
+    };
+
+    // Subtle - these lerp with the existing time-of-day sky color, so they're meant to nudge
+    // the mood, not repaint the sky. All adapted/artistic, see the note above.
+    private static final int[] FOG_BY_ORDINAL = {
+            0xC8E0F0,        // PLAINS
+            0xB8D0B0,        // FOREST
+            0xE8D9A8,        // DESERT
+            0xE0D6A0,        // SAVANNA
+            0xC0D4CC,        // TAIGA
+            0xE8F0F5,        // SNOWY_TUNDRA
+            0xA8CBA0,        // JUNGLE
+            0x8FA089,        // SWAMP
+            0xCCDCE8,        // MOUNTAINS
+            0xE0B888,        // BADLANDS
+    };
+
+    private static final int[] UNDERWATER_FOG_BY_ORDINAL = {
+            DEFAULT_UNDERWATER_FOG, // PLAINS
+            DEFAULT_UNDERWATER_FOG, // FOREST
+            DEFAULT_UNDERWATER_FOG, // DESERT
+            DEFAULT_UNDERWATER_FOG, // SAVANNA
+            DEFAULT_UNDERWATER_FOG, // TAIGA
+            0x0A1A40,               // SNOWY_TUNDRA - adapted, slightly lighter icy blue
+            DEFAULT_UNDERWATER_FOG, // JUNGLE
+            0x232317,               // SWAMP - adapted murky olive-brown
+            DEFAULT_UNDERWATER_FOG, // MOUNTAINS
+            DEFAULT_UNDERWATER_FOG, // BADLANDS
+    };
+
     private final SimplexNoise swampNoise;
     private final float[][] grassByBiome;
     private final float[][] foliageByBiome;
+    private final float[][] waterByBiome;
+    private final float[][] fogByBiome;
+    private final float[][] underwaterFogByBiome;
 
     public BiomeColors(long seed, File grassColormapFile, File foliageColormapFile) {
         this.swampNoise = new SimplexNoise(seed + 6000);
@@ -56,12 +120,18 @@ public class BiomeColors {
         Biome[] all = Biome.values();
         grassByBiome = new float[all.length][];
         foliageByBiome = new float[all.length][];
+        waterByBiome = new float[all.length][];
+        fogByBiome = new float[all.length][];
+        underwaterFogByBiome = new float[all.length][];
         for (int i = 0; i < all.length; i++) {
             Biome b = all[i];
             grassByBiome[i] = b == Biome.BADLANDS ? BADLANDS_GRASS
                     : grassColormap.sampleDefinition(b.defTemperature, b.defDownfall);
             foliageByBiome[i] = b == Biome.BADLANDS ? BADLANDS_FOLIAGE
                     : foliageColormap.sampleDefinition(b.defTemperature, b.defDownfall);
+            waterByBiome[i] = unpackHex(WATER_BY_ORDINAL[i]);
+            fogByBiome[i] = unpackHex(FOG_BY_ORDINAL[i]);
+            underwaterFogByBiome[i] = unpackHex(UNDERWATER_FOG_BY_ORDINAL[i]);
         }
     }
 
@@ -102,6 +172,34 @@ public class BiomeColors {
         float r = 0, g = 0, b = 0;
         for (int i = 0; i < all.length; i++) {
             float[] c = foliageColorFor(all[i]);
+            r += w[i] * c[0];
+            g += w[i] * c[1];
+            b += w[i] * c[2];
+        }
+        return new float[]{r, g, b};
+    }
+
+    /** Weighted blend of every biome's own water tint - a fixed per-biome constant (see the
+     *  table above), so unlike grass this needs no world position. */
+    public float[] blendWater(float[] weights) {
+        return blendConstantTable(waterByBiome, weights);
+    }
+
+    /** Weighted blend of every biome's own surface fog tint - see the table above. */
+    public float[] blendFog(float[] weights) {
+        return blendConstantTable(fogByBiome, weights);
+    }
+
+    /** Weighted blend of every biome's own underwater fog color - see the table above. */
+    public float[] blendUnderwaterFog(float[] weights) {
+        return blendConstantTable(underwaterFogByBiome, weights);
+    }
+
+    private static float[] blendConstantTable(float[][] table, float[] weights) {
+        float[] w = sharpen(weights);
+        float r = 0, g = 0, b = 0;
+        for (int i = 0; i < table.length; i++) {
+            float[] c = table[i];
             r += w[i] * c[0];
             g += w[i] * c[1];
             b += w[i] * c[2];

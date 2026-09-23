@@ -2,9 +2,13 @@ package com.example.world;
 
 /**
  * A snapshot of the climate-*selection* axes at one world column plus the resulting biome
- * blend, for the debug overlay. {@code grassColor}/{@code foliageColor} are the already-blended
- * sRGB tint (see {@link BiomeColors}) - not a per-biome value, since the whole point of the
- * overlay is to show what the player actually sees at this exact column.
+ * blend, for the debug overlay AND for the per-frame atmosphere colors in
+ * {@code Game.renderWorld} - one call to {@link TerrainGenerator#climateAt} at the player's
+ * position gives both, avoiding a second climate/weight computation for fog specifically.
+ * {@code grassColor}/{@code foliageColor}/{@code waterColor}/{@code fogColor}/
+ * {@code underwaterFogColor} are the already-blended sRGB tints (see {@link BiomeColors}) - not
+ * per-biome values, since the whole point of this sample is what the player actually sees at
+ * this exact column.
  *
  * There is no "depth" field: vanilla's depth climate parameter comes from a 3D density
  * function, and this engine generates surface heightmaps rather than a density field, so that
@@ -12,5 +16,6 @@ package com.example.world;
  */
 public record ClimateSample(double temperature, double humidity, double continentalness,
                              double erosion, double weirdness, Biome dominant, float[] weights,
-                             float[] grassColor, float[] foliageColor) {
+                             float[] grassColor, float[] foliageColor, float[] waterColor,
+                             float[] fogColor, float[] underwaterFogColor) {
 }

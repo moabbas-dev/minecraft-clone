@@ -40,6 +40,28 @@ class WorldGenerationTest {
             assertEquals(first.temperature(), second.temperature(), 0.0);
             assertEquals(first.dominant(), second.dominant());
             assertArrayEquals(first.grassColor(), second.grassColor());
+            assertArrayEquals(first.waterColor(), second.waterColor());
+            assertArrayEquals(first.fogColor(), second.fogColor());
+            assertArrayEquals(first.underwaterFogColor(), second.underwaterFogColor());
+        }
+    }
+
+    @Test
+    void bakedWaterTintMatchesTheLiveBlendedColorAtTheSameColumn() {
+        // Chunk.waterTint is baked once at generation time (TerrainGenerator.computeTint);
+        // TerrainGenerator.climateAt computes the same blend on demand for fog. They must never
+        // disagree, or a chunk's water mesh and the live fog color would visibly mismatch.
+        World world = new World(321L, new TerrainGenerator(321L));
+        Chunk chunk = world.getOrCreateChunk(2, -1);
+        world.generateChunk(chunk);
+        int originX = chunk.worldOriginX(), originZ = chunk.worldOriginZ();
+
+        for (int x = 0; x < Chunk.SIZE_X; x += 3) {
+            for (int z = 0; z < Chunk.SIZE_Z; z += 3) {
+                float[] baked = chunk.getWaterTint(x, z);
+                float[] live = world.climateAt(originX + x, originZ + z).waterColor();
+                assertArrayEquals(live, baked, "baked water tint must match the live blended color at (" + x + "," + z + ")");
+            }
         }
     }
 

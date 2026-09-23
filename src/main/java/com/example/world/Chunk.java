@@ -20,6 +20,8 @@ public class Chunk {
     // per-frame or per-vertex. ChunkMeshBuilder reads these when baking grass-top/leaf faces.
     private final float[] grassTint = new float[SIZE_X * SIZE_Z * 3];
     private final float[] foliageTint = new float[SIZE_X * SIZE_Z * 3];
+    /** Same idea as grassTint/foliageTint, but for water faces - see ChunkMeshBuilder. */
+    private final float[] waterTint = new float[SIZE_X * SIZE_Z * 3];
 
     private volatile boolean generated = false;
     private volatile boolean meshDirty = true;
@@ -74,6 +76,18 @@ public class Chunk {
     public float[] getFoliageTint(int x, int z) {
         int i = (z * SIZE_X + x) * 3;
         return new float[]{foliageTint[i], foliageTint[i + 1], foliageTint[i + 2]};
+    }
+
+    public void setWaterTint(int x, int z, float r, float g, float b) {
+        int i = (z * SIZE_X + x) * 3;
+        waterTint[i] = r;
+        waterTint[i + 1] = g;
+        waterTint[i + 2] = b;
+    }
+
+    public float[] getWaterTint(int x, int z) {
+        int i = (z * SIZE_X + x) * 3;
+        return new float[]{waterTint[i], waterTint[i + 1], waterTint[i + 2]};
     }
 
     public int getSkyLight(int x, int y, int z) {

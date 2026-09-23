@@ -47,6 +47,16 @@ public class Game {
     private static final float FOV_LERP_RATE = 9f;
     private static final float SWING_DURATION = 0.28f;
 
+    // Biome atmosphere: how strongly the biome's own fog tint nudges the time-of-day sky color
+    // (see BiomeColors - these are deliberately subtle mood tints, not a sky repaint), how far
+    // underwater fog reaches (vanilla's underwater visibility is short), and how fast the
+    // surface<->underwater fog blend eases when crossing the water plane (avoids a snap).
+    private static final float BIOME_FOG_BLEND_STRENGTH = 0.4f;
+    private static final float UNDERWATER_FOG_START = 0f;
+    private static final float UNDERWATER_FOG_END = 12f;
+    private static final float UNDERWATER_TRANSITION_RATE = 3f;
+    private static final Vector3f DEFAULT_UNDERWATER_FOG = new Vector3f(0.02f, 0.08f, 0.20f);
+
     private enum GameState {TITLE, SELECT_WORLD, WORLD_CREATE, IN_GAME, PAUSED}
 
     private Window window;
@@ -82,6 +92,8 @@ public class Game {
     private float currentFov = FOV_DEGREES;
     private float swingTimer = 0f;
     private boolean debugOverlay = false;
+    /** 0=surface fog, 1=fully underwater fog - eased, see renderWorld. */
+    private float underwaterBlend = 0f;
     private Mesh sunMoonMesh;
     private Mesh heldItemMesh;
 
@@ -347,7 +359,7 @@ public class Game {
 
             long frameStartNanos = System.nanoTime();
             update(dt, now);
-            render();
+            render(dt);
             window.update();
 
             // update(), render() and the buffer swap all run sequentially on this one thread -
@@ -579,6 +591,21 @@ public class Game {
         }
     }
 
+    /**
+     * Is the camera's logical eye position (not the view-bob-adjusted render position, so
+     * crossing the water surface doesn't flicker in and out with the bob) inside a water block.
+     * Reuses the same single-point World.getBlock pattern Player's own inWater check already
+     * uses, just at eye height instead of chest height.
+     */
+    private boolean isEyeSubmerged() {
+        return isSubmerged(world, player.eyePosition());
+    }
+
+    /** Pure, exercised directly by tests in this package - see the wrapper above for real use. */
+    static boolean isSubmerged(World world, Vector3f eyePos) {
+        return world.getBlock((int) Math.floor(eyePos.x), (int) Math.floor(eyePos.y), (int) Math.floor(eyePos.z)) == BlockType.WATER;
+    }
+
     private boolean blockIntersectsPlayer(int bx, int by, int bz) {
         float half = Player.WIDTH / 2f;
         float px0 = player.position.x - half, px1 = player.position.x + half;
@@ -587,11 +614,11 @@ public class Game {
         return bx + 1 > px0 && bx < px1 && by + 1 > py0 && by < py1 && bz + 1 > pz0 && bz < pz1;
     }
 
-    private void render() {
+    private void render(float dt) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         if (world != null && (state == GameState.IN_GAME || state == GameState.PAUSED)) {
-            renderWorld();
+            renderWorld(dt);
         }
 
         glDisable(GL_DEPTH_TEST);
@@ -610,23 +637,59 @@ public class Game {
         glEnable(GL_DEPTH_TEST);
     }
 
-    private void renderWorld() {
-        float fogEnd = RENDER_DISTANCE * Chunk.SIZE_X * 0.9f;
-        float fogStart = fogEnd * 0.6f;
+    private void renderWorld(float dt) {
+        float surfaceFogEnd = RENDER_DISTANCE * Chunk.SIZE_X * 0.9f;
+        float surfaceFogStart = surfaceFogEnd * 0.6f;
 
         Vector3f skyColor = computeSkyColor(dayTime);
         Vector3f sunDir = sunDirection(dayTime);
         float daylightFactor = computeDaylightFactor(sunDir);
-        if (weather.isRaining()) {
+
+        // One climate sample per frame at the player's column - the same call the F3 overlay
+        // already makes every frame with no observed cost, reused here instead of a second
+        // biome/weight computation just for fog. Null for generators with no climate model
+        // (flat worlds), in which case fog falls back to the plain time-of-day sky color.
+        ClimateSample climate = world.climateAt((int) Math.floor(player.position.x), (int) Math.floor(player.position.z));
+
+        // Surface fog: the existing time-of-day sky color, nudged toward the biome's own fog
+        // tint (subtle by design - these are meant to shift mood across biomes, not repaint the
+        // sky), then storms blend on top of that using the eased stormIntensity (0..1) instead
+        // of the old instant boolean snap - this is what actually fixes the abrupt-transition
+        // issue, since the storm now fades in/out over several seconds like everything else in
+        // this codebase that's eased (sprint speed, FOV, eye height).
+        Vector3f surfaceFogColor = climate != null
+                ? new Vector3f(skyColor).lerp(new Vector3f(climate.fogColor()), BIOME_FOG_BLEND_STRENGTH)
+                : new Vector3f(skyColor);
+        float stormFactor = weather.getStormIntensity();
+        if (stormFactor > 0f) {
             Vector3f stormColor = new Vector3f(0.35f, 0.37f, 0.40f);
-            skyColor = new Vector3f(skyColor).lerp(stormColor, weather.isThundering() ? 0.75f : 0.55f);
-            daylightFactor *= weather.isThundering() ? 0.6f : 0.8f;
+            float strength = stormFactor * (weather.isThundering() ? 0.75f : 0.55f);
+            surfaceFogColor = new Vector3f(surfaceFogColor).lerp(stormColor, strength);
+            daylightFactor *= 1f - stormFactor * (weather.isThundering() ? 0.4f : 0.2f);
         }
-        glClearColor(skyColor.x, skyColor.y, skyColor.z, 1f);
+
+        // Underwater fog: biome-blended, does not participate in the storm blend (a storm on
+        // the surface doesn't change how murky the water itself is) and uses much shorter fog
+        // distances, matching vanilla's short underwater visibility. Eased in/out via
+        // underwaterBlend rather than snapping the instant the camera crosses the water plane -
+        // "avoid abrupt transitions when entering or leaving water."
+        Vector3f underwaterFogColor = climate != null
+                ? new Vector3f(climate.underwaterFogColor()) : DEFAULT_UNDERWATER_FOG;
+        boolean submerged = isEyeSubmerged();
+        underwaterBlend += ((submerged ? 1f : 0f) - underwaterBlend) * Math.min(1f, UNDERWATER_TRANSITION_RATE * dt);
+
+        Vector3f fogColor = new Vector3f(surfaceFogColor).lerp(underwaterFogColor, underwaterBlend);
+        float fogStart = surfaceFogStart + (UNDERWATER_FOG_START - surfaceFogStart) * underwaterBlend;
+        float fogEnd = surfaceFogEnd + (UNDERWATER_FOG_END - surfaceFogEnd) * underwaterBlend;
+        // The background clear color matters wherever fog doesn't fully cover (e.g. above the
+        // world's height limit) - blend it the same way so it never mismatches the fog it's
+        // supposed to fade into.
+        Vector3f clearColor = new Vector3f(skyColor).lerp(underwaterFogColor, underwaterBlend);
+        glClearColor(clearColor.x, clearColor.y, clearColor.z, 1f);
 
         // The far plane must comfortably exceed CELESTIAL_DISTANCE or the sun/moon quads get
         // clipped and silently vanish (they were previously placed beyond a too-close far plane).
-        float farPlane = Math.max(fogEnd + 32f, CELESTIAL_DISTANCE + 50f);
+        float farPlane = Math.max(surfaceFogEnd + 32f, CELESTIAL_DISTANCE + 50f);
         Matrix4f projection = new Matrix4f().perspective(
                 (float) Math.toRadians(currentFov), window.aspectRatio(), 0.1f, farPlane);
         Matrix4f view = player.viewMatrix();
@@ -637,7 +700,7 @@ public class Game {
         chunkShader.setUniform("uView", view);
         chunkShader.setUniform("uCameraPos", eye.x, eye.y, eye.z);
         chunkShader.setUniform("uTexture", 0);
-        chunkShader.setUniform("uFogColor", skyColor.x, skyColor.y, skyColor.z);
+        chunkShader.setUniform("uFogColor", fogColor.x, fogColor.y, fogColor.z);
         chunkShader.setUniform("uFogStart", fogStart);
         chunkShader.setUniform("uFogEnd", fogEnd);
         chunkShader.setUniform("uDaylightFactor", daylightFactor);
@@ -656,7 +719,7 @@ public class Game {
             rd.transparentMesh.draw();
         }
 
-        renderSunAndMoon(eye, sunDir, weather.isRaining(), weather.isThundering());
+        renderSunAndMoon(eye, sunDir, stormFactor, weather.isThundering());
         renderRain();
         renderHeldItem();
 
@@ -808,17 +871,21 @@ public class Game {
      * for a storm (see renderWorld) but drew the sun/moon at a hardcoded full alpha regardless -
      * a bright, fully-lit disc sitting on top of a dark stormy sky, which is the actual bug: not
      * that the sun was "visible" (it should be), but that it wasn't dimmed with everything else.
+     *
+     * Uses the eased stormIntensity (not the instant isRaining/isThundering flags) for the same
+     * reason the surface fog blend does - so this fades in/out over several seconds along with
+     * everything else instead of snapping the instant a storm starts or ends.
      */
-    private static final float CELESTIAL_ALPHA_RAIN = 0.35f;
-    private static final float CELESTIAL_ALPHA_THUNDER = 0.12f;
+    private static final float CELESTIAL_ALPHA_RAIN_TARGET = 0.35f;
+    private static final float CELESTIAL_ALPHA_THUNDER_TARGET = 0.12f;
 
-    private void renderSunAndMoon(Vector3f eye, Vector3f sunDir, boolean raining, boolean thundering) {
+    private void renderSunAndMoon(Vector3f eye, Vector3f sunDir, float stormIntensity, boolean thundering) {
         Vector3f right = new Vector3f(-sunDir.z, 0, sunDir.x);
         if (right.lengthSquared() < 1e-6f) right.set(1, 0, 0);
         right.normalize();
         Vector3f up = new Vector3f(right).cross(sunDir).normalize();
 
-        float celestialAlpha = celestialAlpha(raining, thundering);
+        float celestialAlpha = celestialAlpha(stormIntensity, thundering);
 
         Matrix4f identity = new Matrix4f();
         chunkShader.setUniform("uModel", identity);
@@ -837,11 +904,17 @@ public class Game {
         renderCelestialBody(Tile.MOON, moonCenter, right, up);
     }
 
-    /** Pure formula, exercised directly by tests in this package - see com.example.game.unit. */
-    static float celestialAlpha(boolean raining, boolean thundering) {
-        if (thundering) return CELESTIAL_ALPHA_THUNDER;
-        if (raining) return CELESTIAL_ALPHA_RAIN;
-        return 1f;
+    /**
+     * Pure formula, exercised directly by tests in this package. stormIntensity is 0..1
+     * (Weather.getStormIntensity()); the target alpha at full intensity is the thunder or rain
+     * endpoint depending on which is currently happening, eased toward linearly by intensity
+     * rather than snapped - at intensity 0 this is always 1 (fully visible) regardless of which
+     * state is "current," since there's nothing to fade toward yet.
+     */
+    static float celestialAlpha(float stormIntensity, boolean thundering) {
+        float target = thundering ? CELESTIAL_ALPHA_THUNDER_TARGET : CELESTIAL_ALPHA_RAIN_TARGET;
+        float clamped = Math.max(0f, Math.min(1f, stormIntensity));
+        return 1f + (target - 1f) * clamped;
     }
 
     private void renderCelestialBody(Tile tile, Vector3f center, Vector3f right, Vector3f up) {

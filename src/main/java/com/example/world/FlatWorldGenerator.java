@@ -24,10 +24,15 @@ public class FlatWorldGenerator implements WorldGenerator {
         // here rather than plumbing climate noise into a generator that otherwise has none.
         float[] grass = {0.62f, 0.75f, 0.38f};
         float[] foliage = {0.42f, 0.68f, 0.20f};
+        // Default vanilla water color (0x3F76E4) - a flat world has no biome to blend from, so
+        // this matches what most real biomes already use anyway rather than inventing a
+        // flat-specific value.
+        float[] water = {0x3F / 255f, 0x76 / 255f, 0xE4 / 255f};
         for (int x = 0; x < Chunk.SIZE_X; x++) {
             for (int z = 0; z < Chunk.SIZE_Z; z++) {
                 chunk.setGrassTint(x, z, grass[0], grass[1], grass[2]);
                 chunk.setFoliageTint(x, z, foliage[0], foliage[1], foliage[2]);
+                chunk.setWaterTint(x, z, water[0], water[1], water[2]);
             }
         }
     }

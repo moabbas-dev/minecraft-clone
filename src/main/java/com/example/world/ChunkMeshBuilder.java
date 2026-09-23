@@ -64,13 +64,17 @@ public class ChunkMeshBuilder {
                     BlockType east = sampleBlock(chunk, world, lx + 1, ly, lz);
                     BlockType west = sampleBlock(chunk, world, lx - 1, ly, lz);
 
-                    float topY = type == BlockType.WATER ? WATER_TOP_HEIGHT : 1f;
+                    boolean isWater = type == BlockType.WATER;
+                    float topY = isWater ? WATER_TOP_HEIGHT : 1f;
                     // Leaves are tinted on every face; grass only on its top face (the side/bottom
-                    // textures are real, already-colored images - see TextureAtlas). Looked up
+                    // textures are real, already-colored images - see TextureAtlas); water is
+                    // tinted on every face, same as leaves, from the biome-blended color baked
+                    // per column in TerrainGenerator.computeTint (see Chunk.waterTint). Looked up
                     // once per block, not per face; everything else reuses NEUTRAL_TINT (no-op).
                     boolean isLeaves = type == BlockType.OAK_LEAVES;
-                    float[] sideTint = isLeaves ? chunk.getFoliageTint(lx, lz) : NEUTRAL_TINT;
-                    float[] topTint = isLeaves ? sideTint
+                    float[] sideTint = isLeaves ? chunk.getFoliageTint(lx, lz)
+                            : isWater ? chunk.getWaterTint(lx, lz) : NEUTRAL_TINT;
+                    float[] topTint = isLeaves || isWater ? sideTint
                             : type == BlockType.GRASS_BLOCK ? chunk.getGrassTint(lx, lz) : NEUTRAL_TINT;
 
                     if (shouldDrawFace(type, up))

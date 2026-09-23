@@ -172,8 +172,10 @@ public class TerrainGenerator implements WorldGenerator {
                 float[] weights = Biome.weights(c[0], c[1], c[2], c[3], c[4]);
                 float[] grass = biomeColors.blendGrass(worldX, worldZ, weights);
                 float[] foliage = biomeColors.blendFoliage(worldX, worldZ, weights);
+                float[] water = biomeColors.blendWater(weights);
                 chunk.setGrassTint(x, z, grass[0], grass[1], grass[2]);
                 chunk.setFoliageTint(x, z, foliage[0], foliage[1], foliage[2]);
+                chunk.setWaterTint(x, z, water[0], water[1], water[2]);
             }
         }
     }
@@ -185,7 +187,11 @@ public class TerrainGenerator implements WorldGenerator {
         float[] weights = Biome.weights(c[0], c[1], c[2], c[3], c[4]);
         float[] grass = biomeColors.blendGrass(worldX, worldZ, weights);
         float[] foliage = biomeColors.blendFoliage(worldX, worldZ, weights);
-        return new ClimateSample(c[0], c[1], c[2], c[3], c[4], dominant, weights, grass, foliage);
+        float[] water = biomeColors.blendWater(weights);
+        float[] fog = biomeColors.blendFog(weights);
+        float[] underwaterFog = biomeColors.blendUnderwaterFog(weights);
+        return new ClimateSample(c[0], c[1], c[2], c[3], c[4], dominant, weights,
+                grass, foliage, water, fog, underwaterFog);
     }
 
     private BlockType oreOrStone(Random rnd, int y) {
