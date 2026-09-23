@@ -96,6 +96,15 @@ public class TextureAtlas {
         REAL_TEXTURE_PATHS.put(Tile.MANGROVE_LOG_SIDE, "textures/block/mangrove_log.png");
         REAL_TEXTURE_PATHS.put(Tile.MANGROVE_LOG_TOP, "textures/block/mangrove_log_top.png");
         REAL_TEXTURE_PATHS.put(Tile.MANGROVE_LEAVES, "textures/block/mangrove_leaves.png");
+        REAL_TEXTURE_PATHS.put(Tile.DARK_OAK_LOG_SIDE, "textures/block/dark_oak_log.png");
+        REAL_TEXTURE_PATHS.put(Tile.DARK_OAK_LOG_TOP, "textures/block/dark_oak_log_top.png");
+        REAL_TEXTURE_PATHS.put(Tile.DARK_OAK_LEAVES, "textures/block/dark_oak_leaves.png");
+        REAL_TEXTURE_PATHS.put(Tile.CHERRY_LOG_SIDE, "textures/block/cherry_log.png");
+        REAL_TEXTURE_PATHS.put(Tile.CHERRY_LOG_TOP, "textures/block/cherry_log_top.png");
+        REAL_TEXTURE_PATHS.put(Tile.CHERRY_LEAVES, "textures/block/cherry_leaves.png");
+        REAL_TEXTURE_PATHS.put(Tile.MUD, "textures/block/mud.png");
+        REAL_TEXTURE_PATHS.put(Tile.MANGROVE_ROOTS_SIDE, "textures/block/mangrove_roots_side.png");
+        REAL_TEXTURE_PATHS.put(Tile.MANGROVE_ROOTS_TOP, "textures/block/mangrove_roots_top.png");
         // CHEST, SUN, MOON, RAIN: no real block-texture equivalent, always procedural.
     }
 
@@ -286,6 +295,12 @@ public class TextureAtlas {
             case ACACIA_LEAVES -> speckledNoise(img, rnd, new Color(150, 130, 60), new Color[]{new Color(130, 112, 48), new Color(170, 150, 75)}, 60);
             case MANGROVE_LOG_SIDE, MANGROVE_LOG_TOP -> noisyFill(img, rnd, new Color(100, 55, 45), 12);
             case MANGROVE_LEAVES -> speckledNoise(img, rnd, new Color(45, 110, 55), new Color[]{new Color(35, 92, 45), new Color(60, 130, 68)}, 60);
+            case DARK_OAK_LOG_SIDE, DARK_OAK_LOG_TOP -> noisyFill(img, rnd, new Color(50, 35, 22), 10);
+            case DARK_OAK_LEAVES -> speckledNoise(img, rnd, new Color(35, 60, 25), new Color[]{new Color(28, 50, 20), new Color(42, 70, 30)}, 55);
+            case CHERRY_LOG_SIDE, CHERRY_LOG_TOP -> noisyFill(img, rnd, new Color(92, 60, 60), 12);
+            case CHERRY_LEAVES -> speckledNoise(img, rnd, new Color(247, 190, 213), new Color[]{new Color(240, 160, 195), new Color(252, 210, 225)}, 50);
+            case MUD -> noisyFill(img, rnd, new Color(60, 48, 44), 10);
+            case MANGROVE_ROOTS_SIDE, MANGROVE_ROOTS_TOP -> noisyFill(img, rnd, new Color(78, 52, 40), 14);
         }
         g.dispose();
         return img;

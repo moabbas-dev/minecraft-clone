@@ -59,6 +59,12 @@ public class BlockTextureMap {
         uniform(BlockType.ACACIA_LEAVES, Tile.ACACIA_LEAVES);
         put(BlockType.MANGROVE_LOG, Tile.MANGROVE_LOG_TOP, Tile.MANGROVE_LOG_SIDE, Tile.MANGROVE_LOG_TOP);
         uniform(BlockType.MANGROVE_LEAVES, Tile.MANGROVE_LEAVES);
+        put(BlockType.DARK_OAK_LOG, Tile.DARK_OAK_LOG_TOP, Tile.DARK_OAK_LOG_SIDE, Tile.DARK_OAK_LOG_TOP);
+        uniform(BlockType.DARK_OAK_LEAVES, Tile.DARK_OAK_LEAVES);
+        put(BlockType.CHERRY_LOG, Tile.CHERRY_LOG_TOP, Tile.CHERRY_LOG_SIDE, Tile.CHERRY_LOG_TOP);
+        uniform(BlockType.CHERRY_LEAVES, Tile.CHERRY_LEAVES);
+        uniform(BlockType.MUD, Tile.MUD);
+        put(BlockType.MANGROVE_ROOTS, Tile.MANGROVE_ROOTS_TOP, Tile.MANGROVE_ROOTS_SIDE, Tile.MANGROVE_ROOTS_TOP);
     }
 
     private void uniform(BlockType type, Tile tile) {

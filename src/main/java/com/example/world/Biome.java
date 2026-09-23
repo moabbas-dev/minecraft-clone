@@ -38,7 +38,36 @@ public enum Biome {
     FROZEN_OCEAN(-0.8f, -0.1f, -0.85f, 0.0f, 0.0f, 40, 10, BlockType.SAND, BlockType.GRAVEL, 0, 0.0f, 0.5f),
     // Shallow/coastal (continentalness between Swamp's -0.4 and dry land), warm and humid like
     // Jungle/Swamp, baseHeight right at sea level - real mangrove's own shallow-water identity.
-    MANGROVE(0.75f, 0.75f, -0.3f, 0.5f, -0.3f, 63, 4, BlockType.GRASS_BLOCK, BlockType.DIRT, 60, 0.8f, 0.9f);
+    // Surface/subsurface are MUD (this round's addition) rather than grass/dirt - real vanilla
+    // Mangrove Swamp's actual ground block, and a prerequisite for the new root-placement rule
+    // in TreeSpecies.MANGROVE (see its docs).
+    MANGROVE(0.75f, 0.75f, -0.3f, 0.5f, -0.3f, 63, 4, BlockType.MUD, BlockType.MUD, 60, 0.8f, 0.9f),
+    // Carved out along weirdness/erosion, axes Forest itself barely uses, so these three new
+    // Forest-family biomes get their own reachable climate niches instead of just diluting
+    // Forest's - see BiomeAtmosphereTest/NewBiomesTest-style reachability tests.
+    //
+    // Birch Forest: warmer/less humid than Forest (real vanilla's own def temp/downfall are
+    // 0.6/0.6, cooler-toned than Forest's 0.7/0.8 - a paler colormap sample, matching "light or
+    // distinctive birch foliage"), gentler terrain, denser tree coverage via TerrainGenerator's
+    // per-biome treeChance/clusterChance (see speciesFor/clusterChanceFor) rather than a new
+    // species - it reuses the existing BIRCH species at a dedicated-biome density instead of
+    // Forest's ~10-40% probabilistic roll.
+    BIRCH_FOREST(0.5f, 0.15f, 0.15f, 0.35f, -0.3f, 69, 12, BlockType.GRASS_BLOCK, BlockType.DIRT, 22, 0.6f, 0.6f),
+    // Dark Forest: same climate family as Forest but pushed to weirdness's positive extreme (an
+    // axis Forest doesn't use at all) for a distinct, reachable niche. Very low treeChance (see
+    // TerrainGenerator) for the request's "45-75% coverage, dense vegetation, large canopies."
+    // defTemperature/defDownfall match Forest's own values (0.7/0.8) - already one of the
+    // darker-sampling corners of the real foliage colormap - rather than inventing a fixed tint
+    // the way Spruce/Cherry need to (see BiomeColors/ChunkMeshBuilder and TreeSpecies.DARK_OAK).
+    DARK_FOREST(0.15f, 0.5f, 0.15f, 0.15f, 0.5f, 69, 12, BlockType.GRASS_BLOCK, BlockType.DIRT, 10, 0.7f, 0.8f),
+    // Cherry Grove: drier and more elevated/hilly than Forest, its own weirdness pocket (+0.7,
+    // separated from Dark Forest's +0.5) so the two don't collide in climate space. Real vanilla
+    // Cherry Grove's colormap definition isn't as long-documented as Forest/Swamp's - defTemp/
+    // defDownfall below are a best-effort placement in the temperate/moderate-downfall region,
+    // not independently verified this session - moot in practice anyway, since Cherry leaves
+    // bypass the colormap blend entirely for a fixed pink tint (see ChunkMeshBuilder), the same
+    // real vanilla special case Spruce already uses here.
+    CHERRY_GROVE(0.35f, 0.1f, 0.3f, -0.2f, 0.7f, 76, 16, BlockType.GRASS_BLOCK, BlockType.DIRT, 45, 0.5f, 0.6f);
 
     // Temperature/humidity weighted more heavily than the other three axes in the distance
     // metric - they're the primary climate drivers, continentalness/erosion/weirdness are

@@ -172,4 +172,36 @@ class BiomeAtmosphereTest {
         weights[biome.ordinal()] = 1f;
         return blend.apply(weights);
     }
+
+    // --- Birch Forest / Dark Forest / Cherry Grove (this round's new Forest-family biomes) ---
+
+    @Test
+    void newForestFamilyBiomesHaveSkyTintsDistinctFromForestAndFromEachOther() {
+        float[] forest = pureBiomeColor(Biome.FOREST, colors::blendSkyTint);
+        float[] birch = pureBiomeColor(Biome.BIRCH_FOREST, colors::blendSkyTint);
+        float[] dark = pureBiomeColor(Biome.DARK_FOREST, colors::blendSkyTint);
+        float[] cherry = pureBiomeColor(Biome.CHERRY_GROVE, colors::blendSkyTint);
+
+        assertFalse(java.util.Arrays.equals(birch, forest), "Birch Forest sky tint must differ from Forest's");
+        assertFalse(java.util.Arrays.equals(dark, forest), "Dark Forest sky tint must differ from Forest's");
+        assertFalse(java.util.Arrays.equals(cherry, forest), "Cherry Grove sky tint must differ from Forest's");
+        assertFalse(java.util.Arrays.equals(birch, dark), "Birch Forest and Dark Forest sky tints must differ");
+        assertFalse(java.util.Arrays.equals(dark, cherry), "Dark Forest and Cherry Grove sky tints must differ");
+        assertFalse(java.util.Arrays.equals(birch, cherry), "Birch Forest and Cherry Grove sky tints must differ");
+    }
+
+    @Test
+    void newForestFamilyBiomesHaveFogColorsDistinctFromForestAndFromEachOther() {
+        float[] forest = pureBiomeColor(Biome.FOREST, colors::blendFog);
+        float[] birch = pureBiomeColor(Biome.BIRCH_FOREST, colors::blendFog);
+        float[] dark = pureBiomeColor(Biome.DARK_FOREST, colors::blendFog);
+        float[] cherry = pureBiomeColor(Biome.CHERRY_GROVE, colors::blendFog);
+
+        assertFalse(java.util.Arrays.equals(birch, forest), "Birch Forest fog must differ from Forest's");
+        assertFalse(java.util.Arrays.equals(dark, forest), "Dark Forest fog must differ from Forest's");
+        assertFalse(java.util.Arrays.equals(cherry, forest), "Cherry Grove fog must differ from Forest's");
+        assertFalse(java.util.Arrays.equals(birch, dark), "Birch Forest and Dark Forest fog must differ");
+        assertFalse(java.util.Arrays.equals(dark, cherry), "Dark Forest and Cherry Grove fog must differ");
+        assertFalse(java.util.Arrays.equals(birch, cherry), "Birch Forest and Cherry Grove fog must differ");
+    }
 }

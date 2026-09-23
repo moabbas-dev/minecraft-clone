@@ -211,7 +211,10 @@ public class TerrainGenerator implements WorldGenerator {
         if (treeProbability <= 0f) return false;
         if (height <= SEA_LEVEL) return false;
         BlockType top = chunk.getLocal(x, height, z);
-        return top == BlockType.GRASS_BLOCK || top == BlockType.SNOW_BLOCK;
+        // MUD: Mangrove Swamp's own surface block (this round's addition) - without this,
+        // switching MANGROVE's surface from grass to mud would have silently stopped every
+        // Mangrove tree from ever generating again.
+        return top == BlockType.GRASS_BLOCK || top == BlockType.SNOW_BLOCK || top == BlockType.MUD;
     }
 
     /** Canopy fits inside this chunk, doesn't exceed world height, terrain isn't too steep
@@ -254,6 +257,12 @@ public class TerrainGenerator implements WorldGenerator {
             case SAVANNA -> TreeSpecies.ACACIA;
             case SWAMP -> TreeSpecies.SWAMP_OAK;
             case MANGROVE -> TreeSpecies.MANGROVE;
+            // Birch Forest always resolves to Birch (unlike Forest/Plains' probabilistic roll) -
+            // it's the dedicated-biome identity the request asks for, not a denser version of
+            // the same mixed roll.
+            case BIRCH_FOREST -> TreeSpecies.BIRCH;
+            case DARK_FOREST -> TreeSpecies.DARK_OAK;
+            case CHERRY_GROVE -> TreeSpecies.CHERRY;
             case DESERT, BADLANDS, OCEAN, FROZEN_OCEAN -> null;
         };
     }
@@ -262,8 +271,12 @@ public class TerrainGenerator implements WorldGenerator {
      *  by biome, so Forest/Jungle/Swamp clump while Plains/Savanna stay mostly isolated trees. */
     static float clusterChanceFor(Biome dominant) {
         return switch (dominant) {
-            case FOREST, JUNGLE, SWAMP, MANGROVE -> 0.5f;
+            // Dark Forest clumps hardest of all - "45-75% coverage, dense vegetation."
+            case DARK_FOREST -> 0.65f;
+            case FOREST, JUNGLE, SWAMP, MANGROVE, BIRCH_FOREST -> 0.5f;
             case TAIGA, SNOWY_TUNDRA, MOUNTAINS -> 0.35f;
+            // Cherry Grove: "medium tree density," smaller/looser clusters than Forest.
+            case CHERRY_GROVE -> 0.3f;
             case PLAINS, SAVANNA -> 0.05f;
             case DESERT, BADLANDS, OCEAN, FROZEN_OCEAN -> 0f;
         };

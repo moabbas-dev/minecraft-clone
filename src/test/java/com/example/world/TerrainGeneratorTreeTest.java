@@ -71,6 +71,17 @@ class TerrainGeneratorTreeTest {
     }
 
     @Test
+    void birchForestDarkForestAndCherryGroveUseTheirOwnDedicatedSpecies() {
+        Random rnd = new Random(6);
+        for (int i = 0; i < 20; i++) {
+            assertEquals(TreeSpecies.BIRCH, TerrainGenerator.speciesFor(Biome.BIRCH_FOREST, rnd),
+                    "Birch Forest must always resolve to Birch, unlike Forest/Plains' probabilistic roll");
+            assertEquals(TreeSpecies.DARK_OAK, TerrainGenerator.speciesFor(Biome.DARK_FOREST, rnd));
+            assertEquals(TreeSpecies.CHERRY, TerrainGenerator.speciesFor(Biome.CHERRY_GROVE, rnd));
+        }
+    }
+
+    @Test
     void clusterChanceIsAValidProbabilityAndZeroForTreelessBiomes() {
         for (Biome b : Biome.values()) {
             float c = TerrainGenerator.clusterChanceFor(b);

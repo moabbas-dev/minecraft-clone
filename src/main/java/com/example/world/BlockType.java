@@ -54,7 +54,13 @@ public enum BlockType {
     ACACIA_LOG(98, "Acacia Wood", true, false, 2.0f, 0f),
     ACACIA_LEAVES(99, "Acacia Leaves", true, false, 0.2f, 0f),
     MANGROVE_LOG(100, "Mangrove Wood", true, false, 2.0f, 0f),
-    MANGROVE_LEAVES(101, "Mangrove Leaves", true, false, 0.2f, 0f);
+    MANGROVE_LEAVES(101, "Mangrove Leaves", true, false, 0.2f, 0f),
+    DARK_OAK_LOG(102, "Dark Oak Wood", true, false, 2.0f, 0f),
+    DARK_OAK_LEAVES(103, "Dark Oak Leaves", true, false, 0.2f, 0f),
+    CHERRY_LOG(104, "Cherry Wood", true, false, 2.0f, 0f),
+    CHERRY_LEAVES(105, "Cherry Leaves", true, false, 0.2f, 0f),
+    MUD(106, "Mud", true, false, 0.5f, 0f),
+    MANGROVE_ROOTS(107, "Mangrove Roots", true, false, 0.7f, 0f);
 
     public final int id;
     public final String displayName;
@@ -121,6 +127,7 @@ public enum BlockType {
             STONE, COBBLESTONE, DIRT, GRASS_BLOCK, OAK_PLANKS, OAK_LOG, OAK_LEAVES,
             BIRCH_LOG, BIRCH_LEAVES, SPRUCE_LOG, SPRUCE_LEAVES, JUNGLE_LOG, JUNGLE_LEAVES,
             ACACIA_LOG, ACACIA_LEAVES, MANGROVE_LOG, MANGROVE_LEAVES,
+            DARK_OAK_LOG, DARK_OAK_LEAVES, CHERRY_LOG, CHERRY_LEAVES, MUD, MANGROVE_ROOTS,
             SAND, GRAVEL, SANDSTONE, GLASS, BRICKS, MOSSY_COBBLESTONE, OBSIDIAN,
             COAL_ORE, IRON_ORE, GOLD_ORE, DIAMOND_ORE, IRON_BLOCK, GOLD_BLOCK, DIAMOND_BLOCK,
             BOOKSHELF, CRAFTING_TABLE, FURNACE, CHEST, TNT, ICE, SNOW_BLOCK, CLAY,

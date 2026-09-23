@@ -85,6 +85,9 @@ public class BiomeColors {
             DEFAULT_WATER,   // OCEAN - real vanilla ocean also uses the default water color
             COLD_WATER,      // FROZEN_OCEAN - reuses Snowy Tundra's cold water, see note above
             0x4E7A5A,        // MANGROVE - adapted, distinct from Swamp (0x617B64) and Ocean
+            DEFAULT_WATER,   // BIRCH_FOREST - ordinary temperate-forest water, no special body
+            DEFAULT_WATER,   // DARK_FOREST - same
+            DEFAULT_WATER,   // CHERRY_GROVE - same
     };
 
     // Subtle - these lerp with the existing time-of-day sky color, so they're meant to nudge
@@ -103,6 +106,9 @@ public class BiomeColors {
             0xC5E4EC,        // OCEAN - clear, cool, faintly cyan sea-mist tint
             0xE4F2F8,        // FROZEN_OCEAN - pale icy tint
             0xA8C2A0,        // MANGROVE - humid green haze, distinct from Jungle's/Swamp's
+            0xC8DCC0,        // BIRCH_FOREST - pale, brighter green than Forest's own fog
+            0x6E8064,        // DARK_FOREST - dim, muted green - the "reduced light" mood
+            0xE8C8D4,        // CHERRY_GROVE - soft pink-tinted haze
     };
 
     private static final int[] UNDERWATER_FOG_BY_ORDINAL = {
@@ -119,6 +125,9 @@ public class BiomeColors {
             DEFAULT_UNDERWATER_FOG, // OCEAN - same default deep-water murk as everywhere else
             COLD_UNDERWATER_FOG,    // FROZEN_OCEAN - reuses Snowy Tundra's cold underwater fog
             0x1E3B2A,               // MANGROVE - adapted dark murky green, distinct from Swamp's olive-brown
+            DEFAULT_UNDERWATER_FOG, // BIRCH_FOREST - ordinary water, no special underwater identity
+            DEFAULT_UNDERWATER_FOG, // DARK_FOREST - same
+            DEFAULT_UNDERWATER_FOG, // CHERRY_GROVE - same
     };
 
     // Overworld sky color is normally uniform in vanilla - there is no verified per-biome sky
@@ -139,6 +148,9 @@ public class BiomeColors {
             0x7FB8E0,        // OCEAN - clear, saturated sea blue
             0xC8E2EE,        // FROZEN_OCEAN - pale icy blue
             0x86B894,        // MANGROVE - humid green, distinct from Swamp/Jungle
+            0xB8D4D0,        // BIRCH_FOREST - pale, warm-toned blue-green
+            0x7A9078,        // DARK_FOREST - dim, muted green-gray - matches its darker fog
+            0xD8C4D8,        // CHERRY_GROVE - soft pink-blue pastel
     };
 
     private final SimplexNoise swampNoise;
