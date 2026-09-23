@@ -111,13 +111,21 @@ public class ChunkMeshBuilder {
         return world.getBlockLight(chunk.worldOriginX() + lx, ly, chunk.worldOriginZ() + lz);
     }
 
-    private boolean shouldDrawFace(BlockType current, BlockType neighbor) {
+    /**
+     * A face is worth drawing only where the neighbor doesn't fully occlude it - true whether
+     * "current" is opaque or transparent (water/glass/ice). Previously the transparent branch
+     * unconditionally returned true regardless of the neighbor, so e.g. a water face against an
+     * opaque stone neighbor was drawn even though stone already draws its own face at that exact
+     * same plane - two coincident, coplanar quads that z-fight (flicker between the two
+     * textures depending on floating-point depth rounding). Since every underwater block has
+     * water touching most of its faces, this was visible on essentially all submerged terrain,
+     * and on any opaque block (e.g. a placed light source) touching water.
+     */
+    // Package-private (not private) so ChunkMeshBuilderFaceCullingTest can exercise this pure
+    // logic directly - it has no atlas/texture dependency, unlike the rest of this class.
+    static boolean shouldDrawFace(BlockType current, BlockType neighbor) {
         if (neighbor == current) return false;
-        if (current.isOpaqueCube()) {
-            return !neighbor.isOpaqueCube();
-        }
-        // current is water, glass or ice: draw against air, and against the other transparent types
-        return true;
+        return !neighbor.isOpaqueCube();
     }
 
     private enum Face {TOP, BOTTOM, NORTH, SOUTH, EAST, WEST}
