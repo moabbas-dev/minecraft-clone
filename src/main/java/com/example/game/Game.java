@@ -2,6 +2,9 @@ package com.example.game;
 
 import com.example.engine.*;
 import com.example.physics.Player;
+import com.example.testctl.GameAccess;
+import com.example.testctl.GameCommandQueue;
+import com.example.testctl.TestController;
 import com.example.ui.PauseScreen;
 import com.example.ui.SelectWorldScreen;
 import com.example.ui.TitleScreen;
@@ -11,7 +14,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.io.File;
+import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -20,7 +27,7 @@ import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL33.*;
 
 @Slf4j
-public class Game {
+public class Game implements GameAccess {
     private static final int RENDER_DISTANCE = 6; // in chunks
     // Chunk streaming used to be budgeted by a fixed COUNT of chunks/meshes per frame. That
     // doesn't bound wall-clock time: per-chunk cost varies a lot (an exposed-sky column near
@@ -52,6 +59,10 @@ public class Game {
     // underwater fog reaches (vanilla's underwater visibility is short), and how fast the
     // surface<->underwater fog blend eases when crossing the water plane (avoids a snap).
     private static final float BIOME_FOG_BLEND_STRENGTH = 0.4f;
+    /** Same idea as BIOME_FOG_BLEND_STRENGTH but for the sky color itself - kept slightly
+     *  weaker than fog's nudge so the day/night gradient stays clearly the dominant driver of
+     *  sky color, with biome only ever shifting the mood, never overriding the time of day. */
+    private static final float SKY_TINT_BLEND_STRENGTH = 0.3f;
     private static final float UNDERWATER_FOG_START = 0f;
     private static final float UNDERWATER_FOG_END = 12f;
     private static final float UNDERWATER_TRANSITION_RATE = 3f;
@@ -98,6 +109,13 @@ public class Game {
     private Mesh heldItemMesh;
 
     private Weather weather;
+
+    // Opt-in live-controller test harness - see com.example.testctl. Off by default; only
+    // started (init()) when -Dtest.controller=true is passed, so normal play never creates a
+    // GameCommandQueue/TestController at all, let alone opens a socket.
+    private GameCommandQueue testCommandQueue;
+    private TestController testController;
+
     private Mesh rainMesh;
     private final java.util.Random rainRandom = new java.util.Random();
     private final float[] rainX = new float[RAIN_PARTICLE_COUNT];
@@ -211,13 +229,29 @@ public class Game {
         System.out.println("Controls: WASD move, mouse look, Space jump / swim up / double-tap fly, "
                 + "Shift sneak / swim down (fly), Ctrl sprint, Left click break, Right click place, "
                 + "1-9 or scroll to select block, Esc for menu.");
+
+        testCommandQueue = new GameCommandQueue();
+        if ("true".equals(System.getProperty("test.controller"))) {
+            testController = new TestController(this, testCommandQueue);
+            try {
+                testController.start();
+            } catch (IOException e) {
+                log.error("Failed to start test controller", e);
+                testController = null;
+            }
+        }
     }
 
     private void startNewWorld(WorldSettings settings) {
+        startNewWorld(settings, System.currentTimeMillis());
+    }
+
+    /** Seed-overridable variant used by the normal creation flow (random seed) and by the
+     *  test controller's newTestWorld command (fixed seed, for deterministic scenarios). */
+    private void startNewWorld(WorldSettings settings, long seed) {
         for (ChunkRenderData rd : renderData.values()) rd.destroy();
         renderData.clear();
 
-        long seed = System.currentTimeMillis();
         WorldGenerator generator = settings.type() == WorldSettings.WorldType.FLAT
                 ? new FlatWorldGenerator()
                 : new TerrainGenerator(seed);
@@ -359,6 +393,7 @@ public class Game {
 
             long frameStartNanos = System.nanoTime();
             update(dt, now);
+            testCommandQueue.drain(); // run any pending controller commands before this frame renders
             render(dt);
             window.update();
 
@@ -369,7 +404,7 @@ public class Game {
             // if one still fires, the timestamp pins exactly when it happened.
             long frameNanos = System.nanoTime() - frameStartNanos;
             if (frameNanos > FRAME_WARN_THRESHOLD_NANOS) {
-                log.warn("Frame took {} ms (update+render+swap combined) - target is under 16.7ms for 60fps",
+                log.info("Frame took {} ms (update+render+swap combined) - target is under 16.7ms for 60fps",
                         String.format("%.1f", frameNanos / 1_000_000.0));
             }
         }
@@ -648,18 +683,28 @@ public class Game {
         // One climate sample per frame at the player's column - the same call the F3 overlay
         // already makes every frame with no observed cost, reused here instead of a second
         // biome/weight computation just for fog. Null for generators with no climate model
-        // (flat worlds), in which case fog falls back to the plain time-of-day sky color.
+        // (flat worlds), in which case both sky and fog fall back to the plain time-of-day color.
         ClimateSample climate = world.climateAt((int) Math.floor(player.position.x), (int) Math.floor(player.position.z));
 
-        // Surface fog: the existing time-of-day sky color, nudged toward the biome's own fog
-        // tint (subtle by design - these are meant to shift mood across biomes, not repaint the
-        // sky), then storms blend on top of that using the eased stormIntensity (0..1) instead
-        // of the old instant boolean snap - this is what actually fixes the abrupt-transition
-        // issue, since the storm now fades in/out over several seconds like everything else in
-        // this codebase that's eased (sprint speed, FOV, eye height).
-        Vector3f surfaceFogColor = climate != null
-                ? new Vector3f(skyColor).lerp(new Vector3f(climate.fogColor()), BIOME_FOG_BLEND_STRENGTH)
+        // Sky: the time-of-day gradient, nudged toward the biome's own sky tint (subtle by
+        // design, same convention as the fog tint below - real vanilla overworld sky color is
+        // uniform, so this is this project's own adapted mood-shift, not a reproduction of a
+        // vanilla mechanic). Every downstream use of "the sky color" (fog's own base, the clear
+        // color) reads this already-biome-tinted value instead of the raw time-of-day one, so
+        // sky and fog read as one consistent atmosphere rather than two independently-tinted
+        // things.
+        Vector3f biomeSkyColor = climate != null
+                ? new Vector3f(skyColor).lerp(new Vector3f(climate.skyTint()), SKY_TINT_BLEND_STRENGTH)
                 : new Vector3f(skyColor);
+
+        // Surface fog: the (already biome-sky-tinted) base color, nudged further toward the
+        // biome's own fog tint, then storms blend on top using the eased stormIntensity (0..1)
+        // instead of the old instant boolean snap - this is what actually fixes the abrupt-
+        // transition issue, since the storm now fades in/out over several seconds like
+        // everything else in this codebase that's eased (sprint speed, FOV, eye height).
+        Vector3f surfaceFogColor = climate != null
+                ? new Vector3f(biomeSkyColor).lerp(new Vector3f(climate.fogColor()), BIOME_FOG_BLEND_STRENGTH)
+                : new Vector3f(biomeSkyColor);
         float stormFactor = weather.getStormIntensity();
         if (stormFactor > 0f) {
             Vector3f stormColor = new Vector3f(0.35f, 0.37f, 0.40f);
@@ -684,7 +729,7 @@ public class Game {
         // The background clear color matters wherever fog doesn't fully cover (e.g. above the
         // world's height limit) - blend it the same way so it never mismatches the fog it's
         // supposed to fade into.
-        Vector3f clearColor = new Vector3f(skyColor).lerp(underwaterFogColor, underwaterBlend);
+        Vector3f clearColor = new Vector3f(biomeSkyColor).lerp(underwaterFogColor, underwaterBlend);
         glClearColor(clearColor.x, clearColor.y, clearColor.z, 1f);
 
         // The far plane must comfortably exceed CELESTIAL_DISTANCE or the sun/moon quads get
@@ -1146,7 +1191,115 @@ public class Game {
                 uv, atlas.getTextureId(), shade, shade, shade, 1f);
     }
 
+    // ---- com.example.testctl.GameAccess - the live-controller's only way to touch this class ----
+
+    @Override
+    public void teleport(float x, float y, float z, Float yawDegrees, Float pitchDegrees) {
+        if (player == null) throw new IllegalStateException("no active world");
+        player.teleport(x, y, z);
+        if (yawDegrees != null) player.setYaw((float) Math.toRadians(yawDegrees));
+        if (pitchDegrees != null) player.setPitch((float) Math.toRadians(pitchDegrees));
+    }
+
+    @Override
+    public void setTime(float dayTimeFraction) {
+        dayTime = dayTimeFraction;
+    }
+
+    @Override
+    public void setWeather(String stateName) {
+        if (weather == null) throw new IllegalStateException("no active world");
+        weather.forceState(Weather.State.valueOf(stateName));
+    }
+
+    @Override
+    public void newTestWorld(long seed) {
+        startNewWorld(new WorldSettings("Test World", WorldSettings.WorldType.SURVIVAL), seed);
+    }
+
+    @Override
+    public String captureScreenshot(String name) throws IOException {
+        int width = window.getWidth();
+        int height = window.getHeight();
+        ByteBuffer buffer = org.lwjgl.BufferUtils.createByteBuffer(width * height * 4);
+        glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
+
+        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                int i = (x + (height - 1 - y) * width) * 4; // glReadPixels rows are bottom-up; BufferedImage is top-down
+                int r = buffer.get(i) & 0xFF;
+                int g = buffer.get(i + 1) & 0xFF;
+                int b = buffer.get(i + 2) & 0xFF;
+                image.setRGB(x, y, (0xFF << 24) | (r << 16) | (g << 8) | b);
+            }
+        }
+
+        File dir = new File("test-output/screenshots");
+        dir.mkdirs();
+        File out = new File(dir, name + ".png");
+        ImageIO.write(image, "png", out);
+        return out.getPath();
+    }
+
+    @Override
+    public String stateSnapshot() {
+        if (player == null || world == null || weather == null) {
+            return "state=no active world\n";
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.append("player.position=").append(String.format("%.2f,%.2f,%.2f",
+                player.position.x, player.position.y, player.position.z)).append('\n');
+        sb.append("player.yawDeg=").append(String.format("%.2f", Math.toDegrees(player.getYaw()))).append('\n');
+        sb.append("player.pitchDeg=").append(String.format("%.2f", Math.toDegrees(player.getPitch()))).append('\n');
+        sb.append("player.swimming=").append(player.isSwimming()).append('\n');
+        sb.append("player.headSubmerged=").append(player.isHeadSubmerged()).append('\n');
+        sb.append("player.flying=").append(player.isFlying()).append('\n');
+
+        // These are the biome-side tint values from ClimateSample, i.e. before the time-of-day/
+        // storm blending renderWorld applies - not the exact final on-screen pixel color.
+        ClimateSample climate = world.climateAt((int) Math.floor(player.position.x), (int) Math.floor(player.position.z));
+        sb.append("biome.dominant=").append(climate.dominant()).append('\n');
+        StringBuilder weights = new StringBuilder();
+        Biome[] biomes = Biome.values();
+        float[] w = climate.weights();
+        for (int i = 0; i < biomes.length; i++) {
+            if (w[i] < 0.01f) continue;
+            if (weights.length() > 0) weights.append(',');
+            weights.append(biomes[i].name()).append(':').append(String.format("%.2f", w[i]));
+        }
+        sb.append("biome.weights=").append(weights).append('\n');
+        sb.append("biome.grassColor=").append(toHex(climate.grassColor())).append('\n');
+        sb.append("biome.foliageColor=").append(toHex(climate.foliageColor())).append('\n');
+        sb.append("biome.waterColor=").append(toHex(climate.waterColor())).append('\n');
+        sb.append("biome.fogColor=").append(toHex(climate.fogColor())).append('\n');
+        sb.append("biome.underwaterFogColor=").append(toHex(climate.underwaterFogColor())).append('\n');
+        sb.append("biome.skyTint=").append(toHex(climate.skyTint())).append('\n');
+
+        sb.append("weather.state=").append(weather.getState()).append('\n');
+        sb.append("weather.stormIntensity=").append(String.format("%.2f", weather.getStormIntensity())).append('\n');
+        sb.append("time.dayTime=").append(String.format("%.4f", dayTime)).append('\n');
+
+        long dirtyChunks = world.chunkMap().values().stream().filter(Chunk::isMeshDirty).count();
+        sb.append("chunks.loaded=").append(world.chunkMap().size()).append('\n');
+        sb.append("chunks.meshDirty=").append(dirtyChunks).append('\n');
+        return sb.toString();
+    }
+
+    private static String toHex(float[] rgb) {
+        int r = Math.round(Math.max(0f, Math.min(1f, rgb[0])) * 255f);
+        int g = Math.round(Math.max(0f, Math.min(1f, rgb[1])) * 255f);
+        int b = Math.round(Math.max(0f, Math.min(1f, rgb[2])) * 255f);
+        return String.format("#%02X%02X%02X", r, g, b);
+    }
+
+    @Override
+    public void shutdown() {
+        window.close();
+    }
+
     private void cleanup() {
+        if (testController != null) testController.stop();
         saveWorld(); // safety net for any exit path that isn't "Save & Quit to Title" (e.g. the OS close button)
         for (ChunkRenderData rd : renderData.values()) rd.destroy();
         uiRenderer.destroy();

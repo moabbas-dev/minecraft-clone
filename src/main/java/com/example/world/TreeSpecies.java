@@ -30,7 +30,11 @@ public enum TreeSpecies {
     ACACIA(BlockType.ACACIA_LOG, BlockType.ACACIA_LEAVES, 3, 5, 3, 9),
     /** Short and wide with an irregular, asymmetric canopy - a shape variant of oak, not a new
      *  species/block pair (see class docs). */
-    SWAMP_OAK(BlockType.OAK_LOG, BlockType.OAK_LEAVES, 3, 5, 3, 7);
+    SWAMP_OAK(BlockType.OAK_LOG, BlockType.OAK_LEAVES, 3, 5, 3, 7),
+    /** Same low, wide, irregular shape as SWAMP_OAK (real mangrove roots/multi-trunk geometry
+     *  is out of scope this round - see the plan's explicit deferral) but with real mangrove
+     *  blocks, not oak - this project's asset dump has real mangrove_log/mangrove_leaves. */
+    MANGROVE(BlockType.MANGROVE_LOG, BlockType.MANGROVE_LEAVES, 3, 5, 3, 7);
 
     public final BlockType log;
     public final BlockType leaves;
@@ -72,7 +76,7 @@ public enum TreeSpecies {
             case BIRCH -> placeBirch(chunk, x, baseY, z, trunkHeight);
             case JUNGLE -> placeJungle(chunk, x, baseY, z, trunkHeight);
             case ACACIA -> placeAcacia(chunk, x, baseY, z, trunkHeight);
-            case SWAMP_OAK -> placeSwampOak(chunk, x, baseY, z, trunkHeight, rnd);
+            case SWAMP_OAK, MANGROVE -> placeSwampOak(chunk, x, baseY, z, trunkHeight, rnd);
             default -> placeOak(chunk, x, baseY, z, trunkHeight);
         }
     }

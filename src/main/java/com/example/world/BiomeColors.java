@@ -59,10 +59,17 @@ public class BiomeColors {
     //     with no real per-biome variation, so biome-tinted surface fog is this project's own
     //     visual choice inspired by the request, not a reproduction of a vanilla mechanic. The
     //     underwater fog values take the request's reference hexes only as a starting point
-    //     (as instructed) and are re-picked per this project's own 10-biome roster rather than
-    //     mapped from ocean/mangrove biomes this project doesn't have.
+    //     (as instructed) and are re-picked per this project's own biome roster.
+    //   - Ocean/Frozen Ocean/Mangrove (added alongside sky tint in this round): Ocean reuses the
+    //     verified default water color (real vanilla ocean is *not* a special color, it's the
+    //     default - not a gap). Frozen Ocean reuses Snowy Tundra's already-adapted cold water/
+    //     underwater-fog values directly (one consistent "cold water" identity, not a second
+    //     invented number). Mangrove gets its own distinct adapted values - explicitly not
+    //     identical to Swamp's or Ocean's, per the request's own color-consistency requirement.
     private static final int DEFAULT_WATER = 0x3F76E4;
     private static final int DEFAULT_UNDERWATER_FOG = 0x051A33;
+    private static final int COLD_WATER = 0x3D57D6; // Snowy Tundra's adapted cold water, reused by Frozen Ocean
+    private static final int COLD_UNDERWATER_FOG = 0x0A1A40; // same reuse, see above
 
     private static final int[] WATER_BY_ORDINAL = {
             DEFAULT_WATER,   // PLAINS
@@ -70,11 +77,14 @@ public class BiomeColors {
             DEFAULT_WATER,   // DESERT
             DEFAULT_WATER,   // SAVANNA
             DEFAULT_WATER,   // TAIGA
-            0x3D57D6,        // SNOWY_TUNDRA - adapted cooler tint, not a verified vanilla value
+            COLD_WATER,      // SNOWY_TUNDRA - adapted cooler tint, not a verified vanilla value
             DEFAULT_WATER,   // JUNGLE
             0x617B64,        // SWAMP - verified vanilla swamp water color
             DEFAULT_WATER,   // MOUNTAINS
             DEFAULT_WATER,   // BADLANDS
+            DEFAULT_WATER,   // OCEAN - real vanilla ocean also uses the default water color
+            COLD_WATER,      // FROZEN_OCEAN - reuses Snowy Tundra's cold water, see note above
+            0x4E7A5A,        // MANGROVE - adapted, distinct from Swamp (0x617B64) and Ocean
     };
 
     // Subtle - these lerp with the existing time-of-day sky color, so they're meant to nudge
@@ -90,6 +100,9 @@ public class BiomeColors {
             0x8FA089,        // SWAMP
             0xCCDCE8,        // MOUNTAINS
             0xE0B888,        // BADLANDS
+            0xC5E4EC,        // OCEAN - clear, cool, faintly cyan sea-mist tint
+            0xE4F2F8,        // FROZEN_OCEAN - pale icy tint
+            0xA8C2A0,        // MANGROVE - humid green haze, distinct from Jungle's/Swamp's
     };
 
     private static final int[] UNDERWATER_FOG_BY_ORDINAL = {
@@ -98,11 +111,34 @@ public class BiomeColors {
             DEFAULT_UNDERWATER_FOG, // DESERT
             DEFAULT_UNDERWATER_FOG, // SAVANNA
             DEFAULT_UNDERWATER_FOG, // TAIGA
-            0x0A1A40,               // SNOWY_TUNDRA - adapted, slightly lighter icy blue
+            COLD_UNDERWATER_FOG,    // SNOWY_TUNDRA - adapted, slightly lighter icy blue
             DEFAULT_UNDERWATER_FOG, // JUNGLE
             0x232317,               // SWAMP - adapted murky olive-brown
             DEFAULT_UNDERWATER_FOG, // MOUNTAINS
             DEFAULT_UNDERWATER_FOG, // BADLANDS
+            DEFAULT_UNDERWATER_FOG, // OCEAN - same default deep-water murk as everywhere else
+            COLD_UNDERWATER_FOG,    // FROZEN_OCEAN - reuses Snowy Tundra's cold underwater fog
+            0x1E3B2A,               // MANGROVE - adapted dark murky green, distinct from Swamp's olive-brown
+    };
+
+    // Overworld sky color is normally uniform in vanilla - there is no verified per-biome sky
+    // color to draw from, so every value here is explicitly adapted/artistic (same honesty
+    // convention as the fog table above), meant to nudge mood rather than repaint the sky (see
+    // SKY_TINT_BLEND_STRENGTH in Game.renderWorld).
+    private static final int[] SKY_TINT_BY_ORDINAL = {
+            0xA9CDEA,        // PLAINS
+            0x9CC2D8,        // FOREST
+            0xCBD9A0,        // DESERT - faint dusty-warm sky
+            0xC7D6A0,        // SAVANNA
+            0x9AC0C4,        // TAIGA
+            0xD8E8F2,        // SNOWY_TUNDRA
+            0x7FC0C8,        // JUNGLE - humid, slightly teal
+            0x8CAE96,        // SWAMP - muted green-gray
+            0xB8D2E8,        // MOUNTAINS - thin, pale blue
+            0xD8C79A,        // BADLANDS - dusty orange-tan
+            0x7FB8E0,        // OCEAN - clear, saturated sea blue
+            0xC8E2EE,        // FROZEN_OCEAN - pale icy blue
+            0x86B894,        // MANGROVE - humid green, distinct from Swamp/Jungle
     };
 
     private final SimplexNoise swampNoise;
@@ -111,6 +147,7 @@ public class BiomeColors {
     private final float[][] waterByBiome;
     private final float[][] fogByBiome;
     private final float[][] underwaterFogByBiome;
+    private final float[][] skyTintByBiome;
 
     public BiomeColors(long seed, File grassColormapFile, File foliageColormapFile) {
         this.swampNoise = new SimplexNoise(seed + 6000);
@@ -123,6 +160,7 @@ public class BiomeColors {
         waterByBiome = new float[all.length][];
         fogByBiome = new float[all.length][];
         underwaterFogByBiome = new float[all.length][];
+        skyTintByBiome = new float[all.length][];
         for (int i = 0; i < all.length; i++) {
             Biome b = all[i];
             grassByBiome[i] = b == Biome.BADLANDS ? BADLANDS_GRASS
@@ -132,6 +170,7 @@ public class BiomeColors {
             waterByBiome[i] = unpackHex(WATER_BY_ORDINAL[i]);
             fogByBiome[i] = unpackHex(FOG_BY_ORDINAL[i]);
             underwaterFogByBiome[i] = unpackHex(UNDERWATER_FOG_BY_ORDINAL[i]);
+            skyTintByBiome[i] = unpackHex(SKY_TINT_BY_ORDINAL[i]);
         }
     }
 
@@ -193,6 +232,13 @@ public class BiomeColors {
     /** Weighted blend of every biome's own underwater fog color - see the table above. */
     public float[] blendUnderwaterFog(float[] weights) {
         return blendConstantTable(underwaterFogByBiome, weights);
+    }
+
+    /** Weighted blend of every biome's own sky tint - see the table above. Same blend mechanism
+     *  as fog/water (IDW weights already normalized, zero-distance-safe via Biome.weights'
+     *  own EPSILON) - deliberately not a different formula for a different color property. */
+    public float[] blendSkyTint(float[] weights) {
+        return blendConstantTable(skyTintByBiome, weights);
     }
 
     private static float[] blendConstantTable(float[][] table, float[] weights) {

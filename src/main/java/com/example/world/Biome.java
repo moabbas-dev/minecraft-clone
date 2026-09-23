@@ -29,7 +29,16 @@ public enum Biome {
     JUNGLE(0.8f, 0.8f, 0.0f, 0.2f, 0.2f, 72, 16, BlockType.GRASS_BLOCK, BlockType.DIRT, 15, 0.95f, 0.9f),
     SWAMP(0.3f, 0.7f, -0.4f, 0.7f, -0.5f, 64, 5, BlockType.GRASS_BLOCK, BlockType.DIRT, 130, 0.8f, 0.9f),
     MOUNTAINS(-0.6f, 0.0f, 0.7f, -0.8f, 0.9f, 95, 46, BlockType.STONE, BlockType.STONE, 260, 0.2f, 0.3f),
-    BADLANDS(0.95f, -0.9f, 0.3f, 0.0f, 0.1f, 68, 18, BlockType.TERRACOTTA, BlockType.RED_SAND, 0, 2.0f, 0.0f);
+    BADLANDS(0.95f, -0.9f, 0.3f, 0.0f, 0.1f, 68, 18, BlockType.TERRACOTTA, BlockType.RED_SAND, 0, 2.0f, 0.0f),
+    // continentalness is real vanilla's actual mechanism for ocean-vs-land placement - these 3
+    // are simply the first entries in this roster to use its negative extreme, not a new axis
+    // or a new selection mechanism. baseHeight below SEA_LEVEL (63) is what actually makes these
+    // "ocean": no other biome here has ever had one, so nothing generated below sea level before.
+    OCEAN(0.2f, 0.0f, -0.85f, 0.0f, 0.0f, 40, 12, BlockType.SAND, BlockType.GRAVEL, 0, 0.5f, 0.5f),
+    FROZEN_OCEAN(-0.8f, -0.1f, -0.85f, 0.0f, 0.0f, 40, 10, BlockType.SAND, BlockType.GRAVEL, 0, 0.0f, 0.5f),
+    // Shallow/coastal (continentalness between Swamp's -0.4 and dry land), warm and humid like
+    // Jungle/Swamp, baseHeight right at sea level - real mangrove's own shallow-water identity.
+    MANGROVE(0.75f, 0.75f, -0.3f, 0.5f, -0.3f, 63, 4, BlockType.GRASS_BLOCK, BlockType.DIRT, 60, 0.8f, 0.9f);
 
     // Temperature/humidity weighted more heavily than the other three axes in the distance
     // metric - they're the primary climate drivers, continentalness/erosion/weirdness are

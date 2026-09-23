@@ -52,7 +52,9 @@ public enum BlockType {
     JUNGLE_LOG(96, "Jungle Wood", true, false, 2.0f, 0f),
     JUNGLE_LEAVES(97, "Jungle Leaves", true, false, 0.2f, 0f),
     ACACIA_LOG(98, "Acacia Wood", true, false, 2.0f, 0f),
-    ACACIA_LEAVES(99, "Acacia Leaves", true, false, 0.2f, 0f);
+    ACACIA_LEAVES(99, "Acacia Leaves", true, false, 0.2f, 0f),
+    MANGROVE_LOG(100, "Mangrove Wood", true, false, 2.0f, 0f),
+    MANGROVE_LEAVES(101, "Mangrove Leaves", true, false, 0.2f, 0f);
 
     public final int id;
     public final String displayName;
@@ -118,7 +120,7 @@ public enum BlockType {
     public static final BlockType[] PLACEABLE = {
             STONE, COBBLESTONE, DIRT, GRASS_BLOCK, OAK_PLANKS, OAK_LOG, OAK_LEAVES,
             BIRCH_LOG, BIRCH_LEAVES, SPRUCE_LOG, SPRUCE_LEAVES, JUNGLE_LOG, JUNGLE_LEAVES,
-            ACACIA_LOG, ACACIA_LEAVES,
+            ACACIA_LOG, ACACIA_LEAVES, MANGROVE_LOG, MANGROVE_LEAVES,
             SAND, GRAVEL, SANDSTONE, GLASS, BRICKS, MOSSY_COBBLESTONE, OBSIDIAN,
             COAL_ORE, IRON_ORE, GOLD_ORE, DIAMOND_ORE, IRON_BLOCK, GOLD_BLOCK, DIAMOND_BLOCK,
             BOOKSHELF, CRAFTING_TABLE, FURNACE, CHEST, TNT, ICE, SNOW_BLOCK, CLAY,

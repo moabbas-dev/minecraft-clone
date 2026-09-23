@@ -116,6 +116,34 @@ public class Player {
         return headSubmerged;
     }
 
+    public float getYaw() {
+        return yaw;
+    }
+
+    public float getPitch() {
+        return pitch;
+    }
+
+    /** Test/controller-only: instantly relocates the player, clearing residual fall/swim
+     *  velocity so the teleport doesn't inherit momentum from wherever it was before. */
+    public void teleport(float x, float y, float z) {
+        position.set(x, y, z);
+        verticalVelocity = 0f;
+        horizontalVelX = 0f;
+        horizontalVelZ = 0f;
+    }
+
+    /** Test/controller-only: same clamp {@link #look} applies, but settable directly rather
+     *  than as a mouse-delta nudge. */
+    public void setYaw(float radians) {
+        this.yaw = radians;
+    }
+
+    public void setPitch(float radians) {
+        float limit = (float) Math.toRadians(89);
+        this.pitch = Math.max(-limit, Math.min(limit, radians));
+    }
+
     /** Current eased collision height - standing, swimming, or somewhere in between mid-transition. */
     public float currentHitboxHeight() {
         return currentHitboxHeight;

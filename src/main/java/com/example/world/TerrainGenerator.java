@@ -135,11 +135,11 @@ public class TerrainGenerator implements WorldGenerator {
                     chunk.setLocal(x, y, z, type);
                 }
 
-                // Fill water up to sea level where terrain is below it; snowy biomes get a
-                // frozen surface layer instead of open water.
+                // Fill water up to sea level where terrain is below it; snowy/frozen biomes get
+                // a frozen surface layer instead of open water - same rule, now covering both.
+                boolean frozenSurface = biome == Biome.SNOWY_TUNDRA || biome == Biome.FROZEN_OCEAN;
                 for (int y = height + 1; y <= SEA_LEVEL; y++) {
-                    BlockType liquid = (biome == Biome.SNOWY_TUNDRA && y == SEA_LEVEL)
-                            ? BlockType.ICE : BlockType.WATER;
+                    BlockType liquid = (frozenSurface && y == SEA_LEVEL) ? BlockType.ICE : BlockType.WATER;
                     chunk.setLocal(x, y, z, liquid);
                 }
             }
@@ -253,7 +253,8 @@ public class TerrainGenerator implements WorldGenerator {
             case JUNGLE -> TreeSpecies.JUNGLE;
             case SAVANNA -> TreeSpecies.ACACIA;
             case SWAMP -> TreeSpecies.SWAMP_OAK;
-            case DESERT, BADLANDS -> null;
+            case MANGROVE -> TreeSpecies.MANGROVE;
+            case DESERT, BADLANDS, OCEAN, FROZEN_OCEAN -> null;
         };
     }
 
@@ -261,10 +262,10 @@ public class TerrainGenerator implements WorldGenerator {
      *  by biome, so Forest/Jungle/Swamp clump while Plains/Savanna stay mostly isolated trees. */
     static float clusterChanceFor(Biome dominant) {
         return switch (dominant) {
-            case FOREST, JUNGLE, SWAMP -> 0.5f;
+            case FOREST, JUNGLE, SWAMP, MANGROVE -> 0.5f;
             case TAIGA, SNOWY_TUNDRA, MOUNTAINS -> 0.35f;
             case PLAINS, SAVANNA -> 0.05f;
-            case DESERT, BADLANDS -> 0f;
+            case DESERT, BADLANDS, OCEAN, FROZEN_OCEAN -> 0f;
         };
     }
 
@@ -297,8 +298,9 @@ public class TerrainGenerator implements WorldGenerator {
         float[] water = biomeColors.blendWater(weights);
         float[] fog = biomeColors.blendFog(weights);
         float[] underwaterFog = biomeColors.blendUnderwaterFog(weights);
+        float[] skyTint = biomeColors.blendSkyTint(weights);
         return new ClimateSample(c[0], c[1], c[2], c[3], c[4], dominant, weights,
-                grass, foliage, water, fog, underwaterFog);
+                grass, foliage, water, fog, underwaterFog, skyTint);
     }
 
     private BlockType oreOrStone(Random rnd, int y) {

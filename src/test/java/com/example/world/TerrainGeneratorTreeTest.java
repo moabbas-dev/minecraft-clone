@@ -15,12 +15,17 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class TerrainGeneratorTreeTest {
 
+    /** Biomes with treeChance=0 in Biome.java - none of these should ever grow a tree. */
+    private static final java.util.Set<Biome> TREELESS_BIOMES = java.util.Set.of(
+            Biome.DESERT, Biome.BADLANDS, Biome.OCEAN, Biome.FROZEN_OCEAN);
+
     @Test
-    void desertAndBadlandsNeverGrowTrees() {
+    void treelessBiomesNeverGrowTrees() {
         Random rnd = new Random(1);
         for (int i = 0; i < 200; i++) {
-            assertNull(TerrainGenerator.speciesFor(Biome.DESERT, rnd));
-            assertNull(TerrainGenerator.speciesFor(Biome.BADLANDS, rnd));
+            for (Biome b : TREELESS_BIOMES) {
+                assertNull(TerrainGenerator.speciesFor(b, rnd), b + " must never resolve to a species");
+            }
         }
     }
 
@@ -28,7 +33,7 @@ class TerrainGeneratorTreeTest {
     void everyOtherBiomeAlwaysProducesASpecies() {
         Random rnd = new Random(2);
         for (Biome b : Biome.values()) {
-            if (b == Biome.DESERT || b == Biome.BADLANDS) continue;
+            if (TREELESS_BIOMES.contains(b)) continue;
             for (int i = 0; i < 100; i++) {
                 assertNotNull(TerrainGenerator.speciesFor(b, rnd), b + " should always resolve to a species");
             }
@@ -57,11 +62,12 @@ class TerrainGeneratorTreeTest {
     }
 
     @Test
-    void jungleSavannaAndSwampUseTheirOwnDedicatedSpecies() {
+    void jungleSavannaSwampAndMangroveUseTheirOwnDedicatedSpecies() {
         Random rnd = new Random(5);
         assertEquals(TreeSpecies.JUNGLE, TerrainGenerator.speciesFor(Biome.JUNGLE, rnd));
         assertEquals(TreeSpecies.ACACIA, TerrainGenerator.speciesFor(Biome.SAVANNA, rnd));
         assertEquals(TreeSpecies.SWAMP_OAK, TerrainGenerator.speciesFor(Biome.SWAMP, rnd));
+        assertEquals(TreeSpecies.MANGROVE, TerrainGenerator.speciesFor(Biome.MANGROVE, rnd));
     }
 
     @Test
@@ -70,8 +76,9 @@ class TerrainGeneratorTreeTest {
             float c = TerrainGenerator.clusterChanceFor(b);
             assertTrue(c >= 0f && c <= 1f, b + " cluster chance out of [0,1]: " + c);
         }
-        assertEquals(0f, TerrainGenerator.clusterChanceFor(Biome.DESERT));
-        assertEquals(0f, TerrainGenerator.clusterChanceFor(Biome.BADLANDS));
+        for (Biome b : TREELESS_BIOMES) {
+            assertEquals(0f, TerrainGenerator.clusterChanceFor(b), b + " treeless biome must have zero cluster chance");
+        }
     }
 
     @Test

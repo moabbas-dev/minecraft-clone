@@ -93,6 +93,9 @@ public class TextureAtlas {
         REAL_TEXTURE_PATHS.put(Tile.ACACIA_LOG_SIDE, "textures/block/acacia_log.png");
         REAL_TEXTURE_PATHS.put(Tile.ACACIA_LOG_TOP, "textures/block/acacia_log_top.png");
         REAL_TEXTURE_PATHS.put(Tile.ACACIA_LEAVES, "textures/block/acacia_leaves.png");
+        REAL_TEXTURE_PATHS.put(Tile.MANGROVE_LOG_SIDE, "textures/block/mangrove_log.png");
+        REAL_TEXTURE_PATHS.put(Tile.MANGROVE_LOG_TOP, "textures/block/mangrove_log_top.png");
+        REAL_TEXTURE_PATHS.put(Tile.MANGROVE_LEAVES, "textures/block/mangrove_leaves.png");
         // CHEST, SUN, MOON, RAIN: no real block-texture equivalent, always procedural.
     }
 
@@ -281,6 +284,8 @@ public class TextureAtlas {
             case JUNGLE_LEAVES -> speckledNoise(img, rnd, new Color(40, 120, 30), new Color[]{new Color(30, 100, 22), new Color(60, 145, 45)}, 60);
             case ACACIA_LOG_SIDE, ACACIA_LOG_TOP -> noisyFill(img, rnd, new Color(120, 105, 95), 12);
             case ACACIA_LEAVES -> speckledNoise(img, rnd, new Color(150, 130, 60), new Color[]{new Color(130, 112, 48), new Color(170, 150, 75)}, 60);
+            case MANGROVE_LOG_SIDE, MANGROVE_LOG_TOP -> noisyFill(img, rnd, new Color(100, 55, 45), 12);
+            case MANGROVE_LEAVES -> speckledNoise(img, rnd, new Color(45, 110, 55), new Color[]{new Color(35, 92, 45), new Color(60, 130, 68)}, 60);
         }
         g.dispose();
         return img;

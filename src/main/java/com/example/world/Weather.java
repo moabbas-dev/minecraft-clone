@@ -94,4 +94,15 @@ public class Weather {
     public float getStormIntensity() {
         return stormIntensity;
     }
+
+    /** Test/controller-only: immediately forces the weather state, bypassing the normal
+     *  timer-driven cycle. Deliberately does NOT snap stormIntensity - it still eases toward
+     *  the new state's target on the next update() the same as an organic transition, so this
+     *  can't be used to fake an instant fog/sky change either. */
+    public void forceState(State newState) {
+        this.state = newState;
+        this.timeRemaining = newState == State.CLEAR
+                ? randomBetween(MIN_CLEAR_SECONDS, MAX_CLEAR_SECONDS)
+                : randomBetween(MIN_RAIN_SECONDS, MAX_RAIN_SECONDS);
+    }
 }

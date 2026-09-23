@@ -17,5 +17,5 @@ package com.example.world;
 public record ClimateSample(double temperature, double humidity, double continentalness,
                              double erosion, double weirdness, Biome dominant, float[] weights,
                              float[] grassColor, float[] foliageColor, float[] waterColor,
-                             float[] fogColor, float[] underwaterFogColor) {
+                             float[] fogColor, float[] underwaterFogColor, float[] skyTint) {
 }
