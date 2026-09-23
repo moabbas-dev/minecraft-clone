@@ -1,6 +1,5 @@
 package com.example.physics.gameplay;
 
-import com.example.engine.InputState;
 import com.example.physics.Player;
 import com.example.world.BlockType;
 import com.example.world.FlatWorldGenerator;
@@ -33,29 +32,6 @@ class PlayerMovementGameplayTest {
             for (int cz = -1; cz <= 1; cz++) {
                 world.generateChunk(world.getOrCreateChunk(cx, cz));
             }
-        }
-    }
-
-    /** Edge-triggered like the real Input class: consumeKeyPressed fires once per press, not once per tick held. */
-    private static final class FakeInputState implements InputState {
-        private final boolean[] down = new boolean[GLFW_KEY_LAST + 1];
-        private final boolean[] pressedEdge = new boolean[GLFW_KEY_LAST + 1];
-
-        void setKeyDown(int key, boolean isDown) {
-            if (isDown && !down[key]) pressedEdge[key] = true;
-            down[key] = isDown;
-        }
-
-        @Override
-        public boolean isKeyDown(int key) {
-            return down[key];
-        }
-
-        @Override
-        public boolean consumeKeyPressed(int key) {
-            boolean v = pressedEdge[key];
-            pressedEdge[key] = false;
-            return v;
         }
     }
 

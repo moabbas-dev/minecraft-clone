@@ -609,7 +609,7 @@ public class Game {
     private boolean blockIntersectsPlayer(int bx, int by, int bz) {
         float half = Player.WIDTH / 2f;
         float px0 = player.position.x - half, px1 = player.position.x + half;
-        float py0 = player.position.y, py1 = player.position.y + Player.HEIGHT;
+        float py0 = player.position.y, py1 = player.position.y + player.currentHitboxHeight();
         float pz0 = player.position.z - half, pz1 = player.position.z + half;
         return bx + 1 > px0 && bx < px1 && by + 1 > py0 && by < py1 && bz + 1 > pz0 && bz < pz1;
     }
