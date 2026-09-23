@@ -81,6 +81,18 @@ public class TextureAtlas {
         REAL_TEXTURE_PATHS.put(Tile.GLOWSTONE, "textures/block/glowstone.png");
         REAL_TEXTURE_PATHS.put(Tile.TERRACOTTA, "textures/block/terracotta.png");
         REAL_TEXTURE_PATHS.put(Tile.RED_SAND, "textures/block/red_sand.png");
+        REAL_TEXTURE_PATHS.put(Tile.BIRCH_LOG_SIDE, "textures/block/birch_log.png");
+        REAL_TEXTURE_PATHS.put(Tile.BIRCH_LOG_TOP, "textures/block/birch_log_top.png");
+        REAL_TEXTURE_PATHS.put(Tile.BIRCH_LEAVES, "textures/block/birch_leaves.png");
+        REAL_TEXTURE_PATHS.put(Tile.SPRUCE_LOG_SIDE, "textures/block/spruce_log.png");
+        REAL_TEXTURE_PATHS.put(Tile.SPRUCE_LOG_TOP, "textures/block/spruce_log_top.png");
+        REAL_TEXTURE_PATHS.put(Tile.SPRUCE_LEAVES, "textures/block/spruce_leaves.png");
+        REAL_TEXTURE_PATHS.put(Tile.JUNGLE_LOG_SIDE, "textures/block/jungle_log.png");
+        REAL_TEXTURE_PATHS.put(Tile.JUNGLE_LOG_TOP, "textures/block/jungle_log_top.png");
+        REAL_TEXTURE_PATHS.put(Tile.JUNGLE_LEAVES, "textures/block/jungle_leaves.png");
+        REAL_TEXTURE_PATHS.put(Tile.ACACIA_LOG_SIDE, "textures/block/acacia_log.png");
+        REAL_TEXTURE_PATHS.put(Tile.ACACIA_LOG_TOP, "textures/block/acacia_log_top.png");
+        REAL_TEXTURE_PATHS.put(Tile.ACACIA_LEAVES, "textures/block/acacia_leaves.png");
         // CHEST, SUN, MOON, RAIN: no real block-texture equivalent, always procedural.
     }
 
@@ -258,6 +270,17 @@ public class TextureAtlas {
             case TERRACOTTA -> bandedHorizontal(img, rnd, new Color(180, 95, 65), new Color(160, 80, 55));
             case RED_SAND -> noisyFill(img, rnd, new Color(191, 108, 57), 14);
             case RAIN -> rainStreak(img, rnd);
+            // New species fallbacks (only reached if the copied PNG is missing/unreadable -
+            // verified present, see REAL_TEXTURE_PATHS): simple tinted variants of the existing
+            // oak log/leaf procedural style rather than dedicated bark patterns per species.
+            case BIRCH_LOG_SIDE, BIRCH_LOG_TOP -> noisyFill(img, rnd, new Color(224, 216, 195), 14);
+            case BIRCH_LEAVES -> speckledNoise(img, rnd, new Color(128, 167, 85), new Color[]{new Color(110, 150, 70), new Color(150, 185, 105)}, 60);
+            case SPRUCE_LOG_SIDE, SPRUCE_LOG_TOP -> noisyFill(img, rnd, new Color(84, 60, 40), 10);
+            case SPRUCE_LEAVES -> speckledNoise(img, rnd, new Color(56, 84, 56), new Color[]{new Color(42, 68, 42), new Color(70, 100, 68)}, 60);
+            case JUNGLE_LOG_SIDE, JUNGLE_LOG_TOP -> noisyFill(img, rnd, new Color(90, 60, 40), 12);
+            case JUNGLE_LEAVES -> speckledNoise(img, rnd, new Color(40, 120, 30), new Color[]{new Color(30, 100, 22), new Color(60, 145, 45)}, 60);
+            case ACACIA_LOG_SIDE, ACACIA_LOG_TOP -> noisyFill(img, rnd, new Color(120, 105, 95), 12);
+            case ACACIA_LEAVES -> speckledNoise(img, rnd, new Color(150, 130, 60), new Color[]{new Color(130, 112, 48), new Color(170, 150, 75)}, 60);
         }
         g.dispose();
         return img;

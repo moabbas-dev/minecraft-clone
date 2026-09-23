@@ -44,7 +44,15 @@ public enum BlockType {
     NETHERRACK(87, "Netherrack", true, false, 0.4f, 0f),
     GLOWSTONE(89, "Glowstone", true, false, 0.3f, 15f),
     TERRACOTTA(90, "Terracotta", true, false, 1.25f, 0f),
-    RED_SAND(91, "Red Sand", true, false, 0.5f, 0f);
+    RED_SAND(91, "Red Sand", true, false, 0.5f, 0f),
+    BIRCH_LOG(92, "Birch Wood", true, false, 2.0f, 0f),
+    BIRCH_LEAVES(93, "Birch Leaves", true, false, 0.2f, 0f),
+    SPRUCE_LOG(94, "Spruce Wood", true, false, 2.0f, 0f),
+    SPRUCE_LEAVES(95, "Spruce Leaves", true, false, 0.2f, 0f),
+    JUNGLE_LOG(96, "Jungle Wood", true, false, 2.0f, 0f),
+    JUNGLE_LEAVES(97, "Jungle Leaves", true, false, 0.2f, 0f),
+    ACACIA_LOG(98, "Acacia Wood", true, false, 2.0f, 0f),
+    ACACIA_LEAVES(99, "Acacia Leaves", true, false, 0.2f, 0f);
 
     public final int id;
     public final String displayName;
@@ -109,6 +117,8 @@ public enum BlockType {
     /** Block types the player can place, in a sensible hotbar order. */
     public static final BlockType[] PLACEABLE = {
             STONE, COBBLESTONE, DIRT, GRASS_BLOCK, OAK_PLANKS, OAK_LOG, OAK_LEAVES,
+            BIRCH_LOG, BIRCH_LEAVES, SPRUCE_LOG, SPRUCE_LEAVES, JUNGLE_LOG, JUNGLE_LEAVES,
+            ACACIA_LOG, ACACIA_LEAVES,
             SAND, GRAVEL, SANDSTONE, GLASS, BRICKS, MOSSY_COBBLESTONE, OBSIDIAN,
             COAL_ORE, IRON_ORE, GOLD_ORE, DIAMOND_ORE, IRON_BLOCK, GOLD_BLOCK, DIAMOND_BLOCK,
             BOOKSHELF, CRAFTING_TABLE, FURNACE, CHEST, TNT, ICE, SNOW_BLOCK, CLAY,

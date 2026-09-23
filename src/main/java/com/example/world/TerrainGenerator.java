@@ -145,20 +145,127 @@ public class TerrainGenerator implements WorldGenerator {
             }
         }
 
-        // Trees: only on interior columns so the whole canopy fits inside this chunk. Density
-        // is the continuously-blended probability computed above, not the dominant biome's
-        // raw treeChance, so tree density itself ramps smoothly across a biome border too.
-        for (int x = 2; x < Chunk.SIZE_X - 2; x++) {
-            for (int z = 2; z < Chunk.SIZE_Z - 2; z++) {
-                if (treeProbability[x][z] <= 0f) continue;
-                int height = heights[x][z];
-                if (height <= SEA_LEVEL) continue;
-                BlockType top = chunk.getLocal(x, height, z);
-                if (top != BlockType.GRASS_BLOCK && top != BlockType.SNOW_BLOCK) continue;
+        placeTrees(chunk, heights, dominantBiome, treeProbability, rnd);
+    }
+
+    /**
+     * Deterministic minimum-distance rejection with probabilistic satellite clustering - not a
+     * fixed grid (would look unnatural) and not independent per-column checks (the old
+     * behavior; nothing stopped two trees from landing on adjacent columns with overlapping
+     * canopies). A chunk holds at most a few dozen trees, so an O(n) "far enough from every
+     * already-placed tree" check against a plain list is cheap and needs no spatial hash -
+     * avoids scanning anything world-sized. Deterministic because both the candidate order
+     * (raster column order) and the Random source (the existing per-chunk seed) already are.
+     *
+     * Density stays the continuously-blended probability computed above (ramps smoothly across
+     * a biome border); species selection uses the *dominant* biome at each column - a discrete
+     * choice, matching how the dominant biome already decides the surface block, so species
+     * doesn't flicker into an unnatural mixture near a border the way blending it would.
+     */
+    static void placeTrees(Chunk chunk, int[][] heights, Biome[][] dominantBiome, float[][] treeProbability, Random rnd) {
+        java.util.List<int[]> placed = new java.util.ArrayList<>(); // {x, z, canopyRadius}
+        for (int x = 1; x < Chunk.SIZE_X - 1; x++) {
+            for (int z = 1; z < Chunk.SIZE_Z - 1; z++) {
+                if (!suitableColumn(chunk, x, z, heights[x][z], treeProbability[x][z])) continue;
                 if (rnd.nextFloat() >= treeProbability[x][z]) continue;
-                placeTree(chunk, x, height + 1, z, rnd);
+
+                TreeSpecies species = speciesFor(dominantBiome[x][z], rnd);
+                if (species == null) continue; // Desert/Badlands: never place trees, even if
+                // blended density bled in slightly from a neighboring forest biome near the
+                // border - "don't place trees merely because a neighbor is close" (request
+                // Phase 3) takes precedence over the density blend specifically for these two.
+                if (!fitsAndIsSuitable(chunk, x, z, heights, species, placed)) continue;
+
+                species.place(chunk, x, heights[x][z] + 1, z, rnd);
+                placed.add(new int[]{x, z, species.canopyRadius});
+
+                float clusterChance = clusterChanceFor(dominantBiome[x][z]);
+                if (rnd.nextFloat() < clusterChance) {
+                    placeClusterSatellites(chunk, x, z, species, heights, dominantBiome, treeProbability, placed, rnd);
+                }
             }
         }
+    }
+
+    private static void placeClusterSatellites(Chunk chunk, int centerX, int centerZ, TreeSpecies species,
+                                         int[][] heights, Biome[][] dominantBiome, float[][] treeProbability,
+                                         java.util.List<int[]> placed, Random rnd) {
+        int satellites = 1 + rnd.nextInt(3);
+        int reach = species.minSpacing * 2;
+        for (int s = 0; s < satellites; s++) {
+            int sx = centerX + rnd.nextInt(reach + 1) - reach / 2;
+            int sz = centerZ + rnd.nextInt(reach + 1) - reach / 2;
+            if (sx < 1 || sx >= Chunk.SIZE_X - 1 || sz < 1 || sz >= Chunk.SIZE_Z - 1) continue;
+            if (!suitableColumn(chunk, sx, sz, heights[sx][sz], treeProbability[sx][sz])) continue;
+            // Satellites stay the same species as the cluster's seed tree, regardless of what
+            // this exact column's own dominant biome would independently pick - a cluster is
+            // visually one clump of one species, not a mixed grove.
+            if (!fitsAndIsSuitable(chunk, sx, sz, heights, species, placed)) continue;
+            species.place(chunk, sx, heights[sx][sz] + 1, sz, rnd);
+            placed.add(new int[]{sx, sz, species.canopyRadius});
+        }
+    }
+
+    /** Ground-suitability checks shared by both the primary candidate loop and cluster satellites. */
+    private static boolean suitableColumn(Chunk chunk, int x, int z, int height, float treeProbability) {
+        if (treeProbability <= 0f) return false;
+        if (height <= SEA_LEVEL) return false;
+        BlockType top = chunk.getLocal(x, height, z);
+        return top == BlockType.GRASS_BLOCK || top == BlockType.SNOW_BLOCK;
+    }
+
+    /** Canopy fits inside this chunk, doesn't exceed world height, terrain isn't too steep
+     *  underfoot, and isn't within another tree's minimum spacing. */
+    static boolean fitsAndIsSuitable(Chunk chunk, int x, int z, int[][] heights, TreeSpecies species, java.util.List<int[]> placed) {
+        int r = species.canopyRadius;
+        if (x - r < 0 || x + r >= Chunk.SIZE_X || z - r < 0 || z + r >= Chunk.SIZE_Z) return false;
+        if (heights[x][z] + species.maxTotalHeight() >= Chunk.SIZE_Y) return false;
+        if (!slopeOk(heights, x, z)) return false;
+        for (int[] p : placed) {
+            double dx = x - p[0], dz = z - p[1];
+            double minAllowed = Math.max(species.minSpacing, p[2] + r); // also keep canopies from overlapping
+            if (Math.sqrt(dx * dx + dz * dz) < minAllowed) return false;
+        }
+        return true;
+    }
+
+    private static final int SLOPE_LIMIT = 4;
+
+    /** Rejects a candidate whose immediate neighbors' terrain height differs too much - avoids
+     *  trees on cliff faces, the mechanism behind "respect slope limits" for Mountains. */
+    static boolean slopeOk(int[][] heights, int x, int z) {
+        int h = heights[x][z];
+        int maxDiff = 0;
+        if (x > 0) maxDiff = Math.max(maxDiff, Math.abs(h - heights[x - 1][z]));
+        if (x < Chunk.SIZE_X - 1) maxDiff = Math.max(maxDiff, Math.abs(h - heights[x + 1][z]));
+        if (z > 0) maxDiff = Math.max(maxDiff, Math.abs(h - heights[x][z - 1]));
+        if (z < Chunk.SIZE_Z - 1) maxDiff = Math.max(maxDiff, Math.abs(h - heights[x][z + 1]));
+        return maxDiff <= SLOPE_LIMIT;
+    }
+
+    /** Discrete species choice at the *dominant* biome (see placeTrees docs) - null means this
+     *  biome never grows trees, regardless of any blended density bleeding in from a neighbor. */
+    static TreeSpecies speciesFor(Biome dominant, Random rnd) {
+        return switch (dominant) {
+            case PLAINS -> rnd.nextFloat() < 0.1f ? TreeSpecies.BIRCH : TreeSpecies.OAK;
+            case FOREST -> rnd.nextFloat() < 0.4f ? TreeSpecies.BIRCH : TreeSpecies.OAK;
+            case TAIGA, SNOWY_TUNDRA, MOUNTAINS -> TreeSpecies.SPRUCE;
+            case JUNGLE -> TreeSpecies.JUNGLE;
+            case SAVANNA -> TreeSpecies.ACACIA;
+            case SWAMP -> TreeSpecies.SWAMP_OAK;
+            case DESERT, BADLANDS -> null;
+        };
+    }
+
+    /** How often an accepted tree tries to spawn 1-3 same-species satellites nearby - biome
+     *  by biome, so Forest/Jungle/Swamp clump while Plains/Savanna stay mostly isolated trees. */
+    static float clusterChanceFor(Biome dominant) {
+        return switch (dominant) {
+            case FOREST, JUNGLE, SWAMP -> 0.5f;
+            case TAIGA, SNOWY_TUNDRA, MOUNTAINS -> 0.35f;
+            case PLAINS, SAVANNA -> 0.05f;
+            case DESERT, BADLANDS -> 0f;
+        };
     }
 
     @Override
@@ -203,42 +310,4 @@ public class TerrainGenerator implements WorldGenerator {
         return BlockType.STONE;
     }
 
-    private void placeTree(Chunk chunk, int x, int baseY, int z, Random rnd) {
-        int trunkHeight = 4 + rnd.nextInt(2);
-        int top = baseY + trunkHeight - 1;
-        if (top + 2 >= Chunk.SIZE_Y) return;
-
-        for (int dy = 0; dy < trunkHeight; dy++) {
-            chunk.setLocal(x, baseY + dy, z, BlockType.OAK_LOG);
-        }
-
-        // Two wide leaf layers (radius 2, corners trimmed), then a narrow cap (radius 1, plus-shape).
-        for (int dy = -2; dy <= -1; dy++) {
-            int ly = top + dy + 1;
-            for (int lx = -2; lx <= 2; lx++) {
-                for (int lz = -2; lz <= 2; lz++) {
-                    if (Math.abs(lx) == 2 && Math.abs(lz) == 2) continue;
-                    if (lx == 0 && lz == 0 && dy != -2) continue;
-                    placeLeaf(chunk, x + lx, ly, z + lz);
-                }
-            }
-        }
-        for (int dy = 0; dy <= 1; dy++) {
-            int ly = top + dy + 1;
-            for (int lx = -1; lx <= 1; lx++) {
-                for (int lz = -1; lz <= 1; lz++) {
-                    if (dy == 1 && lx != 0 && lz != 0) continue;
-                    if (lx == 0 && lz == 0 && dy == 0) continue;
-                    placeLeaf(chunk, x + lx, ly, z + lz);
-                }
-            }
-        }
-    }
-
-    private void placeLeaf(Chunk chunk, int x, int y, int z) {
-        if (x < 0 || x >= Chunk.SIZE_X || z < 0 || z >= Chunk.SIZE_Z || y < 0 || y >= Chunk.SIZE_Y) return;
-        if (chunk.getLocal(x, y, z).isAir()) {
-            chunk.setLocal(x, y, z, BlockType.OAK_LEAVES);
-        }
-    }
 }

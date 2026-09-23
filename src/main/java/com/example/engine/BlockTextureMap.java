@@ -49,6 +49,14 @@ public class BlockTextureMap {
         uniform(BlockType.GLOWSTONE, Tile.GLOWSTONE);
         uniform(BlockType.TERRACOTTA, Tile.TERRACOTTA);
         uniform(BlockType.RED_SAND, Tile.RED_SAND);
+        put(BlockType.BIRCH_LOG, Tile.BIRCH_LOG_TOP, Tile.BIRCH_LOG_SIDE, Tile.BIRCH_LOG_TOP);
+        uniform(BlockType.BIRCH_LEAVES, Tile.BIRCH_LEAVES);
+        put(BlockType.SPRUCE_LOG, Tile.SPRUCE_LOG_TOP, Tile.SPRUCE_LOG_SIDE, Tile.SPRUCE_LOG_TOP);
+        uniform(BlockType.SPRUCE_LEAVES, Tile.SPRUCE_LEAVES);
+        put(BlockType.JUNGLE_LOG, Tile.JUNGLE_LOG_TOP, Tile.JUNGLE_LOG_SIDE, Tile.JUNGLE_LOG_TOP);
+        uniform(BlockType.JUNGLE_LEAVES, Tile.JUNGLE_LEAVES);
+        put(BlockType.ACACIA_LOG, Tile.ACACIA_LOG_TOP, Tile.ACACIA_LOG_SIDE, Tile.ACACIA_LOG_TOP);
+        uniform(BlockType.ACACIA_LEAVES, Tile.ACACIA_LEAVES);
     }
 
     private void uniform(BlockType type, Tile tile) {

@@ -34,6 +34,9 @@ public class ChunkMeshBuilder {
     private static final float WATER_TOP_HEIGHT = 14f / 16f;
     /** No-op tint multiplier for every face except grass-top/leaves - reused to avoid allocating per face. */
     private static final float[] NEUTRAL_TINT = {1f, 1f, 1f};
+    /** Real vanilla spruce foliage is a fixed color, not colormap-sampled like oak/birch/jungle/
+     *  acacia - a genuine, long-standing vanilla special case (see TreeSpecies), not an invented one. */
+    private static final float[] SPRUCE_TINT = {0.38f, 0.50f, 0.38f};
 
     private final TextureAtlas atlas;
     private final BlockTextureMap textureMap;
@@ -69,12 +72,16 @@ public class ChunkMeshBuilder {
                     // Leaves are tinted on every face; grass only on its top face (the side/bottom
                     // textures are real, already-colored images - see TextureAtlas); water is
                     // tinted on every face, same as leaves, from the biome-blended color baked
-                    // per column in TerrainGenerator.computeTint (see Chunk.waterTint). Looked up
-                    // once per block, not per face; everything else reuses NEUTRAL_TINT (no-op).
-                    boolean isLeaves = type == BlockType.OAK_LEAVES;
-                    float[] sideTint = isLeaves ? chunk.getFoliageTint(lx, lz)
+                    // per column in TerrainGenerator.computeTint (see Chunk.waterTint). Spruce is
+                    // the one species that does NOT use the biome-blended tint - see SPRUCE_TINT.
+                    // Looked up once per block, not per face; everything else reuses NEUTRAL_TINT.
+                    boolean isBiomeTintedLeaves = type == BlockType.OAK_LEAVES || type == BlockType.BIRCH_LEAVES
+                            || type == BlockType.JUNGLE_LEAVES || type == BlockType.ACACIA_LEAVES;
+                    boolean isSpruceLeaves = type == BlockType.SPRUCE_LEAVES;
+                    float[] sideTint = isBiomeTintedLeaves ? chunk.getFoliageTint(lx, lz)
+                            : isSpruceLeaves ? SPRUCE_TINT
                             : isWater ? chunk.getWaterTint(lx, lz) : NEUTRAL_TINT;
-                    float[] topTint = isLeaves || isWater ? sideTint
+                    float[] topTint = isBiomeTintedLeaves || isWater || isSpruceLeaves ? sideTint
                             : type == BlockType.GRASS_BLOCK ? chunk.getGrassTint(lx, lz) : NEUTRAL_TINT;
 
                     if (shouldDrawFace(type, up))
