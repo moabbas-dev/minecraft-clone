@@ -267,6 +267,31 @@ class NewBiomesTest {
         assertTrue(countBlock(chunk, BlockType.CHERRY_LOG) > 0, "a full Cherry Grove chunk should grow at least one cherry tree");
     }
 
+    @Test
+    void reloadingADarkForestChunkNeverDuplicatesOrRemovesBranches() {
+        // Same pattern as the Birch Forest hardening round's reload test, now exercising Dark
+        // Oak's branch geometry through the real generation pipeline (not just the isolated
+        // place() call) - regenerating the same coordinates must be byte-identical.
+        long seed = 2024L;
+        int[] column = findColumnWithMinWeight(new TerrainGenerator(seed), Biome.DARK_FOREST, 60, 0.35f);
+        assertNotNull(column);
+        int cx = World.worldToChunk(column[0]), cz = World.worldToChunk(column[1]);
+
+        World world = new World(seed, new TerrainGenerator(seed));
+        Chunk chunk = world.getOrCreateChunk(cx, cz);
+        world.generateChunk(chunk);
+        byte[] firstGeneration = chunk.exportBlocks();
+        assertTrue(countBlock(chunk, BlockType.DARK_OAK_LOG) > 0, "expected at least one Dark Oak tree (with branches) in this chunk");
+
+        World reloadedWorld = new World(seed, new TerrainGenerator(seed));
+        Chunk reloadedChunk = reloadedWorld.getOrCreateChunk(cx, cz);
+        reloadedWorld.generateChunk(reloadedChunk);
+        byte[] secondGeneration = reloadedChunk.exportBlocks();
+
+        assertArrayEquals(firstGeneration, secondGeneration,
+                "reloading the same Dark Forest chunk coordinates must reproduce identical branches, not duplicate or drop them");
+    }
+
     private int countBlock(Chunk chunk, BlockType type) {
         int count = 0;
         for (int x = 0; x < Chunk.SIZE_X; x++) {

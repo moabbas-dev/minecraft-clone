@@ -7,8 +7,9 @@ import java.util.Random;
  * shape-only variant (SWAMP_OAK, reusing the oak blocks - real vanilla also calls swamp trees
  * "oak variants," not a separate species). Each entry owns its own dimension ranges and its own
  * shape-generator method - the "TreeGenerationProfile" the request describes, sized to what a
- * block-based voxel tree actually needs: no branch geometry beyond simple trunk+canopy shapes,
- * since this engine has no non-cube geometry to build a branch out of.
+ * block-based voxel tree actually needs. Branch geometry (this project's first) is opt-in per
+ * species rather than a shared mechanism every species must use - see {@link #DARK_OAK} and
+ * {@link #placeDarkOakBranches}; every other species still generates trunk+canopy only.
  *
  * Trunk color is always the species' own real log texture - never tinted (see
  * ChunkMeshBuilder, which only ever tints LEAVES faces). Foliage color is the existing
@@ -49,9 +50,11 @@ public enum TreeSpecies {
      *  "thick trunk, broad canopy" reading distinct from just a wider single-block oak. The 2x2
      *  footprint is safe within the shared TerrainGenerator suitability check unchanged: canopyRadius
      *  4 already reserves far more chunk-interior margin than the 1-block trunk extension needs.
-     *  maxBlockCount 190: measured max 153 across 200 seeded trials (the 2x2 trunk itself
-     *  accounts for roughly double a normal trunk's own block count). */
-    DARK_OAK(BlockType.DARK_OAK_LOG, BlockType.DARK_OAK_LEAVES, 5, 7, 2, 4, 3, CanopyShape.THICK_BROAD, 9, 190),
+     *  Also this project's only species with real branch geometry (see {@link #placeDarkOakBranches}) -
+     *  the one species with enough canopyRadius margin (4) to fit a visible branch without
+     *  widening that shared suitability check. maxBlockCount 240: measured max 196 across 500
+     *  seeded trials after adding branches (previously 190/153 before branches existed). */
+    DARK_OAK(BlockType.DARK_OAK_LOG, BlockType.DARK_OAK_LEAVES, 5, 7, 2, 4, 3, CanopyShape.THICK_BROAD, 9, 240),
     /** Rounded (circular-distance, not square) canopy, real cherry blocks - foliage uses a fixed
      *  pink tint rather than the per-column biome blend (see ChunkMeshBuilder's isCherryLeaves
      *  branch), the same real vanilla special case Spruce already gets here, so cherry pink can
@@ -276,6 +279,19 @@ public enum TreeSpecies {
         }
     }
 
+    /** This project's first branch geometry (see the class docs on DARK_OAK for why it's the
+     *  only species that gets it this round). Cardinal directions only, one of {@link #BRANCH_DIRECTIONS}
+     *  each. Every branch's first log is placed directly adjacent to a real trunk log of the 2x2
+     *  footprint - always connected, never a floating log - and its farthest reach (connection
+     *  point + BRANCH_LENGTH-1 steps + the 1-block leaf puff) is exactly canopyRadius (4) from the
+     *  tree's own (x,z) anchor, the same margin TerrainGenerator.fitsAndIsSuitable already
+     *  reserves for this species' canopy - so this needed no change to that shared check. */
+    private static final int[][] BRANCH_DIRECTIONS = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+    private static final int BRANCH_MIN_COUNT = 2;
+    private static final int BRANCH_MAX_COUNT = 4;
+    /** Log blocks per branch, connection point inclusive. */
+    private static final int BRANCH_LENGTH = 2;
+
     /** Real vanilla's 2x2 trunk (this project's only multi-block-footprint trunk) topped with a
      *  wide, layered canopy - see the class docs on DARK_OAK. */
     private void placeDarkOak(Chunk chunk, int x, int baseY, int z, int trunkHeight, Random rnd) {
@@ -285,6 +301,7 @@ public enum TreeSpecies {
             setIfInBounds(chunk, x, baseY + dy, z + 1, log);
             setIfInBounds(chunk, x + 1, baseY + dy, z + 1, log);
         }
+        placeDarkOakBranches(chunk, x, baseY, trunkHeight, z, rnd);
         int top = baseY + trunkHeight - 1;
         // Two broad layers spanning the full 2x2 trunk footprint plus canopyRadius, then a
         // smaller cap - wide and thick, not just tall, the request's "large and wide canopies."
@@ -306,6 +323,47 @@ public enum TreeSpecies {
         for (int lx = 0; lx <= 1; lx++) {
             for (int lz = 0; lz <= 1; lz++) {
                 leaf(chunk, x + lx, top + 1, z + lz);
+            }
+        }
+    }
+
+    /** 2-4 branches (deterministic, drawn from the same {@code rnd} already threaded through
+     *  this whole placement - no second random source), each starting in the trunk's upper half
+     *  so there's always bare trunk beneath them, one distinct cardinal direction per branch
+     *  (shuffled, not sampled with replacement, so up to 4 branches never repeat a direction). */
+    private void placeDarkOakBranches(Chunk chunk, int x, int baseY, int trunkHeight, int z, Random rnd) {
+        if (trunkHeight < 4) return; // defensive: DARK_OAK's own minTrunkHeight (5) never hits this
+        int lowestBranchY = baseY + trunkHeight / 2;
+        int highestBranchY = Math.max(lowestBranchY, baseY + trunkHeight - 2); // stay below the canopy's own bottom layer
+
+        java.util.List<int[]> dirs = new java.util.ArrayList<>(java.util.Arrays.asList(BRANCH_DIRECTIONS));
+        java.util.Collections.shuffle(dirs, rnd);
+        int branchCount = BRANCH_MIN_COUNT + rnd.nextInt(BRANCH_MAX_COUNT - BRANCH_MIN_COUNT + 1);
+        for (int i = 0; i < branchCount && i < dirs.size(); i++) {
+            int branchY = lowestBranchY + (highestBranchY > lowestBranchY ? rnd.nextInt(highestBranchY - lowestBranchY + 1) : 0);
+            placeSingleDarkOakBranch(chunk, x, z, branchY, dirs.get(i));
+        }
+    }
+
+    /** One branch: connects directly to the real trunk log on this side of the 2x2 footprint,
+     *  extends BRANCH_LENGTH-1 further steps outward with a slight upward angle, then a small
+     *  leaf puff at the tip using the existing leaf() helper (so branch foliage gets the exact
+     *  same "never overwrite anything solid" protection every other species' canopy already has). */
+    private void placeSingleDarkOakBranch(Chunk chunk, int x, int z, int y, int[] dir) {
+        int connectX = dir[0] > 0 ? x + 2 : dir[0] < 0 ? x - 1 : x;
+        int connectZ = dir[1] > 0 ? z + 2 : dir[1] < 0 ? z - 1 : z;
+        int tipX = connectX + dir[0] * (BRANCH_LENGTH - 1);
+        int tipZ = connectZ + dir[1] * (BRANCH_LENGTH - 1);
+        int tipY = y + 1; // a slight upward angle over the branch's short length
+
+        setIfInBounds(chunk, connectX, y, connectZ, log);
+        setIfInBounds(chunk, tipX, tipY, tipZ, log);
+
+        for (int lx = -1; lx <= 1; lx++) {
+            for (int lz = -1; lz <= 1; lz++) {
+                if (Math.abs(lx) + Math.abs(lz) > 1) continue; // a small diamond, not a cube
+                leaf(chunk, tipX + lx, tipY, tipZ + lz);
+                leaf(chunk, tipX + lx, tipY + 1, tipZ + lz);
             }
         }
     }
