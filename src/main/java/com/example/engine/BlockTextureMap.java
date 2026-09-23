@@ -65,6 +65,11 @@ public class BlockTextureMap {
         uniform(BlockType.CHERRY_LEAVES, Tile.CHERRY_LEAVES);
         uniform(BlockType.MUD, Tile.MUD);
         put(BlockType.MANGROVE_ROOTS, Tile.MANGROVE_ROOTS_TOP, Tile.MANGROVE_ROOTS_SIDE, Tile.MANGROVE_ROOTS_TOP);
+        // All 4 growth stages share one texture - see BlockType's own doc comment on why.
+        uniform(BlockType.OAK_SAPLING_STAGE_0, Tile.OAK_SAPLING);
+        uniform(BlockType.OAK_SAPLING_STAGE_1, Tile.OAK_SAPLING);
+        uniform(BlockType.OAK_SAPLING_STAGE_2, Tile.OAK_SAPLING);
+        uniform(BlockType.OAK_SAPLING_STAGE_3, Tile.OAK_SAPLING);
     }
 
     private void uniform(BlockType type, Tile tile) {

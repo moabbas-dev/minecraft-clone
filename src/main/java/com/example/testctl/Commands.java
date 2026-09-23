@@ -33,6 +33,7 @@ public final class Commands {
             case "setTime" -> setTime(params);
             case "setWeather" -> setWeather(params);
             case "newTestWorld" -> newTestWorld(params);
+            case "setBlock" -> setBlock(params);
             case "screenshot" -> screenshot(params);
             case "state" -> state();
             case "shutdown" -> shutdown();
@@ -81,6 +82,22 @@ public final class Commands {
         return Result.ok("new test world created with seed " + resolved);
     }
 
+    private Result setBlock(Map<String, String> p) {
+        Integer x = parseInt(p, "x");
+        Integer y = parseInt(p, "y");
+        Integer z = parseInt(p, "z");
+        String type = p.get("type");
+        if (x == null || y == null || z == null || type == null || type.isBlank()) {
+            return Result.badRequest("setBlock requires integer x, y, z and a 'type' param (a BlockType enum name)");
+        }
+        try {
+            game.setBlock(x, y, z, type);
+        } catch (IllegalArgumentException e) {
+            return Result.badRequest("unknown block type: " + type);
+        }
+        return Result.ok("set " + x + "," + y + "," + z + " to " + type.toUpperCase(Locale.ROOT));
+    }
+
     private Result screenshot(Map<String, String> p) {
         String name = p.get("name");
         if (name == null || name.isBlank()) return Result.badRequest("screenshot requires a 'name' param");
@@ -119,6 +136,16 @@ public final class Commands {
         if (v == null) return null;
         try {
             return Long.parseLong(v);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private Integer parseInt(Map<String, String> p, String key) {
+        String v = p.get(key);
+        if (v == null) return null;
+        try {
+            return Integer.parseInt(v);
         } catch (NumberFormatException e) {
             return null;
         }

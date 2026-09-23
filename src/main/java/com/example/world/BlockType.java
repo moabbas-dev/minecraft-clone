@@ -60,7 +60,18 @@ public enum BlockType {
     CHERRY_LOG(104, "Cherry Wood", true, false, 2.0f, 0f),
     CHERRY_LEAVES(105, "Cherry Leaves", true, false, 0.2f, 0f),
     MUD(106, "Mud", true, false, 0.5f, 0f),
-    MANGROVE_ROOTS(107, "Mangrove Roots", true, false, 0.7f, 0f);
+    MANGROVE_ROOTS(107, "Mangrove Roots", true, false, 0.7f, 0f),
+    // Real vanilla saplings are a small non-full-block cross/plant model with no solid collision;
+    // this engine's mesh builder has no cross/billboard geometry (full axis-aligned cubes only,
+    // see ChunkMeshBuilder), so these render as a full cube using the real sapling texture - a
+    // documented simplification, not an invented asset. All 4 growth stages share one texture,
+    // matching real vanilla (the stage is an internal simulation detail, not a visual one there
+    // either). Only STAGE_0 is player-placeable (see BlockType.PLACEABLE) - stages 1-3 are
+    // SaplingGrowth's own internal states, reached only by growing from stage 0.
+    OAK_SAPLING_STAGE_0(108, "Oak Sapling", false, false, 0f, 0f),
+    OAK_SAPLING_STAGE_1(109, "Oak Sapling", false, false, 0f, 0f),
+    OAK_SAPLING_STAGE_2(110, "Oak Sapling", false, false, 0f, 0f),
+    OAK_SAPLING_STAGE_3(111, "Oak Sapling", false, false, 0f, 0f);
 
     public final int id;
     public final String displayName;
@@ -128,6 +139,7 @@ public enum BlockType {
             BIRCH_LOG, BIRCH_LEAVES, SPRUCE_LOG, SPRUCE_LEAVES, JUNGLE_LOG, JUNGLE_LEAVES,
             ACACIA_LOG, ACACIA_LEAVES, MANGROVE_LOG, MANGROVE_LEAVES,
             DARK_OAK_LOG, DARK_OAK_LEAVES, CHERRY_LOG, CHERRY_LEAVES, MUD, MANGROVE_ROOTS,
+            OAK_SAPLING_STAGE_0,
             SAND, GRAVEL, SANDSTONE, GLASS, BRICKS, MOSSY_COBBLESTONE, OBSIDIAN,
             COAL_ORE, IRON_ORE, GOLD_ORE, DIAMOND_ORE, IRON_BLOCK, GOLD_BLOCK, DIAMOND_BLOCK,
             BOOKSHELF, CRAFTING_TABLE, FURNACE, CHEST, TNT, ICE, SNOW_BLOCK, CLAY,

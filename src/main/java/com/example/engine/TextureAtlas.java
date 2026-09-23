@@ -105,6 +105,7 @@ public class TextureAtlas {
         REAL_TEXTURE_PATHS.put(Tile.MUD, "textures/block/mud.png");
         REAL_TEXTURE_PATHS.put(Tile.MANGROVE_ROOTS_SIDE, "textures/block/mangrove_roots_side.png");
         REAL_TEXTURE_PATHS.put(Tile.MANGROVE_ROOTS_TOP, "textures/block/mangrove_roots_top.png");
+        REAL_TEXTURE_PATHS.put(Tile.OAK_SAPLING, "textures/block/oak_sapling.png");
         // CHEST, SUN, MOON, RAIN: no real block-texture equivalent, always procedural.
     }
 
@@ -301,6 +302,7 @@ public class TextureAtlas {
             case CHERRY_LEAVES -> speckledNoise(img, rnd, new Color(247, 190, 213), new Color[]{new Color(240, 160, 195), new Color(252, 210, 225)}, 50);
             case MUD -> noisyFill(img, rnd, new Color(60, 48, 44), 10);
             case MANGROVE_ROOTS_SIDE, MANGROVE_ROOTS_TOP -> noisyFill(img, rnd, new Color(78, 52, 40), 14);
+            case OAK_SAPLING -> speckledNoise(img, rnd, new Color(60, 120, 40), new Color[]{new Color(50, 100, 32), new Color(75, 140, 50)}, 65);
         }
         g.dispose();
         return img;

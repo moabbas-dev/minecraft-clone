@@ -109,6 +109,7 @@ public class Game implements GameAccess {
     private Mesh heldItemMesh;
 
     private Weather weather;
+    private SaplingGrowth saplingGrowth;
 
     // Opt-in live-controller test harness - see com.example.testctl. Off by default; only
     // started (init()) when -Dtest.controller=true is passed, so normal play never creates a
@@ -262,8 +263,10 @@ public class Game implements GameAccess {
         world.setSaveDir(WorldIO.worldDir(currentWorldFolder));
         dayTime = 0.3f; // fresh worlds start shortly after sunrise
 
+        saplingGrowth = new SaplingGrowth(seed);
         Chunk spawnChunk = world.getOrCreateChunk(0, 0);
         world.generateChunk(spawnChunk);
+        saplingGrowth.registerChunk(spawnChunk); // a no-op for a fresh world, kept for consistency with loadWorld
 
         int spawnLocalX = 8, spawnLocalZ = 8;
         int spawnY;
@@ -320,10 +323,12 @@ public class Game implements GameAccess {
         currentSettings = meta.settings();
         dayTime = meta.dayTime();
 
+        saplingGrowth = new SaplingGrowth(meta.seed());
         int spawnCx = World.worldToChunk((int) Math.floor(meta.playerPos().x));
         int spawnCz = World.worldToChunk((int) Math.floor(meta.playerPos().z));
         Chunk spawnChunk = world.getOrCreateChunk(spawnCx, spawnCz);
         world.generateChunk(spawnChunk); // restores from disk since it was already saved
+        saplingGrowth.registerChunk(spawnChunk); // rescans for any saplings that were saved mid-growth
 
         player = new Player(new Vector3f(meta.playerPos()));
         selectedIndex = Math.max(0, Math.min(BlockType.PLACEABLE.length - 1, meta.selectedIndex()));
@@ -377,6 +382,7 @@ public class Game implements GameAccess {
         world = null;
         player = null;
         weather = null;
+        saplingGrowth = null;
         currentWorldFolder = null;
         currentSettings = null;
         window.releaseMouse();
@@ -447,6 +453,7 @@ public class Game implements GameAccess {
         dayTime -= (float) Math.floor(dayTime);
         weather.update(dt);
         updateRainParticles(dt);
+        saplingGrowth.update(world, dt);
 
         updateHotbarSelection();
         updateChunkStreaming();
@@ -491,6 +498,7 @@ public class Game implements GameAccess {
                 if (!world.hasChunk(cx, cz)) {
                     Chunk c = world.getOrCreateChunk(cx, cz);
                     world.generateChunk(c); // biome climate sampling + height noise + block fill
+                    saplingGrowth.registerChunk(c); // picks up any saplings this chunk had saved
                     generated++;
                     // Check the deadline only AFTER doing a chunk of work, never before, so a
                     // frame is always guaranteed to make forward progress even if a single
@@ -514,6 +522,7 @@ public class Game implements GameAccess {
                 if (c.isGenerated() && world.getSaveDir() != null) {
                     WorldIO.saveChunk(world.getSaveDir(), c); // synchronous disk write
                 }
+                saplingGrowth.unregisterChunk(c.chunkX, c.chunkZ); // its saplings pause until reload
                 ChunkRenderData rd = renderData.remove(entry.getKey());
                 if (rd != null) rd.destroy();
                 unloaded++;
@@ -619,11 +628,35 @@ public class Game implements GameAccess {
 
         if (input.consumeMousePressed(GLFW_MOUSE_BUTTON_RIGHT)) {
             BlockType place = BlockType.PLACEABLE[selectedIndex];
-            if (!blockIntersectsPlayer(hit.placeX(), hit.placeY(), hit.placeZ())) {
+            SaplingSpecies sapling = SaplingSpecies.bySaplingBlock(place);
+            if (sapling != null) {
+                if (canPlantSapling(hit, sapling)) {
+                    world.setBlock(hit.placeX(), hit.placeY(), hit.placeZ(), place);
+                    saplingGrowth.registerPlanted(hit.placeX(), hit.placeY(), hit.placeZ(), sapling);
+                    swingTimer = SWING_DURATION;
+                }
+            } else if (!blockIntersectsPlayer(hit.placeX(), hit.placeY(), hit.placeZ())) {
                 world.setBlock(hit.placeX(), hit.placeY(), hit.placeZ(), place);
                 swingTimer = SWING_DURATION;
             }
         }
+    }
+
+    /** Saplings may only be planted directly on top of a valid ground block for their species -
+     *  the surface hit must be exactly one block below the new position (placing against a
+     *  side face doesn't count, same as real vanilla), never on top of an incompatible block -
+     *  the first placement-validation hook this project has needed for any block type. */
+    private boolean canPlantSapling(Raycast.Hit hit, SaplingSpecies sapling) {
+        if (!isDirectlyAboveGround(hit)) return false;
+        if (!sapling.validGround.contains(hit.type())) return false;
+        return !blockIntersectsPlayer(hit.placeX(), hit.placeY(), hit.placeZ());
+    }
+
+    /** Pure geometric half of canPlantSapling, package-private so it's directly testable without
+     *  a Player/GL context (unlike blockIntersectsPlayer, which no block type's placement has
+     *  ever needed to unit-test in this codebase). */
+    static boolean isDirectlyAboveGround(Raycast.Hit hit) {
+        return hit.placeX() == hit.x() && hit.placeZ() == hit.z() && hit.placeY() == hit.y() + 1;
     }
 
     /**
@@ -1215,6 +1248,17 @@ public class Game implements GameAccess {
     @Override
     public void newTestWorld(long seed) {
         startNewWorld(new WorldSettings("Test World", WorldSettings.WorldType.SURVIVAL), seed);
+    }
+
+    @Override
+    public void setBlock(int x, int y, int z, String blockTypeName) {
+        if (world == null) throw new IllegalStateException("no active world");
+        BlockType type = BlockType.valueOf(blockTypeName.toUpperCase(java.util.Locale.ROOT));
+        world.setBlock(x, y, z, type);
+        SaplingSpecies species = SaplingSpecies.bySaplingBlock(type);
+        if (species != null) {
+            saplingGrowth.registerPlanted(x, y, z, species);
+        }
     }
 
     @Override

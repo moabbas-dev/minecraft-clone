@@ -21,6 +21,14 @@ public interface GameAccess {
     /** Starts a fresh world for testing, overriding the normal random-seed path with a fixed one. */
     void newTestWorld(long seed);
 
+    /** Sets a single world block by BlockType enum name (case-insensitive) - the one narrow,
+     *  named-enum-only write surface exposed here (no arbitrary code/expression evaluation).
+     *  If the placed block is a sapling stage block, it's registered with growth tracking the
+     *  same way a real player planting it or a chunk reload discovering it would be, so this
+     *  can exercise the full growth path live, not just rendering.
+     *  @throws IllegalArgumentException if blockTypeName isn't a real BlockType. */
+    void setBlock(int x, int y, int z, String blockTypeName);
+
     /** Captures the current frame to test-output/screenshots/&lt;name&gt;.png. Returns the file path. */
     String captureScreenshot(String name) throws IOException;
 

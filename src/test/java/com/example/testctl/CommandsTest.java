@@ -25,6 +25,9 @@ class CommandsTest {
         String screenshotName;
         boolean shutdownCalled;
         boolean throwOnScreenshot;
+        Integer setBlockX, setBlockY, setBlockZ;
+        String setBlockType;
+        boolean throwOnSetBlock;
 
         @Override
         public void teleport(float x, float y, float z, Float yawDegrees, Float pitchDegrees) {
@@ -48,6 +51,15 @@ class CommandsTest {
         @Override
         public void newTestWorld(long seed) {
             this.seed = seed;
+        }
+
+        @Override
+        public void setBlock(int x, int y, int z, String blockTypeName) {
+            if (throwOnSetBlock) throw new IllegalArgumentException("unknown block type: " + blockTypeName);
+            setBlockX = x;
+            setBlockY = y;
+            setBlockZ = z;
+            setBlockType = blockTypeName;
         }
 
         @Override
@@ -167,6 +179,44 @@ class CommandsTest {
         Commands.Result r = commands.execute("newTestWorld", params());
         assertEquals(200, r.status());
         assertNotNull(fake.seed, "must fall back to some seed rather than skip the call");
+    }
+
+    @Test
+    void setBlockDispatchesWithAllFields() {
+        Commands.Result r = commands.execute("setBlock", params("x", "8", "y", "70", "z", "8", "type", "oak_sapling_stage_0"));
+        assertEquals(200, r.status());
+        assertEquals(8, fake.setBlockX);
+        assertEquals(70, fake.setBlockY);
+        assertEquals(8, fake.setBlockZ);
+        assertEquals("oak_sapling_stage_0", fake.setBlockType);
+    }
+
+    @Test
+    void setBlockRejectsMissingCoordinate() {
+        Commands.Result r = commands.execute("setBlock", params("x", "8", "y", "70", "type", "STONE"));
+        assertEquals(400, r.status());
+        assertNull(fake.setBlockX);
+    }
+
+    @Test
+    void setBlockRejectsMissingType() {
+        Commands.Result r = commands.execute("setBlock", params("x", "8", "y", "70", "z", "8"));
+        assertEquals(400, r.status());
+        assertNull(fake.setBlockType);
+    }
+
+    @Test
+    void setBlockRejectsNonIntegerCoordinate() {
+        Commands.Result r = commands.execute("setBlock", params("x", "not-a-number", "y", "70", "z", "8", "type", "STONE"));
+        assertEquals(400, r.status());
+        assertNull(fake.setBlockX);
+    }
+
+    @Test
+    void setBlockUnknownTypeBecomesA400NotACrash() {
+        fake.throwOnSetBlock = true;
+        Commands.Result r = commands.execute("setBlock", params("x", "8", "y", "70", "z", "8", "type", "not_a_real_block"));
+        assertEquals(400, r.status());
     }
 
     @Test
