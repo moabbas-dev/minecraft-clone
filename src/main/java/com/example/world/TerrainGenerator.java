@@ -145,6 +145,12 @@ public class TerrainGenerator implements WorldGenerator {
             }
         }
 
+        // After the column fill (so caves see real stone/ore) and before trees (so a rare
+        // surface-opening cave naturally stops a tree from being placed over the hole it left -
+        // placeTrees' own suitability check re-reads the real post-carve block). See CaveCarver's
+        // class docs for why this can't simply carve neighbor chunks directly.
+        CaveCarver.carve(chunk, seed);
+
         placeTrees(chunk, heights, dominantBiome, treeProbability, rnd);
     }
 
