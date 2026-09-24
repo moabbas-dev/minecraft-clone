@@ -61,17 +61,21 @@ public enum BlockType {
     CHERRY_LEAVES(105, "Cherry Leaves", true, false, 0.2f, 0f),
     MUD(106, "Mud", true, false, 0.5f, 0f),
     MANGROVE_ROOTS(107, "Mangrove Roots", true, false, 0.7f, 0f),
-    // Real vanilla saplings are a small non-full-block cross/plant model with no solid collision;
-    // this engine's mesh builder has no cross/billboard geometry (full axis-aligned cubes only,
-    // see ChunkMeshBuilder), so these render as a full cube using the real sapling texture - a
-    // documented simplification, not an invented asset. All 4 growth stages share one texture,
-    // matching real vanilla (the stage is an internal simulation detail, not a visual one there
-    // either). Only STAGE_0 is player-placeable (see BlockType.PLACEABLE) - stages 1-3 are
-    // SaplingGrowth's own internal states, reached only by growing from stage 0.
-    OAK_SAPLING_STAGE_0(108, "Oak Sapling", false, false, 0f, 0f),
-    OAK_SAPLING_STAGE_1(109, "Oak Sapling", false, false, 0f, 0f),
-    OAK_SAPLING_STAGE_2(110, "Oak Sapling", false, false, 0f, 0f),
-    OAK_SAPLING_STAGE_3(111, "Oak Sapling", false, false, 0f, 0f);
+    // Real vanilla saplings are a small cross/plant model with no solid collision - rendered by
+    // ChunkMeshBuilder as two crossing diagonal quads (not a cube), same idea as real vanilla's
+    // model, see its emitCrossPlant. transparentRender=true is required for that (not just a
+    // rendering-style choice): it's what keeps isOpaqueCube() false, so a sapling never culls
+    // the face of the block underneath it (it previously did, when this was marked opaque - a
+    // real bug: the grass block's own top face was being skipped because the sapling above it
+    // was treated as fully solid) and light still passes through it correctly (LightEngine also
+    // keys off isOpaqueCube()). All 4 growth stages share one texture, matching real vanilla
+    // (the stage is an internal simulation detail, not a visual one there either). Only STAGE_0
+    // is player-placeable (see BlockType.PLACEABLE) - stages 1-3 are SaplingGrowth's own
+    // internal states, reached only by growing from stage 0.
+    OAK_SAPLING_STAGE_0(108, "Oak Sapling", false, true, 0f, 0f),
+    OAK_SAPLING_STAGE_1(109, "Oak Sapling", false, true, 0f, 0f),
+    OAK_SAPLING_STAGE_2(110, "Oak Sapling", false, true, 0f, 0f),
+    OAK_SAPLING_STAGE_3(111, "Oak Sapling", false, true, 0f, 0f);
 
     public final int id;
     public final String displayName;

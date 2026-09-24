@@ -43,6 +43,39 @@ public class ChunkMeshBuilder {
      *  of cherry blossom pink - not independently verified against vanilla's exact source value
      *  this session, same honesty convention as every other adapted color in this codebase. */
     private static final float[] CHERRY_TINT = {0.97f, 0.75f, 0.84f};
+    /** Slightly under a full block, matching a real young sapling's actual visual scale. */
+    private static final float CROSS_PLANT_HEIGHT = 0.8f;
+    /** The same "no colormap file available" fallback constants BiomeColors already passes to
+     *  Colormap.load - reused here (not reinvented) as the representative tint for hotbar icons,
+     *  which have no world column to sample a real per-biome blend from. */
+    private static final float[] DEFAULT_GRASS_TINT = unpackHex(0x7CBD6B);
+    private static final float[] DEFAULT_FOLIAGE_TINT = unpackHex(0x59AE30);
+
+    private static float[] unpackHex(int rgb) {
+        return new float[]{((rgb >> 16) & 0xFF) / 255f, ((rgb >> 8) & 0xFF) / 255f, (rgb & 0xFF) / 255f};
+    }
+
+    private static boolean isBiomeTintedLeaves(BlockType type) {
+        return type == BlockType.OAK_LEAVES || type == BlockType.BIRCH_LEAVES
+                || type == BlockType.JUNGLE_LEAVES || type == BlockType.ACACIA_LEAVES
+                || type == BlockType.MANGROVE_LEAVES || type == BlockType.DARK_OAK_LEAVES;
+    }
+
+    /** The tint a leaf-family block's icon should use, or {@code null} if {@code type} isn't
+     *  one - a representative default (see DEFAULT_FOLIAGE_TINT) for the biome-blended species,
+     *  since an icon has no world column to blend a real one from; the exact fixed tint for
+     *  spruce/cherry, since those never blend with biome color in the first place. */
+    public static float[] leafIconTint(BlockType type) {
+        if (type == BlockType.SPRUCE_LEAVES) return SPRUCE_TINT;
+        if (type == BlockType.CHERRY_LEAVES) return CHERRY_TINT;
+        if (isBiomeTintedLeaves(type)) return DEFAULT_FOLIAGE_TINT;
+        return null;
+    }
+
+    /** The representative grass-top tint for icons - see DEFAULT_GRASS_TINT. */
+    public static float[] grassIconTint() {
+        return DEFAULT_GRASS_TINT;
+    }
 
     private final TextureAtlas atlas;
     private final BlockTextureMap textureMap;
@@ -63,6 +96,15 @@ public class ChunkMeshBuilder {
                     BlockType type = chunk.getLocal(lx, ly, lz);
                     if (type.isAir()) continue;
 
+                    if (isCrossShapedPlant(type)) {
+                        // A real plant model (two crossing diagonal quads), not a cube - see
+                        // emitCrossPlant. Unconditional: a plant never occludes anything and is
+                        // never occluded by a neighboring cube face the way a real cube face is,
+                        // so none of the up/down/north/south/east/west culling below applies to it.
+                        emitCrossPlant(transparent, chunk, world, lx, ly, lz, atlas.getUv(textureMap.facesFor(type).side()));
+                        continue;
+                    }
+
                     BlockTextureMap.Faces faces = textureMap.facesFor(type);
                     FloatBuffer target = type.isTransparentRender() ? transparent : opaque;
 
@@ -81,9 +123,7 @@ public class ChunkMeshBuilder {
                     // per column in TerrainGenerator.computeTint (see Chunk.waterTint). Spruce is
                     // the one species that does NOT use the biome-blended tint - see SPRUCE_TINT.
                     // Looked up once per block, not per face; everything else reuses NEUTRAL_TINT.
-                    boolean isBiomeTintedLeaves = type == BlockType.OAK_LEAVES || type == BlockType.BIRCH_LEAVES
-                            || type == BlockType.JUNGLE_LEAVES || type == BlockType.ACACIA_LEAVES
-                            || type == BlockType.MANGROVE_LEAVES || type == BlockType.DARK_OAK_LEAVES;
+                    boolean isBiomeTintedLeaves = isBiomeTintedLeaves(type);
                     boolean isSpruceLeaves = type == BlockType.SPRUCE_LEAVES;
                     boolean isCherryLeaves = type == BlockType.CHERRY_LEAVES;
                     float[] sideTint = isBiomeTintedLeaves ? chunk.getFoliageTint(lx, lz)
@@ -146,6 +186,44 @@ public class ChunkMeshBuilder {
     static boolean shouldDrawFace(BlockType current, BlockType neighbor) {
         if (neighbor == current) return false;
         return !neighbor.isOpaqueCube();
+    }
+
+    /** Blocks rendered as a real cross/plant model (see {@link #emitCrossPlant}) instead of a
+     *  cube - package-private so {@code ChunkMeshBuilderFaceCullingTest}-style pure-logic tests
+     *  can exercise this classification directly. */
+    static boolean isCrossShapedPlant(BlockType type) {
+        return type == BlockType.OAK_SAPLING_STAGE_0 || type == BlockType.OAK_SAPLING_STAGE_1
+                || type == BlockType.OAK_SAPLING_STAGE_2 || type == BlockType.OAK_SAPLING_STAGE_3;
+    }
+
+    /**
+     * Real vanilla's actual sapling/flower/grass model: two quads set diagonally across the
+     * block's footprint, crossing in an X when viewed from above, instead of 6 axis-aligned cube
+     * faces. Each plane is a single quad, not the double-sided pair real vanilla needs - this
+     * project never enables {@code GL_CULL_FACE} anywhere (confirmed), so one quad is already
+     * visible from both sides here. Lit from the block's own light level directly (no per-face
+     * directional shade or neighbor-face sampling - a plant isn't a face being occluded by a
+     * neighbor the way a cube face is, so that whole model doesn't apply to it).
+     */
+    private void emitCrossPlant(FloatBuffer buf, Chunk chunk, World world, int lx, int ly, int lz, float[] uv) {
+        float skyShade = sampleSkyLight(chunk, world, lx, ly, lz) / 15f;
+        float blockLight = sampleBlockLight(chunk, world, lx, ly, lz) / 15f;
+        float u0 = uv[0], v0 = uv[1], u1 = uv[2], v1 = uv[3];
+        float h = CROSS_PLANT_HEIGHT;
+
+        float[][] planeA = {
+                {0, 0, 0, u0, v1}, {1, 0, 1, u1, v1}, {1, h, 1, u1, v0},
+                {0, 0, 0, u0, v1}, {1, h, 1, u1, v0}, {0, h, 0, u0, v0}
+        };
+        float[][] planeB = {
+                {1, 0, 0, u0, v1}, {0, 0, 1, u1, v1}, {0, h, 1, u1, v0},
+                {1, 0, 0, u0, v1}, {0, h, 1, u1, v0}, {1, h, 0, u0, v0}
+        };
+        for (float[][] plane : new float[][][]{planeA, planeB}) {
+            for (float[] c : plane) {
+                buf.add(lx + c[0], ly + c[1], lz + c[2], c[3], c[4], skyShade, blockLight, 1f, 1f, 1f);
+            }
+        }
     }
 
     private enum Face {TOP, BOTTOM, NORTH, SOUTH, EAST, WEST}

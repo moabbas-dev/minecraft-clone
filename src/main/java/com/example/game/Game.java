@@ -96,6 +96,14 @@ public class Game implements GameAccess {
     private int selectedIndex = 0;
     private int[] breakingTarget = null;
     private float breakingProgress = 0f;
+    /** Seconds left to show the selected-block name label above the hotbar - reset to
+     *  HOTBAR_LABEL_DURATION whenever selectedIndex actually changes (see
+     *  updateHotbarSelection), counted down every frame, drawn only while > 0. */
+    private float hotbarLabelTimer = 0f;
+    private static final float HOTBAR_LABEL_DURATION = 1.5f;
+    /** The label fades out over this many seconds at the tail of HOTBAR_LABEL_DURATION, rather
+     *  than popping off abruptly. */
+    private static final float HOTBAR_LABEL_FADE_SECONDS = 0.4f;
 
     private double titleTimer = 0;
     /** 0=midnight, 0.25=sunrise, 0.5=noon, 0.75=sunset. */
@@ -456,6 +464,7 @@ public class Game implements GameAccess {
         saplingGrowth.update(world, dt);
 
         updateHotbarSelection();
+        if (hotbarLabelTimer > 0f) hotbarLabelTimer = Math.max(0f, hotbarLabelTimer - dt);
         updateChunkStreaming();
         handleInteraction(dt);
 
@@ -470,6 +479,7 @@ public class Game implements GameAccess {
     }
 
     private void updateHotbarSelection() {
+        int previousIndex = selectedIndex;
         int len = BlockType.PLACEABLE.length;
         double scroll = input.getScrollDelta();
         if (scroll > 0) selectedIndex = Math.floorMod(selectedIndex - 1, len);
@@ -481,6 +491,9 @@ public class Game implements GameAccess {
             if (input.consumeKeyPressed(numberKeys[i]) && i < len) {
                 selectedIndex = i;
             }
+        }
+        if (selectedIndex != previousIndex) {
+            hotbarLabelTimer = HOTBAR_LABEL_DURATION;
         }
     }
 
@@ -1072,17 +1085,20 @@ public class Game implements GameAccess {
         float startX = (window.getWidth() - totalWidth) / 2f;
         float y = window.getHeight() - slotSize - 12f;
 
+        float selectedSlotX = startX;
         for (int i = 0; i < visibleSlots; i++) {
             int idx = windowStart + i;
             float x = startX + i * (slotSize + margin);
             boolean selected = idx == selectedIndex;
             if (selected) {
                 uiRenderer.drawColorQuad(x - 3, y - 3, slotSize + 6, slotSize + 6, 1f, 1f, 0.4f, 0.95f);
+                selectedSlotX = x;
             }
             uiRenderer.drawColorQuad(x, y, slotSize, slotSize, 0.1f, 0.1f, 0.1f, 0.55f);
 
             drawBlockIcon(BlockType.PLACEABLE[idx], x, y, slotSize);
         }
+        drawHotbarLabel(selectedSlotX, y, slotSize);
 
         float flash = weather.getLightningFlash();
         if (flash > 0.01f) {
@@ -1090,6 +1106,22 @@ public class Game implements GameAccess {
         }
 
         renderDebugOverlay();
+    }
+
+    /** The selected block's display name, floating just above its hotbar slot for
+     *  HOTBAR_LABEL_DURATION seconds after selection actually changes (see
+     *  updateHotbarSelection), fading out over the last HOTBAR_LABEL_FADE_SECONDS rather than
+     *  disappearing abruptly. */
+    private void drawHotbarLabel(float slotX, float slotY, float slotSize) {
+        if (hotbarLabelTimer <= 0f) return;
+        float alpha = Math.min(1f, hotbarLabelTimer / HOTBAR_LABEL_FADE_SECONDS);
+        String name = BlockType.PLACEABLE[selectedIndex].displayName;
+        float scale = 1.1f;
+        float textWidth = font.measureText(name, scale);
+        float x = slotX + slotSize / 2f - textWidth / 2f;
+        float y = slotY - font.lineHeight(scale) - 10f;
+        uiRenderer.drawColorQuad(x - 6f, y - 3f, textWidth + 12f, font.lineHeight(scale) + 6f, 0f, 0f, 0f, 0.55f * alpha);
+        font.drawText(uiRenderer, name, x, y, scale, 1f, 1f, 1f, alpha);
     }
 
     /**
@@ -1181,15 +1213,28 @@ public class Game implements GameAccess {
     }
 
     private static final float ISO_COS30 = 0.8660254f;
+    private static final float[] NEUTRAL_ICON_TINT = {1f, 1f, 1f};
 
     /**
      * Draws a block as a proper isometric 3D cube icon (top + 2 side faces), matching how
      * Minecraft actually renders inventory/hotbar items, instead of a single flat top texture.
+     * Grass-top and every leaf species were rendering with no color at all before this - their
+     * real textures (like the world-rendering ones) are plain colormap-sampled greyish-green
+     * base images meant to be tinted at render time, and the icon path never tinted anything.
+     * Reuses ChunkMeshBuilder's own tint logic/constants (not a second, possibly-drifting copy)
+     * - a representative default tint here, since an icon has no world column to blend a real
+     * per-biome one from.
      */
     private void drawBlockIcon(BlockType block, float slotX, float slotY, float slotSize) {
         BlockTextureMap.Faces faces = textureMap.facesFor(block);
         float[] topUv = atlas.getUv(faces.top());
         float[] sideUv = atlas.getUv(faces.side());
+
+        float[] leafTint = ChunkMeshBuilder.leafIconTint(block);
+        // Grass's side/bottom textures are real, already-colored images (dirt with a green
+        // overlay strip) - never tinted, same as in real chunk rendering (see ChunkMeshBuilder).
+        float[] topTint = leafTint != null ? leafTint : block == BlockType.GRASS_BLOCK ? ChunkMeshBuilder.grassIconTint() : NEUTRAL_ICON_TINT;
+        float[] sideTint = leafTint != null ? leafTint : NEUTRAL_ICON_TINT;
 
         float pad = 3f;
         float scale = Math.min((slotSize - pad * 2) / 1.7320508f, (slotSize - pad * 2) / 2f);
@@ -1214,14 +1259,14 @@ public class Game implements GameAccess {
         // with a bottom corner into p0/p1 instead, which rotated or vertically flipped any
         // vertically-asymmetric side texture (grass_block_side's grass/dirt split, tnt_side's
         // label) - unnoticeable on vertically-symmetric textures like stone, hence easy to miss.
-        drawIconFace(pts[2], pts[4], pts[7], pts[6], topUv, 1.0f);  // top face (y=1)
-        drawIconFace(pts[4], pts[7], pts[5], pts[1], sideUv, 0.75f); // east face (x=1)
-        drawIconFace(pts[6], pts[7], pts[5], pts[3], sideUv, 0.55f); // south face (z=1)
+        drawIconFace(pts[2], pts[4], pts[7], pts[6], topUv, 1.0f, topTint);  // top face (y=1)
+        drawIconFace(pts[4], pts[7], pts[5], pts[1], sideUv, 0.75f, sideTint); // east face (x=1)
+        drawIconFace(pts[6], pts[7], pts[5], pts[3], sideUv, 0.55f, sideTint); // south face (z=1)
     }
 
-    private void drawIconFace(float[] p0, float[] p1, float[] p2, float[] p3, float[] uv, float shade) {
+    private void drawIconFace(float[] p0, float[] p1, float[] p2, float[] p3, float[] uv, float shade, float[] tint) {
         uiRenderer.drawTexturedQuadPoints(p0[0], p0[1], p1[0], p1[1], p2[0], p2[1], p3[0], p3[1],
-                uv, atlas.getTextureId(), shade, shade, shade, 1f);
+                uv, atlas.getTextureId(), shade * tint[0], shade * tint[1], shade * tint[2], 1f);
     }
 
     // ---- com.example.testctl.GameAccess - the live-controller's only way to touch this class ----
