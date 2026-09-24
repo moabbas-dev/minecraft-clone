@@ -11,11 +11,18 @@ public final class Shaders {
             layout (location = 2) in float aSkyShade;
             layout (location = 3) in float aBlockLight;
             layout (location = 4) in vec3 aTint;
+            // 0.0 = rigid (every solid block, held item, rain, sun/moon); >0.0 = leaf faces and
+            // sapling cross-plant tops only - see ChunkMeshBuilder.windWeightFor/emitCrossPlant.
+            layout (location = 5) in float aWindWeight;
 
             uniform mat4 uProjection;
             uniform mat4 uView;
             uniform mat4 uModel;
             uniform vec3 uCameraPos;
+            // Elapsed seconds (only while actually in-game and unpaused - see Game.updateInGame),
+            // and a single debug-tunable strength multiplier (0 disables wind entirely).
+            uniform float uWindTime;
+            uniform float uWindStrength;
 
             out vec2 vUv;
             out float vSkyShade;
@@ -25,6 +32,33 @@ public final class Shaders {
 
             void main() {
                 vec4 worldPos = uModel * vec4(aPos, 1.0);
+
+                if (aWindWeight > 0.0) {
+                    // Maximum displacement in block units at full weight/strength - this
+                    // project's own tuning (see ChunkMeshBuilder's LEAF_WIND_WEIGHT javadoc),
+                    // chosen within the suggested 0.02-0.08 (leaves) / 0.03-0.1 (sapling) ranges,
+                    // not an official Minecraft value. sin() alone ranges roughly [-1.25, 1.25]
+                    // (primary + a 25%-strength secondary term) - without this scale the raw
+                    // sine value was being used directly as block-unit displacement, up to
+                    // nearly a full block, which is what produced visibly torn/gappy leaf faces
+                    // during live testing.
+                    const float WIND_AMPLITUDE = 0.06;
+                    // Stable world-space phase (not camera-relative, not per-frame-random) so
+                    // neighboring trees sway out of sync with each other but never pop or drift
+                    // as the camera moves.
+                    float phase = worldPos.x * 0.9 + worldPos.z * 0.7;
+                    float primary = sin(uWindTime * 1.2566 + phase);
+                    float secondary = sin(uWindTime * 3.1416 + phase * 1.7) * 0.25;
+                    // fract(aPos.y) gives each individual leaf cube's own top-vs-bottom edge a
+                    // little extra lean (top sways more) for free - no additional per-vertex CPU
+                    // data beyond aWindWeight itself; harmless for the sapling top/base vertices,
+                    // whose own aWindWeight (0 or 1) already carries the real base-to-top gradient.
+                    float heightFactor = mix(0.4, 1.0, fract(aPos.y));
+                    float sway = (primary + secondary) * WIND_AMPLITUDE * aWindWeight * heightFactor * uWindStrength;
+                    worldPos.x += sway;
+                    worldPos.z += sway * 0.6;
+                }
+
                 gl_Position = uProjection * uView * worldPos;
                 vUv = aUv;
                 vSkyShade = aSkyShade;

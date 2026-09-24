@@ -67,6 +67,11 @@ public class Game implements GameAccess {
     private static final float UNDERWATER_FOG_END = 12f;
     private static final float UNDERWATER_TRANSITION_RATE = 3f;
     private static final Vector3f DEFAULT_UNDERWATER_FOG = new Vector3f(0.02f, 0.08f, 0.20f);
+    /** Global wind-sway multiplier (see Shaders.CHUNK_VERTEX) - the one debug/tuning knob for
+     *  this feature: set to 0f to disable wind entirely with no other code changes, per the
+     *  request's own "simple configuration constant is acceptable" guidance. This project's own
+     *  tuning, not an official Minecraft value. */
+    private static final float WIND_STRENGTH = 1f;
 
     private enum GameState {TITLE, SELECT_WORLD, WORLD_CREATE, IN_GAME, PAUSED}
 
@@ -104,6 +109,10 @@ public class Game implements GameAccess {
     /** The label fades out over this many seconds at the tail of HOTBAR_LABEL_DURATION, rather
      *  than popping off abruptly. */
     private static final float HOTBAR_LABEL_FADE_SECONDS = 0.4f;
+    /** Elapsed seconds fed to the wind shader as uWindTime - only accumulates during real
+     *  gameplay (updateInGame), never while paused/on a menu, so wind visibly freezes when the
+     *  game is paused rather than continuing to animate an unattended world. */
+    private float windTime = 0f;
 
     private double titleTimer = 0;
     /** 0=midnight, 0.25=sunrise, 0.5=noon, 0.75=sunset. */
@@ -131,10 +140,16 @@ public class Game implements GameAccess {
     private final float[] rainY = new float[RAIN_PARTICLE_COUNT];
     private final float[] rainZ = new float[RAIN_PARTICLE_COUNT];
 
+    // 11 floats/vertex everywhere: position(3), uv(2), skyShade(1), blockLight(1), tint(3),
+    // windWeight(1) - one shared layout across every mesh that uses chunkShader (chunk terrain,
+    // held item, rain, sun/moon; see Shaders.CHUNK_VERTEX's aWindWeight). Only leaf faces and
+    // sapling cross-plants ever write a nonzero value; everything else writes a constant 0f.
+    private static final int[] CHUNK_VERTEX_LAYOUT = {3, 2, 1, 1, 3, 1};
+
     private static final class ChunkRenderData {
         final int chunkX, chunkZ;
-        final Mesh opaqueMesh = new Mesh(new int[]{3, 2, 1, 1, 3});
-        final Mesh transparentMesh = new Mesh(new int[]{3, 2, 1, 1, 3});
+        final Mesh opaqueMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
+        final Mesh transparentMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
 
         ChunkRenderData(int chunkX, int chunkZ) {
             this.chunkX = chunkX;
@@ -169,9 +184,9 @@ public class Game implements GameAccess {
         chunkShader = new Shader(Shaders.CHUNK_VERTEX, Shaders.CHUNK_FRAGMENT);
         uiRenderer = new UiRenderer();
         font = new Font();
-        sunMoonMesh = new Mesh(new int[]{3, 2, 1, 1, 3});
-        rainMesh = new Mesh(new int[]{3, 2, 1, 1, 3});
-        heldItemMesh = new Mesh(new int[]{3, 2, 1, 1, 3});
+        sunMoonMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
+        rainMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
+        heldItemMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
 
         titleScreen = new TitleScreen(new TitleScreen.Listener() {
             @Override
@@ -462,6 +477,7 @@ public class Game implements GameAccess {
         weather.update(dt);
         updateRainParticles(dt);
         saplingGrowth.update(world, dt);
+        windTime += dt;
 
         updateHotbarSelection();
         if (hotbarLabelTimer > 0f) hotbarLabelTimer = Math.max(0f, hotbarLabelTimer - dt);
@@ -795,6 +811,8 @@ public class Game implements GameAccess {
         chunkShader.setUniform("uFogStart", fogStart);
         chunkShader.setUniform("uFogEnd", fogEnd);
         chunkShader.setUniform("uDaylightFactor", daylightFactor);
+        chunkShader.setUniform("uWindTime", windTime);
+        chunkShader.setUniform("uWindStrength", WIND_STRENGTH);
         atlas.bind(0);
 
         chunkShader.setUniform("uAlpha", 1f);
@@ -863,7 +881,7 @@ public class Game implements GameAccess {
         float[] bottom = atlas.getUv(faces.bottom());
         float[] side = atlas.getUv(faces.side());
 
-        float[] verts = new float[6 * 6 * 10];
+        float[] verts = new float[6 * 6 * 11];
         int idx = 0;
         idx = emitCubeFace(verts, idx, new float[]{-0.5f, 0.5f, -0.5f}, new float[]{-0.5f, 0.5f, 0.5f}, new float[]{0.5f, 0.5f, 0.5f}, new float[]{0.5f, 0.5f, -0.5f}, top, 1.0f);
         idx = emitCubeFace(verts, idx, new float[]{-0.5f, -0.5f, 0.5f}, new float[]{-0.5f, -0.5f, -0.5f}, new float[]{0.5f, -0.5f, -0.5f}, new float[]{0.5f, -0.5f, 0.5f}, bottom, 0.6f);
@@ -897,6 +915,7 @@ public class Game implements GameAccess {
         arr[idx++] = 1f; // tint r - the held item is never grass/leaves, always neutral
         arr[idx++] = 1f; // tint g
         arr[idx++] = 1f; // tint b
+        arr[idx++] = 0f; // wind weight - the held item never sways
         return idx;
     }
 
@@ -918,7 +937,7 @@ public class Game implements GameAccess {
         chunkShader.setUniform("uFogStart", 1_000_000f);
         chunkShader.setUniform("uFogEnd", 2_000_000f);
 
-        float[] verts = new float[RAIN_PARTICLE_COUNT * 6 * 10];
+        float[] verts = new float[RAIN_PARTICLE_COUNT * 6 * 11];
         int idx = 0;
         for (int i = 0; i < RAIN_PARTICLE_COUNT; i++) {
             float cx = rainX[i], cy = rainY[i], cz = rainZ[i];
@@ -952,6 +971,7 @@ public class Game implements GameAccess {
         arr[idx++] = 1f; // tint r
         arr[idx++] = 1f; // tint g
         arr[idx++] = 1f; // tint b
+        arr[idx++] = 0f; // wind weight - rain never sways
         return idx;
     }
 
@@ -1020,14 +1040,14 @@ public class Game implements GameAccess {
         Vector3f p2 = new Vector3f(center).add(rHalf).add(uHalf);
         Vector3f p3 = new Vector3f(center).sub(rHalf).add(uHalf);
 
-        float sky = 1f, block = 1f, t = 1f;
+        float sky = 1f, block = 1f, t = 1f, wind = 0f; // celestial bodies never sway
         float[] verts = {
-                p0.x, p0.y, p0.z, u0, v1, sky, block, t, t, t,
-                p1.x, p1.y, p1.z, u1, v1, sky, block, t, t, t,
-                p2.x, p2.y, p2.z, u1, v0, sky, block, t, t, t,
-                p0.x, p0.y, p0.z, u0, v1, sky, block, t, t, t,
-                p2.x, p2.y, p2.z, u1, v0, sky, block, t, t, t,
-                p3.x, p3.y, p3.z, u0, v0, sky, block, t, t, t,
+                p0.x, p0.y, p0.z, u0, v1, sky, block, t, t, t, wind,
+                p1.x, p1.y, p1.z, u1, v1, sky, block, t, t, t, wind,
+                p2.x, p2.y, p2.z, u1, v0, sky, block, t, t, t, wind,
+                p0.x, p0.y, p0.z, u0, v1, sky, block, t, t, t, wind,
+                p2.x, p2.y, p2.z, u1, v0, sky, block, t, t, t, wind,
+                p3.x, p3.y, p3.z, u0, v0, sky, block, t, t, t, wind,
         };
         sunMoonMesh.upload(verts);
         sunMoonMesh.draw();

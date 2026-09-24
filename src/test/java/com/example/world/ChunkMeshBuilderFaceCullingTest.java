@@ -124,4 +124,36 @@ class ChunkMeshBuilderFaceCullingTest {
         assertFalse(tint[0] == 1f && tint[1] == 1f && tint[2] == 1f, "grass icon tint must not be the neutral (no-op) tint");
         assertTrue(tint[1] > tint[0] && tint[1] > tint[2], "grass tint should read as green (G channel dominant)");
     }
+
+    // --- Wind-weight classification (task #81) ---
+
+    @Test
+    void everyLeafSpeciesGetsANonzeroWindWeight() {
+        BlockType[] leaves = {BlockType.OAK_LEAVES, BlockType.BIRCH_LEAVES, BlockType.SPRUCE_LEAVES,
+                BlockType.JUNGLE_LEAVES, BlockType.ACACIA_LEAVES, BlockType.MANGROVE_LEAVES,
+                BlockType.DARK_OAK_LEAVES, BlockType.CHERRY_LEAVES};
+        for (BlockType leaf : leaves) {
+            float w = ChunkMeshBuilder.windWeightFor(leaf);
+            assertTrue(w > 0f && w <= 1f, leaf + " wind weight must be in (0,1], got " + w);
+        }
+    }
+
+    @Test
+    void rigidBlocksIncludingLogsGetZeroWindWeight() {
+        // Logs specifically: trunks/branches share the exact same BlockType (see TreeSpecies'
+        // class docs on Dark Oak) and can't be told apart at this level - both must stay rigid.
+        BlockType[] rigid = {BlockType.STONE, BlockType.GRASS_BLOCK, BlockType.DIRT, BlockType.WATER,
+                BlockType.OAK_LOG, BlockType.DARK_OAK_LOG, BlockType.GLASS, BlockType.MANGROVE_ROOTS};
+        for (BlockType type : rigid) {
+            assertEquals(0f, ChunkMeshBuilder.windWeightFor(type), type + " must be rigid (wind weight 0)");
+        }
+    }
+
+    @Test
+    void saplingBlocksThemselvesAreNotClassifiedByWindWeightFor() {
+        // Saplings get their own explicit per-vertex gradient directly in emitCrossPlant (base=0,
+        // top=1), not the flat windWeightFor(BlockType) path leaves use - confirms the two
+        // mechanisms don't overlap or double-apply.
+        assertEquals(0f, ChunkMeshBuilder.windWeightFor(BlockType.OAK_SAPLING_STAGE_0));
+    }
 }

@@ -45,6 +45,10 @@ public class ChunkMeshBuilder {
     private static final float[] CHERRY_TINT = {0.97f, 0.75f, 0.84f};
     /** Slightly under a full block, matching a real young sapling's actual visual scale. */
     private static final float CROSS_PLANT_HEIGHT = 0.8f;
+    /** Per-vertex wind-displacement weight for leaf faces (0=rigid, 1=full sway) - this project's
+     *  own tuning (see Shaders.CHUNK_VERTEX's wind formula), not an official Minecraft value.
+     *  Every non-leaf, non-plant face gets 0.0. */
+    private static final float LEAF_WIND_WEIGHT = 0.7f;
     /** The same "no colormap file available" fallback constants BiomeColors already passes to
      *  Colormap.load - reused here (not reinvented) as the representative tint for hotbar icons,
      *  which have no world column to sample a real per-biome blend from. */
@@ -75,6 +79,18 @@ public class ChunkMeshBuilder {
     /** The representative grass-top tint for icons - see DEFAULT_GRASS_TINT. */
     public static float[] grassIconTint() {
         return DEFAULT_GRASS_TINT;
+    }
+
+    /** Wind-displacement weight for a cube-face block - LEAF_WIND_WEIGHT for any of the 8 leaf
+     *  species (every one gets the same flat weight; the shader adds its own free per-vertex
+     *  height gradient via fract(aPos.y), so no CPU-side per-face variation is needed here), 0.0
+     *  for everything else. Trunks/branches are deliberately excluded - see the class docs on
+     *  DARK_OAK's shared trunk/branch block type for why they can't be told apart at this level
+     *  without new per-face metadata this round doesn't otherwise need. Package-private so
+     *  ChunkMeshBuilderFaceCullingTest-style pure-logic tests can exercise it directly. */
+    static float windWeightFor(BlockType type) {
+        boolean isLeaf = isBiomeTintedLeaves(type) || type == BlockType.SPRUCE_LEAVES || type == BlockType.CHERRY_LEAVES;
+        return isLeaf ? LEAF_WIND_WEIGHT : 0f;
     }
 
     private final TextureAtlas atlas;
@@ -132,19 +148,20 @@ public class ChunkMeshBuilder {
                             : isWater ? chunk.getWaterTint(lx, lz) : NEUTRAL_TINT;
                     float[] topTint = isBiomeTintedLeaves || isWater || isSpruceLeaves || isCherryLeaves ? sideTint
                             : type == BlockType.GRASS_BLOCK ? chunk.getGrassTint(lx, lz) : NEUTRAL_TINT;
+                    float windWeight = windWeightFor(type);
 
                     if (shouldDrawFace(type, up))
-                        emitFace(target, Face.TOP, lx, ly, lz, atlas.getUv(faces.top()), SHADE_TOP, chunk, world, lx, ly + 1, lz, topY, topTint);
+                        emitFace(target, Face.TOP, lx, ly, lz, atlas.getUv(faces.top()), SHADE_TOP, chunk, world, lx, ly + 1, lz, topY, topTint, windWeight);
                     if (shouldDrawFace(type, down))
-                        emitFace(target, Face.BOTTOM, lx, ly, lz, atlas.getUv(faces.bottom()), SHADE_BOTTOM, chunk, world, lx, ly - 1, lz, topY, sideTint);
+                        emitFace(target, Face.BOTTOM, lx, ly, lz, atlas.getUv(faces.bottom()), SHADE_BOTTOM, chunk, world, lx, ly - 1, lz, topY, sideTint, windWeight);
                     if (shouldDrawFace(type, north))
-                        emitFace(target, Face.NORTH, lx, ly, lz, atlas.getUv(faces.side()), SHADE_NORTH_SOUTH, chunk, world, lx, ly, lz - 1, topY, sideTint);
+                        emitFace(target, Face.NORTH, lx, ly, lz, atlas.getUv(faces.side()), SHADE_NORTH_SOUTH, chunk, world, lx, ly, lz - 1, topY, sideTint, windWeight);
                     if (shouldDrawFace(type, south))
-                        emitFace(target, Face.SOUTH, lx, ly, lz, atlas.getUv(faces.side()), SHADE_NORTH_SOUTH, chunk, world, lx, ly, lz + 1, topY, sideTint);
+                        emitFace(target, Face.SOUTH, lx, ly, lz, atlas.getUv(faces.side()), SHADE_NORTH_SOUTH, chunk, world, lx, ly, lz + 1, topY, sideTint, windWeight);
                     if (shouldDrawFace(type, east))
-                        emitFace(target, Face.EAST, lx, ly, lz, atlas.getUv(faces.side()), SHADE_EAST_WEST, chunk, world, lx + 1, ly, lz, topY, sideTint);
+                        emitFace(target, Face.EAST, lx, ly, lz, atlas.getUv(faces.side()), SHADE_EAST_WEST, chunk, world, lx + 1, ly, lz, topY, sideTint, windWeight);
                     if (shouldDrawFace(type, west))
-                        emitFace(target, Face.WEST, lx, ly, lz, atlas.getUv(faces.side()), SHADE_EAST_WEST, chunk, world, lx - 1, ly, lz, topY, sideTint);
+                        emitFace(target, Face.WEST, lx, ly, lz, atlas.getUv(faces.side()), SHADE_EAST_WEST, chunk, world, lx - 1, ly, lz, topY, sideTint, windWeight);
                 }
             }
         }
@@ -211,17 +228,20 @@ public class ChunkMeshBuilder {
         float u0 = uv[0], v0 = uv[1], u1 = uv[2], v1 = uv[3];
         float h = CROSS_PLANT_HEIGHT;
 
+        // Base vertices (dy=0) get wind weight 0.0 - anchored to the ground, never translating
+        // as a rigid object; top vertices (dy=h) get 1.0 - a real per-vertex bend-from-the-base
+        // gradient, not a flat per-block weight the way leaf cube faces use.
         float[][] planeA = {
-                {0, 0, 0, u0, v1}, {1, 0, 1, u1, v1}, {1, h, 1, u1, v0},
-                {0, 0, 0, u0, v1}, {1, h, 1, u1, v0}, {0, h, 0, u0, v0}
+                {0, 0, 0, u0, v1, 0}, {1, 0, 1, u1, v1, 0}, {1, h, 1, u1, v0, 1},
+                {0, 0, 0, u0, v1, 0}, {1, h, 1, u1, v0, 1}, {0, h, 0, u0, v0, 1}
         };
         float[][] planeB = {
-                {1, 0, 0, u0, v1}, {0, 0, 1, u1, v1}, {0, h, 1, u1, v0},
-                {1, 0, 0, u0, v1}, {0, h, 1, u1, v0}, {1, h, 0, u0, v0}
+                {1, 0, 0, u0, v1, 0}, {0, 0, 1, u1, v1, 0}, {0, h, 1, u1, v0, 1},
+                {1, 0, 0, u0, v1, 0}, {0, h, 1, u1, v0, 1}, {1, h, 0, u0, v0, 1}
         };
         for (float[][] plane : new float[][][]{planeA, planeB}) {
             for (float[] c : plane) {
-                buf.add(lx + c[0], ly + c[1], lz + c[2], c[3], c[4], skyShade, blockLight, 1f, 1f, 1f);
+                buf.add(lx + c[0], ly + c[1], lz + c[2], c[3], c[4], skyShade, blockLight, 1f, 1f, 1f, c[5]);
             }
         }
     }
@@ -229,7 +249,8 @@ public class ChunkMeshBuilder {
     private enum Face {TOP, BOTTOM, NORTH, SOUTH, EAST, WEST}
 
     private void emitFace(FloatBuffer buf, Face face, int x, int y, int z, float[] uv, float directionalShade,
-                           Chunk chunk, World world, int neighborLx, int neighborLy, int neighborLz, float topY, float[] tint) {
+                           Chunk chunk, World world, int neighborLx, int neighborLy, int neighborLz, float topY,
+                           float[] tint, float windWeight) {
         float skyShade = (sampleSkyLight(chunk, world, neighborLx, neighborLy, neighborLz) / 15f) * directionalShade;
         float blockLight = sampleBlockLight(chunk, world, neighborLx, neighborLy, neighborLz) / 15f;
 
@@ -267,7 +288,7 @@ public class ChunkMeshBuilder {
             default -> throw new IllegalStateException();
         }
         for (float[] c : corners) {
-            buf.add(x + c[0], y + c[1], z + c[2], c[3], c[4], skyShade, blockLight, tint[0], tint[1], tint[2]);
+            buf.add(x + c[0], y + c[1], z + c[2], c[3], c[4], skyShade, blockLight, tint[0], tint[1], tint[2], windWeight);
         }
     }
 
