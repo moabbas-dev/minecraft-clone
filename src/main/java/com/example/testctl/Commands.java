@@ -34,6 +34,7 @@ public final class Commands {
             case "setWeather" -> setWeather(params);
             case "newTestWorld" -> newTestWorld(params);
             case "setBlock" -> setBlock(params);
+            case "selectSlot" -> selectSlot(params);
             case "screenshot" -> screenshot(params);
             case "state" -> state();
             case "shutdown" -> shutdown();
@@ -96,6 +97,17 @@ public final class Commands {
             return Result.badRequest("unknown block type: " + type);
         }
         return Result.ok("set " + x + "," + y + "," + z + " to " + type.toUpperCase(Locale.ROOT));
+    }
+
+    private Result selectSlot(Map<String, String> p) {
+        Integer index = parseInt(p, "index");
+        if (index == null) return Result.badRequest("selectSlot requires an integer 'index' param");
+        try {
+            game.selectSlot(index);
+        } catch (IllegalArgumentException e) {
+            return Result.badRequest(e.getMessage());
+        }
+        return Result.ok("selected slot " + index);
     }
 
     private Result screenshot(Map<String, String> p) {

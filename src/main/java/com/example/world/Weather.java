@@ -1,5 +1,7 @@
 package com.example.world;
 
+import lombok.Getter;
+
 import java.util.Random;
 
 /**
@@ -23,16 +25,20 @@ public class Weather {
     private static final float STORM_INTENSITY_RATE = 0.4f;
 
     private final Random random;
+    @Getter
     private State state = State.CLEAR;
     private float timeRemaining;
     private float lightningTimer;
+    /** 0..1, spikes to 1 on a lightning strike and decays back to 0 - drive a screen flash with it. */
+    @Getter
     private float lightningFlash = 0f;
     /**
      * 0..1, eased toward 1 while raining/thundering and toward 0 otherwise - unlike
      * {@link #isRaining()} (an instant flag flip the moment the state timer expires), this fades
      * smoothly, so anything driven by it (sky/fog blending in Game.renderWorld) doesn't snap the
-     * instant a storm starts or ends.
+     * instant a storm starts or ends. Use this instead of isRaining() for anything visual.
      */
+    @Getter
     private float stormIntensity = 0f;
 
     public Weather(long seed) {
@@ -73,26 +79,12 @@ public class Weather {
         return min + random.nextFloat() * (max - min);
     }
 
-    public State getState() {
-        return state;
-    }
-
     public boolean isRaining() {
         return state == State.RAIN || state == State.THUNDER;
     }
 
     public boolean isThundering() {
         return state == State.THUNDER;
-    }
-
-    /** 0..1, spikes to 1 on a lightning strike and decays back to 0 - drive a screen flash with it. */
-    public float getLightningFlash() {
-        return lightningFlash;
-    }
-
-    /** 0..1, eased - see the field javadoc. Use this instead of isRaining() for anything visual. */
-    public float getStormIntensity() {
-        return stormIntensity;
     }
 
     /** Test/controller-only: immediately forces the weather state, bypassing the normal

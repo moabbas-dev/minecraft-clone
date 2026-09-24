@@ -10,6 +10,7 @@ import com.example.ui.SelectWorldScreen;
 import com.example.ui.TitleScreen;
 import com.example.ui.WorldCreateScreen;
 import com.example.world.*;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
@@ -146,15 +147,11 @@ public class Game implements GameAccess {
     // sapling cross-plants ever write a nonzero value; everything else writes a constant 0f.
     private static final int[] CHUNK_VERTEX_LAYOUT = {3, 2, 1, 1, 3, 1};
 
+    @RequiredArgsConstructor
     private static final class ChunkRenderData {
         final int chunkX, chunkZ;
         final Mesh opaqueMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
         final Mesh transparentMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
-
-        ChunkRenderData(int chunkX, int chunkZ) {
-            this.chunkX = chunkX;
-            this.chunkZ = chunkZ;
-        }
 
         void destroy() {
             opaqueMesh.destroy();
@@ -881,29 +878,35 @@ public class Game implements GameAccess {
         float[] bottom = atlas.getUv(faces.bottom());
         float[] side = atlas.getUv(faces.side());
 
+        // Same tint split as drawBlockIcon: leaf species tint every face, grass tints only the
+        // top (its side/bottom textures are already-colored images), everything else is neutral.
+        float[] leafTint = ChunkMeshBuilder.leafIconTint(block);
+        float[] topTint = leafTint != null ? leafTint : block == BlockType.GRASS_BLOCK ? ChunkMeshBuilder.grassIconTint() : NEUTRAL_ICON_TINT;
+        float[] sideTint = leafTint != null ? leafTint : NEUTRAL_ICON_TINT;
+
         float[] verts = new float[6 * 6 * 11];
         int idx = 0;
-        idx = emitCubeFace(verts, idx, new float[]{-0.5f, 0.5f, -0.5f}, new float[]{-0.5f, 0.5f, 0.5f}, new float[]{0.5f, 0.5f, 0.5f}, new float[]{0.5f, 0.5f, -0.5f}, top, 1.0f);
-        idx = emitCubeFace(verts, idx, new float[]{-0.5f, -0.5f, 0.5f}, new float[]{-0.5f, -0.5f, -0.5f}, new float[]{0.5f, -0.5f, -0.5f}, new float[]{0.5f, -0.5f, 0.5f}, bottom, 0.6f);
-        idx = emitCubeFace(verts, idx, new float[]{-0.5f, -0.5f, 0.5f}, new float[]{0.5f, -0.5f, 0.5f}, new float[]{0.5f, 0.5f, 0.5f}, new float[]{-0.5f, 0.5f, 0.5f}, side, 0.85f);
-        idx = emitCubeFace(verts, idx, new float[]{0.5f, -0.5f, -0.5f}, new float[]{-0.5f, -0.5f, -0.5f}, new float[]{-0.5f, 0.5f, -0.5f}, new float[]{0.5f, 0.5f, -0.5f}, side, 0.85f);
-        idx = emitCubeFace(verts, idx, new float[]{0.5f, -0.5f, 0.5f}, new float[]{0.5f, -0.5f, -0.5f}, new float[]{0.5f, 0.5f, -0.5f}, new float[]{0.5f, 0.5f, 0.5f}, side, 0.7f);
-        idx = emitCubeFace(verts, idx, new float[]{-0.5f, -0.5f, -0.5f}, new float[]{-0.5f, -0.5f, 0.5f}, new float[]{-0.5f, 0.5f, 0.5f}, new float[]{-0.5f, 0.5f, -0.5f}, side, 0.7f);
+        idx = emitCubeFace(verts, idx, new float[]{-0.5f, 0.5f, -0.5f}, new float[]{-0.5f, 0.5f, 0.5f}, new float[]{0.5f, 0.5f, 0.5f}, new float[]{0.5f, 0.5f, -0.5f}, top, 1.0f, topTint);
+        idx = emitCubeFace(verts, idx, new float[]{-0.5f, -0.5f, 0.5f}, new float[]{-0.5f, -0.5f, -0.5f}, new float[]{0.5f, -0.5f, -0.5f}, new float[]{0.5f, -0.5f, 0.5f}, bottom, 0.6f, sideTint);
+        idx = emitCubeFace(verts, idx, new float[]{-0.5f, -0.5f, 0.5f}, new float[]{0.5f, -0.5f, 0.5f}, new float[]{0.5f, 0.5f, 0.5f}, new float[]{-0.5f, 0.5f, 0.5f}, side, 0.85f, sideTint);
+        idx = emitCubeFace(verts, idx, new float[]{0.5f, -0.5f, -0.5f}, new float[]{-0.5f, -0.5f, -0.5f}, new float[]{-0.5f, 0.5f, -0.5f}, new float[]{0.5f, 0.5f, -0.5f}, side, 0.85f, sideTint);
+        idx = emitCubeFace(verts, idx, new float[]{0.5f, -0.5f, 0.5f}, new float[]{0.5f, -0.5f, -0.5f}, new float[]{0.5f, 0.5f, -0.5f}, new float[]{0.5f, 0.5f, 0.5f}, side, 0.7f, sideTint);
+        idx = emitCubeFace(verts, idx, new float[]{-0.5f, -0.5f, -0.5f}, new float[]{-0.5f, -0.5f, 0.5f}, new float[]{-0.5f, 0.5f, 0.5f}, new float[]{-0.5f, 0.5f, -0.5f}, side, 0.7f, sideTint);
         return verts;
     }
 
-    private int emitCubeFace(float[] arr, int idx, float[] p0, float[] p1, float[] p2, float[] p3, float[] uv, float shade) {
+    private int emitCubeFace(float[] arr, int idx, float[] p0, float[] p1, float[] p2, float[] p3, float[] uv, float shade, float[] tint) {
         float u0 = uv[0], v0 = uv[1], u1 = uv[2], v1 = uv[3];
-        idx = emitHeldVert(arr, idx, p0, u0, v1, shade);
-        idx = emitHeldVert(arr, idx, p1, u1, v1, shade);
-        idx = emitHeldVert(arr, idx, p2, u1, v0, shade);
-        idx = emitHeldVert(arr, idx, p0, u0, v1, shade);
-        idx = emitHeldVert(arr, idx, p2, u1, v0, shade);
-        idx = emitHeldVert(arr, idx, p3, u0, v0, shade);
+        idx = emitHeldVert(arr, idx, p0, u0, v1, shade, tint);
+        idx = emitHeldVert(arr, idx, p1, u1, v1, shade, tint);
+        idx = emitHeldVert(arr, idx, p2, u1, v0, shade, tint);
+        idx = emitHeldVert(arr, idx, p0, u0, v1, shade, tint);
+        idx = emitHeldVert(arr, idx, p2, u1, v0, shade, tint);
+        idx = emitHeldVert(arr, idx, p3, u0, v0, shade, tint);
         return idx;
     }
 
-    private int emitHeldVert(float[] arr, int idx, float[] p, float u, float v, float shade) {
+    private int emitHeldVert(float[] arr, int idx, float[] p, float u, float v, float shade, float[] tint) {
         arr[idx++] = p[0];
         arr[idx++] = p[1];
         arr[idx++] = p[2];
@@ -912,9 +915,9 @@ public class Game implements GameAccess {
         arr[idx++] = 0f; // skyShade unused - the held item ignores day/night and world lighting
         arr[idx++] = shade; // baked per-face brightness lives in the blockLight channel instead,
         // since that one isn't multiplied by uDaylightFactor, so it stays constant day or night
-        arr[idx++] = 1f; // tint r - the held item is never grass/leaves, always neutral
-        arr[idx++] = 1f; // tint g
-        arr[idx++] = 1f; // tint b
+        arr[idx++] = tint[0];
+        arr[idx++] = tint[1];
+        arr[idx++] = tint[2];
         arr[idx++] = 0f; // wind weight - the held item never sways
         return idx;
     }
@@ -1324,6 +1327,14 @@ public class Game implements GameAccess {
         if (species != null) {
             saplingGrowth.registerPlanted(x, y, z, species);
         }
+    }
+
+    @Override
+    public void selectSlot(int index) {
+        if (index < 0 || index >= BlockType.PLACEABLE.length) {
+            throw new IllegalArgumentException("slot index out of range: " + index);
+        }
+        selectedIndex = index;
     }
 
     @Override

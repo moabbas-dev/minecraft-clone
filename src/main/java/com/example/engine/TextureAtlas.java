@@ -1,5 +1,6 @@
 package com.example.engine;
 
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
 import javax.imageio.ImageIO;
@@ -109,6 +110,7 @@ public class TextureAtlas {
         // CHEST, SUN, MOON, RAIN: no real block-texture equivalent, always procedural.
     }
 
+    @Getter
     private final int textureId;
 
     public TextureAtlas() {
@@ -193,9 +195,6 @@ public class TextureAtlas {
         glBindTexture(GL_TEXTURE_2D, textureId);
     }
 
-    public int getTextureId() {
-        return textureId;
-    }
 
     private int upload(BufferedImage image) {
         int w = image.getWidth();

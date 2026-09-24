@@ -29,6 +29,10 @@ public interface GameAccess {
      *  @throws IllegalArgumentException if blockTypeName isn't a real BlockType. */
     void setBlock(int x, int y, int z, String blockTypeName);
 
+    /** Selects a hotbar slot by index into {@code BlockType.PLACEABLE}, same effect as pressing
+     *  the matching number key. @throws IllegalArgumentException if index is out of range. */
+    void selectSlot(int index);
+
     /** Captures the current frame to test-output/screenshots/&lt;name&gt;.png. Returns the file path. */
     String captureScreenshot(String name) throws IOException;
 

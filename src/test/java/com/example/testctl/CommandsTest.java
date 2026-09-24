@@ -28,6 +28,8 @@ class CommandsTest {
         Integer setBlockX, setBlockY, setBlockZ;
         String setBlockType;
         boolean throwOnSetBlock;
+        Integer selectedSlot;
+        boolean throwOnSelectSlot;
 
         @Override
         public void teleport(float x, float y, float z, Float yawDegrees, Float pitchDegrees) {
@@ -60,6 +62,12 @@ class CommandsTest {
             setBlockY = y;
             setBlockZ = z;
             setBlockType = blockTypeName;
+        }
+
+        @Override
+        public void selectSlot(int index) {
+            if (throwOnSelectSlot) throw new IllegalArgumentException("slot index out of range: " + index);
+            selectedSlot = index;
         }
 
         @Override
@@ -216,6 +224,34 @@ class CommandsTest {
     void setBlockUnknownTypeBecomesA400NotACrash() {
         fake.throwOnSetBlock = true;
         Commands.Result r = commands.execute("setBlock", params("x", "8", "y", "70", "z", "8", "type", "not_a_real_block"));
+        assertEquals(400, r.status());
+    }
+
+    @Test
+    void selectSlotDispatchesWithIndex() {
+        Commands.Result r = commands.execute("selectSlot", params("index", "3"));
+        assertEquals(200, r.status());
+        assertEquals(3, fake.selectedSlot);
+    }
+
+    @Test
+    void selectSlotRejectsMissingIndex() {
+        Commands.Result r = commands.execute("selectSlot", params());
+        assertEquals(400, r.status());
+        assertNull(fake.selectedSlot);
+    }
+
+    @Test
+    void selectSlotRejectsNonIntegerIndex() {
+        Commands.Result r = commands.execute("selectSlot", params("index", "not-a-number"));
+        assertEquals(400, r.status());
+        assertNull(fake.selectedSlot);
+    }
+
+    @Test
+    void selectSlotOutOfRangeBecomesA400NotACrash() {
+        fake.throwOnSelectSlot = true;
+        Commands.Result r = commands.execute("selectSlot", params("index", "999"));
         assertEquals(400, r.status());
     }
 

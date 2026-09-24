@@ -1,5 +1,6 @@
 package com.example.engine;
 
+import lombok.Getter;
 import org.lwjgl.system.MemoryStack;
 
 import java.nio.DoubleBuffer;
@@ -16,8 +17,10 @@ public class Input implements InputState {
     private final StringBuilder typedChars = new StringBuilder();
 
     private double lastMouseX, lastMouseY;
+    @Getter
     private double mouseDeltaX, mouseDeltaY;
     private boolean firstMouse = true;
+    @Getter
     private double scrollDelta;
 
     // GLFW reports cursor position in "screen coordinates", but window.getWidth()/getHeight()
@@ -91,18 +94,6 @@ public class Input implements InputState {
         boolean v = mousePressedEdge[button];
         mousePressedEdge[button] = false;
         return v;
-    }
-
-    public double getMouseDeltaX() {
-        return mouseDeltaX;
-    }
-
-    public double getMouseDeltaY() {
-        return mouseDeltaY;
-    }
-
-    public double getScrollDelta() {
-        return scrollDelta;
     }
 
     public double getMouseX() {

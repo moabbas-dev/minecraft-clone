@@ -1,5 +1,7 @@
 package com.example.world;
 
+import lombok.Getter;
+
 /**
  * Block palette. Originally matched Minecraft Java Edition 1.8's (pre-flattening) numeric
  * block IDs; the project now targets modern Minecraft, which dropped numeric IDs entirely in
@@ -79,7 +81,9 @@ public enum BlockType {
 
     public final int id;
     public final String displayName;
+    @Getter
     private final boolean solidCollision;
+    @Getter
     private final boolean transparentRender;
     /** Hardness in seconds; -1 means unbreakable by hand. */
     public final float hardness;
@@ -103,14 +107,6 @@ public enum BlockType {
      */
     public boolean isOpaqueCube() {
         return this != AIR && !transparentRender;
-    }
-
-    public boolean isSolidCollision() {
-        return solidCollision;
-    }
-
-    public boolean isTransparentRender() {
-        return transparentRender;
     }
 
     public boolean isAir() {

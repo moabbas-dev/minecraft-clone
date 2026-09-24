@@ -2,11 +2,13 @@ package com.example.ui;
 
 import com.example.engine.Font;
 import com.example.engine.UiRenderer;
+import lombok.Getter;
 
 /** A clickable rectangle with a label, shared by every menu screen. */
 public class Button {
     public final float x, y, width, height;
     public final String label;
+    @Getter
     private boolean hovered;
 
     public Button(float x, float y, float width, float height, String label) {
@@ -19,10 +21,6 @@ public class Button {
 
     public void updateHover(double mouseX, double mouseY) {
         hovered = contains(mouseX, mouseY);
-    }
-
-    public boolean isHovered() {
-        return hovered;
     }
 
     public boolean contains(double mouseX, double mouseY) {

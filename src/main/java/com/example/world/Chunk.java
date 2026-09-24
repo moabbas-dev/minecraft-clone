@@ -1,5 +1,7 @@
 package com.example.world;
 
+import lombok.Getter;
+
 public class Chunk {
     public static final int SIZE_X = 16;
     public static final int SIZE_Z = 16;
@@ -23,8 +25,12 @@ public class Chunk {
     /** Same idea as grassTint/foliageTint, but for water faces - see ChunkMeshBuilder. */
     private final float[] waterTint = new float[SIZE_X * SIZE_Z * 3];
 
+    @Getter
     private volatile boolean generated = false;
+    @Getter
     private volatile boolean meshDirty = true;
+    /** True once {@link LightEngine#compute} has run at least once - see {@link World#getSkyLight}. */
+    @Getter
     private volatile boolean lightComputed = false;
 
     public Chunk(int chunkX, int chunkZ) {
@@ -100,25 +106,12 @@ public class Chunk {
         return blockLight[index(x, y, z)] & 0xFF;
     }
 
-    public boolean isGenerated() {
-        return generated;
-    }
-
     public void markGenerated() {
         generated = true;
     }
 
-    /** True once {@link LightEngine#compute} has run at least once - see {@link World#getSkyLight}. */
-    public boolean isLightComputed() {
-        return lightComputed;
-    }
-
     public void markLightComputed() {
         lightComputed = true;
-    }
-
-    public boolean isMeshDirty() {
-        return meshDirty;
     }
 
     public void clearMeshDirty() {

@@ -1,5 +1,6 @@
 package com.example.engine;
 
+import lombok.Getter;
 import org.lwjgl.opengl.GL;
 
 import static org.lwjgl.glfw.Callbacks.glfwFreeCallbacks;
@@ -8,8 +9,11 @@ import static org.lwjgl.opengl.GL33.*;
 import static org.lwjgl.system.MemoryUtil.NULL;
 
 public class Window {
+    @Getter
     private final long handle;
+    @Getter
     private int width;
+    @Getter
     private int height;
     private boolean resized;
 
@@ -87,18 +91,6 @@ public class Window {
         glfwFreeCallbacks(handle);
         glfwDestroyWindow(handle);
         glfwTerminate();
-    }
-
-    public long getHandle() {
-        return handle;
-    }
-
-    public int getWidth() {
-        return width;
-    }
-
-    public int getHeight() {
-        return height;
     }
 
     public float aspectRatio() {

@@ -1,5 +1,7 @@
 package com.example.world;
 
+import lombok.AllArgsConstructor;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -42,18 +44,11 @@ public class SaplingGrowth {
     private static final float RETRY_MIN_DELAY_SECONDS = 20f;
     private static final float RETRY_MAX_DELAY_SECONDS = 40f;
 
+    @AllArgsConstructor
     private static final class Entry {
         final int x, y, z;
         final SaplingSpecies species;
         float secondsRemaining;
-
-        Entry(int x, int y, int z, SaplingSpecies species, float secondsRemaining) {
-            this.x = x;
-            this.y = y;
-            this.z = z;
-            this.species = species;
-            this.secondsRemaining = secondsRemaining;
-        }
     }
 
     private final Map<Long, Entry> active = new HashMap<>();

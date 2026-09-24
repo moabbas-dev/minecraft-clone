@@ -1,5 +1,8 @@
 package com.example.world;
 
+import lombok.Getter;
+import lombok.Setter;
+
 import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
@@ -9,19 +12,13 @@ public class World {
     private final Map<Long, Chunk> chunks = new HashMap<>();
     private final WorldGenerator generator;
     /** Null means this world is never persisted (shouldn't normally happen once a world exists on disk). */
+    @Setter
+    @Getter
     private File saveDir;
 
     public World(long seed, WorldGenerator generator) {
         this.seed = seed;
         this.generator = generator;
-    }
-
-    public void setSaveDir(File saveDir) {
-        this.saveDir = saveDir;
-    }
-
-    public File getSaveDir() {
-        return saveDir;
     }
 
     /** Climate at a world column for the debug overlay; null for generators with no climate model. */

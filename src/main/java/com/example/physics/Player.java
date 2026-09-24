@@ -3,6 +3,8 @@ package com.example.physics;
 import com.example.engine.InputState;
 import com.example.world.BlockType;
 import com.example.world.World;
+import lombok.Getter;
+import lombok.Setter;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
@@ -75,53 +77,39 @@ public class Player {
 
     /** Feet position (bottom-center of the hitbox). */
     public final Vector3f position;
+    /** Test/controller-only settable directly via {@link #setYaw} rather than as a mouse-delta nudge. */
+    @Getter
+    @Setter
     private float yaw = (float) Math.toRadians(-90); // facing -Z initially
+    @Getter
     private float pitch = 0f;
     private float verticalVelocity = 0f;
     private boolean onGround = false;
+    @Getter
     private boolean flying = false;
     private boolean wasInWater = false;
     /** Feet in water (possibly only partially submerged) - see {@link #updateWaterState}. */
+    @Getter
     private boolean swimming = false;
     /** Eye/camera position specifically inside a water block - fully submerged. */
+    @Getter
     private boolean headSubmerged = false;
     private double lastSpacePressTime = -10;
     private double lastWPressTime = -10;
     private boolean sprintToggled = false;
+    @Getter
     private boolean sprinting = false;
     private float currentEyeHeight = EYE_HEIGHT;
     private float currentHitboxHeight = HEIGHT;
     private float currentSpeed = 0f;
     private float horizontalVelX = 0f, horizontalVelZ = 0f;
+    @Getter
     private float bobPhase = 0f;
+    @Getter
     private float bobAmplitude = 0f;
 
     public Player(Vector3f spawnPosition) {
         this.position = new Vector3f(spawnPosition);
-    }
-
-    public boolean isFlying() {
-        return flying;
-    }
-
-    public boolean isSprinting() {
-        return sprinting;
-    }
-
-    public boolean isSwimming() {
-        return swimming;
-    }
-
-    public boolean isHeadSubmerged() {
-        return headSubmerged;
-    }
-
-    public float getYaw() {
-        return yaw;
-    }
-
-    public float getPitch() {
-        return pitch;
     }
 
     /** Test/controller-only: instantly relocates the player, clearing residual fall/swim
@@ -133,12 +121,6 @@ public class Player {
         horizontalVelZ = 0f;
     }
 
-    /** Test/controller-only: same clamp {@link #look} applies, but settable directly rather
-     *  than as a mouse-delta nudge. */
-    public void setYaw(float radians) {
-        this.yaw = radians;
-    }
-
     public void setPitch(float radians) {
         float limit = (float) Math.toRadians(89);
         this.pitch = Math.max(-limit, Math.min(limit, radians));
@@ -147,14 +129,6 @@ public class Player {
     /** Current eased collision height - standing, swimming, or somewhere in between mid-transition. */
     public float currentHitboxHeight() {
         return currentHitboxHeight;
-    }
-
-    public float getBobPhase() {
-        return bobPhase;
-    }
-
-    public float getBobAmplitude() {
-        return bobAmplitude;
     }
 
     public void look(double dx, double dy) {
