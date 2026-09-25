@@ -81,16 +81,21 @@ public class ChunkMeshBuilder {
         return DEFAULT_GRASS_TINT;
     }
 
+    /** True for any of the 8 leaf species, regardless of which tint rule (biome-blended vs.
+     *  spruce/cherry's fixed tint) applies to it - package-private so
+     *  ChunkMeshBuilderFaceCullingTest-style pure-logic tests can exercise it directly. */
+    static boolean isAnyLeaves(BlockType type) {
+        return isBiomeTintedLeaves(type) || type == BlockType.SPRUCE_LEAVES || type == BlockType.CHERRY_LEAVES;
+    }
+
     /** Wind-displacement weight for a cube-face block - LEAF_WIND_WEIGHT for any of the 8 leaf
      *  species (every one gets the same flat weight; the shader adds its own free per-vertex
      *  height gradient via fract(aPos.y), so no CPU-side per-face variation is needed here), 0.0
      *  for everything else. Trunks/branches are deliberately excluded - see the class docs on
      *  DARK_OAK's shared trunk/branch block type for why they can't be told apart at this level
-     *  without new per-face metadata this round doesn't otherwise need. Package-private so
-     *  ChunkMeshBuilderFaceCullingTest-style pure-logic tests can exercise it directly. */
+     *  without new per-face metadata this round doesn't otherwise need. */
     static float windWeightFor(BlockType type) {
-        boolean isLeaf = isBiomeTintedLeaves(type) || type == BlockType.SPRUCE_LEAVES || type == BlockType.CHERRY_LEAVES;
-        return isLeaf ? LEAF_WIND_WEIGHT : 0f;
+        return isAnyLeaves(type) ? LEAF_WIND_WEIGHT : 0f;
     }
 
     private final TextureAtlas atlas;
@@ -201,14 +206,27 @@ public class ChunkMeshBuilder {
     // Package-private (not private) so ChunkMeshBuilderFaceCullingTest can exercise this pure
     // logic directly - it has no atlas/texture dependency, unlike the rest of this class.
     static boolean shouldDrawFace(BlockType current, BlockType neighbor) {
+        if (isAnyLeaves(current) || isAnyLeaves(neighbor)) {
+            // Leaves are flagged isOpaqueCube()=true (their base shape is a full cube, and
+            // that flag also drives light propagation - see LightEngine), but their real
+            // textures bake in genuine per-pixel transparent cutout holes (the leafy silhouette
+            // look), so neither direction of this relationship reliably occludes anything.
+            // Culling here caused visible holes wherever a leaf touched anything solid - most
+            // commonly another leaf of any species (every interior face inside an ordinary tree
+            // canopy), or the leaf's own tree trunk - the reported "I can see through a placed
+            // leaf block". Real vanilla itself never culls a face against a leaf neighbor for
+            // exactly this reason; this now matches that instead of treating leaves like an
+            // ordinary opaque cube for culling purposes.
+            return true;
+        }
         if (neighbor == current) return false;
         return !neighbor.isOpaqueCube();
     }
 
     /** Blocks rendered as a real cross/plant model (see {@link #emitCrossPlant}) instead of a
-     *  cube - package-private so {@code ChunkMeshBuilderFaceCullingTest}-style pure-logic tests
-     *  can exercise this classification directly. */
-    static boolean isCrossShapedPlant(BlockType type) {
+     *  cube - public so Game's hotbar-icon/held-item rendering can also branch on it (see
+     *  drawBlockIcon/buildHeldItemVerts), not just this class's own mesh-building pass. */
+    public static boolean isCrossShapedPlant(BlockType type) {
         return type == BlockType.OAK_SAPLING_STAGE_0 || type == BlockType.OAK_SAPLING_STAGE_1
                 || type == BlockType.OAK_SAPLING_STAGE_2 || type == BlockType.OAK_SAPLING_STAGE_3;
     }

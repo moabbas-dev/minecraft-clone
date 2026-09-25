@@ -50,6 +50,55 @@ class ChunkMeshBuilderFaceCullingTest {
         assertFalse(ChunkMeshBuilder.shouldDrawFace(BlockType.GLOWSTONE, BlockType.STONE));
     }
 
+    // --- Regression: leaves are flagged isOpaqueCube()=true (a full cube shape, and that flag
+    // also drives light propagation), but their real textures have genuine per-pixel
+    // transparent cutout holes, so neither direction of a leaf-involving neighbor relationship
+    // reliably occludes anything. Treating them like an ordinary opaque cube for culling caused
+    // visible holes wherever a leaf touched anything solid - most commonly another leaf of any
+    // species (every interior face inside an ordinary tree canopy) or the leaf's own tree
+    // trunk - the reported "I can see through a placed leaf block". ---
+
+    @Test
+    void sameSpeciesLeavesStillDrawAFaceBetweenThem() {
+        assertTrue(ChunkMeshBuilder.shouldDrawFace(BlockType.OAK_LEAVES, BlockType.OAK_LEAVES),
+                "two adjacent oak leaves must still draw a face, or leaf textures' own transparent cutouts reveal what's behind them");
+        assertTrue(ChunkMeshBuilder.shouldDrawFace(BlockType.SPRUCE_LEAVES, BlockType.SPRUCE_LEAVES));
+        assertTrue(ChunkMeshBuilder.shouldDrawFace(BlockType.CHERRY_LEAVES, BlockType.CHERRY_LEAVES));
+    }
+
+    @Test
+    void differentLeafSpeciesTouchingStillDrawFacesEitherWay() {
+        assertTrue(ChunkMeshBuilder.shouldDrawFace(BlockType.OAK_LEAVES, BlockType.BIRCH_LEAVES));
+        assertTrue(ChunkMeshBuilder.shouldDrawFace(BlockType.BIRCH_LEAVES, BlockType.OAK_LEAVES));
+    }
+
+    @Test
+    void leavesTouchingASolidNonLeafBlockStillDrawFacesOnBothSides() {
+        // The leaf's own face touching its tree's trunk...
+        assertTrue(ChunkMeshBuilder.shouldDrawFace(BlockType.OAK_LEAVES, BlockType.OAK_LOG));
+        // ...and the trunk's face touching the leaf, symmetrically.
+        assertTrue(ChunkMeshBuilder.shouldDrawFace(BlockType.OAK_LOG, BlockType.OAK_LEAVES));
+    }
+
+    @Test
+    void nonLeafTransparentBlocksStillCullSameTypeFacesToAvoidZFighting() {
+        // Unchanged: water/glass have no cutout-alpha problem, and culling these keeps the
+        // original z-fighting fix from ChunkMeshBuilderFaceCullingTest's own earlier regression.
+        assertFalse(ChunkMeshBuilder.shouldDrawFace(BlockType.WATER, BlockType.WATER));
+        assertFalse(ChunkMeshBuilder.shouldDrawFace(BlockType.GLASS, BlockType.GLASS));
+    }
+
+    @Test
+    void isAnyLeavesCoversEverySpecies() {
+        for (BlockType leaf : new BlockType[]{BlockType.OAK_LEAVES, BlockType.BIRCH_LEAVES, BlockType.SPRUCE_LEAVES,
+                BlockType.JUNGLE_LEAVES, BlockType.ACACIA_LEAVES, BlockType.MANGROVE_LEAVES,
+                BlockType.DARK_OAK_LEAVES, BlockType.CHERRY_LEAVES}) {
+            assertTrue(ChunkMeshBuilder.isAnyLeaves(leaf), leaf + " must be recognized as a leaf block");
+        }
+        assertFalse(ChunkMeshBuilder.isAnyLeaves(BlockType.OAK_LOG));
+        assertFalse(ChunkMeshBuilder.isAnyLeaves(BlockType.GRASS_BLOCK));
+    }
+
     // --- Regression: a sapling sitting on top of grass used to delete the grass block's own
     // top face, because the sapling was (incorrectly) marked as a fully opaque cube. ---
 

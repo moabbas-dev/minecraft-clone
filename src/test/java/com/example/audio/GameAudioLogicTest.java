@@ -35,6 +35,20 @@ class GameAudioLogicTest {
     }
 
     @Test
+    void landingEdgeDetectedOnlyOnTheTransitionFromAirborneToGrounded() {
+        assertTrue(GameAudio.isLandingEdge(true, false, false, false), "airborne last frame, grounded now = a landing");
+        assertFalse(GameAudio.isLandingEdge(true, true, false, false), "already grounded last frame too - not a new landing");
+        assertFalse(GameAudio.isLandingEdge(false, false, false, false), "still airborne - no landing yet");
+        assertFalse(GameAudio.isLandingEdge(false, true, false, false), "just left the ground - not a landing");
+    }
+
+    @Test
+    void landingEdgeSuppressedWhileFlyingOrSwimming() {
+        assertFalse(GameAudio.isLandingEdge(true, false, true, false), "flying must not count as landing");
+        assertFalse(GameAudio.isLandingEdge(true, false, false, true), "swimming must not count as landing");
+    }
+
+    @Test
     void undergroundDetectedAtOrBelowSkyLightThreshold() {
         assertTrue(GameAudio.isUnderground(0));
         assertTrue(GameAudio.isUnderground(GameAudio.CAVE_SKYLIGHT_THRESHOLD));

@@ -865,7 +865,10 @@ public class Game implements GameAccess {
         float swingArc = swingTimer > 0f ? (float) Math.sin((1f - swingTimer / SWING_DURATION) * Math.PI) : 0f;
 
         BlockType held = BlockType.PLACEABLE[selectedIndex];
-        float[] verts = buildHeldItemVerts(held);
+        // Saplings (and any future cross/plant block) are a thin flat cross in-world, never a
+        // cube (see ChunkMeshBuilder.emitCrossPlant) - held in hand, they were rendering as the
+        // same solid cube every other block gets.
+        float[] verts = ChunkMeshBuilder.isCrossShapedPlant(held) ? buildCrossPlantHeldVerts(held) : buildHeldItemVerts(held);
 
         Matrix4f model = new Matrix4f()
                 .translate(0.62f + bobX, -0.52f - bobY - swingArc * 0.12f, -1.1f - swingArc * 0.25f)
@@ -905,6 +908,22 @@ public class Game implements GameAccess {
         idx = emitCubeFace(verts, idx, new float[]{0.5f, -0.5f, -0.5f}, new float[]{-0.5f, -0.5f, -0.5f}, new float[]{-0.5f, 0.5f, -0.5f}, new float[]{0.5f, 0.5f, -0.5f}, side, 0.85f, sideTint);
         idx = emitCubeFace(verts, idx, new float[]{0.5f, -0.5f, 0.5f}, new float[]{0.5f, -0.5f, -0.5f}, new float[]{0.5f, 0.5f, -0.5f}, new float[]{0.5f, 0.5f, 0.5f}, side, 0.7f, sideTint);
         idx = emitCubeFace(verts, idx, new float[]{-0.5f, -0.5f, -0.5f}, new float[]{-0.5f, -0.5f, 0.5f}, new float[]{-0.5f, 0.5f, 0.5f}, new float[]{-0.5f, 0.5f, -0.5f}, side, 0.7f, sideTint);
+        return verts;
+    }
+
+    /** Two crossing diagonal planes centered at the origin (-0.5..0.5, matching the cube's own
+     *  scale) - the same shape ChunkMeshBuilder.emitCrossPlant uses in-world, just recentered
+     *  and reusing emitCubeFace's quad-emission (its p0..p3 corner-to-UV convention already
+     *  matches emitCrossPlant's own corner ordering exactly). Saplings are never tinted (not a
+     *  leaf, not the grass block), so this always uses the neutral tint. */
+    private float[] buildCrossPlantHeldVerts(BlockType block) {
+        float[] uv = atlas.getUv(textureMap.facesFor(block).side());
+        float[] verts = new float[2 * 6 * 11];
+        int idx = 0;
+        idx = emitCubeFace(verts, idx, new float[]{-0.5f, -0.5f, -0.5f}, new float[]{0.5f, -0.5f, 0.5f},
+                new float[]{0.5f, 0.5f, 0.5f}, new float[]{-0.5f, 0.5f, -0.5f}, uv, 1f, NEUTRAL_ICON_TINT);
+        idx = emitCubeFace(verts, idx, new float[]{0.5f, -0.5f, -0.5f}, new float[]{-0.5f, -0.5f, 0.5f},
+                new float[]{-0.5f, 0.5f, 0.5f}, new float[]{0.5f, 0.5f, -0.5f}, uv, 1f, NEUTRAL_ICON_TINT);
         return verts;
     }
 
@@ -1262,6 +1281,16 @@ public class Game implements GameAccess {
      * per-biome one from.
      */
     private void drawBlockIcon(BlockType block, float slotX, float slotY, float slotSize) {
+        if (ChunkMeshBuilder.isCrossShapedPlant(block)) {
+            // Saplings (and any future cross/plant block) render in-world as a thin flat cross,
+            // never a cube (see ChunkMeshBuilder.emitCrossPlant) - the icon was drawing the same
+            // 3-face isometric cube every other block gets, which looked like solid plank rather
+            // than the correct thin plant sprite. A single front-facing flat quad matches real
+            // vanilla's own flat 2D item-icon convention for plants far better than an isometric
+            // cube would anyway.
+            drawFlatPlantIcon(block, slotX, slotY, slotSize);
+            return;
+        }
         BlockTextureMap.Faces faces = textureMap.facesFor(block);
         float[] topUv = atlas.getUv(faces.top());
         float[] sideUv = atlas.getUv(faces.side());
@@ -1298,6 +1327,20 @@ public class Game implements GameAccess {
         drawIconFace(pts[2], pts[4], pts[7], pts[6], topUv, 1.0f, topTint);  // top face (y=1)
         drawIconFace(pts[4], pts[7], pts[5], pts[1], sideUv, 0.75f, sideTint); // east face (x=1)
         drawIconFace(pts[6], pts[7], pts[5], pts[3], sideUv, 0.55f, sideTint); // south face (z=1)
+    }
+
+    /** A single flat front-facing textured quad, centered in the slot - the correct icon shape
+     *  for a cross/plant block (see drawBlockIcon), instead of the isometric cube every other
+     *  block gets. */
+    private void drawFlatPlantIcon(BlockType block, float slotX, float slotY, float slotSize) {
+        float[] uv = atlas.getUv(textureMap.facesFor(block).side());
+        float pad = 4f;
+        float half = (slotSize - pad * 2) / 2f;
+        float cx = slotX + slotSize / 2f;
+        float cy = slotY + slotSize / 2f;
+        drawIconFace(new float[]{cx - half, cy - half}, new float[]{cx + half, cy - half},
+                new float[]{cx + half, cy + half}, new float[]{cx - half, cy + half},
+                uv, 1.0f, NEUTRAL_ICON_TINT);
     }
 
     private void drawIconFace(float[] p0, float[] p1, float[] p2, float[] p3, float[] uv, float shade, float[] tint) {

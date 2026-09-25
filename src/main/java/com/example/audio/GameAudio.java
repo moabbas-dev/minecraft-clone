@@ -43,6 +43,7 @@ public class GameAudio {
     private final Vector3f lastFootstepPos = new Vector3f();
     private boolean footstepPosInitialized = false;
     private float footstepDistance = 0f;
+    private boolean prevOnGround = false;
 
     private float caveAmbientTimer = 0f;
     private float prevLightningFlash = 0f;
@@ -87,22 +88,34 @@ public class GameAudio {
         if (!footstepPosInitialized) {
             lastFootstepPos.set(pos);
             footstepPosInitialized = true;
+            prevOnGround = player.isOnGround();
             return;
         }
         float dx = pos.x - lastFootstepPos.x;
         float dz = pos.z - lastFootstepPos.z;
         lastFootstepPos.set(pos);
 
+        boolean onGround = player.isOnGround();
+        boolean grounded = onGround && !player.isFlying() && !player.isSwimming();
+        // Landing edge (was airborne last frame, grounded now): plays immediately regardless of
+        // accumulated distance. Without this there's a real dead gap right at touchdown - not a
+        // logic bug in the distance accumulator itself (it resumes counting correctly on its
+        // own), but it reads as "the sound disappeared" the instant you land, since the very
+        // first post-landing footstep otherwise waits for a full fresh stride's worth of ground
+        // travel before making any sound at all.
+        boolean justLanded = isLandingEdge(onGround, prevOnGround, player.isFlying(), player.isSwimming());
+        prevOnGround = onGround;
+
         // No footsteps airborne, flying, or swimming (Phase 8's explicit "should not trigger"
         // list) - sneaking is allowed but uses a longer, quieter step (below), not suppressed.
-        if (!player.isOnGround() || player.isFlying() || player.isSwimming()) {
+        if (!grounded) {
             footstepDistance = 0f;
             return;
         }
 
         footstepDistance += Math.sqrt(dx * dx + dz * dz);
         float threshold = footstepThreshold(player.isSneaking());
-        if (!shouldTriggerFootstep(footstepDistance, threshold)) return;
+        if (!justLanded && !shouldTriggerFootstep(footstepDistance, threshold)) return;
         footstepDistance = 0f;
 
         BlockType under = blockUnderFeet(world, pos);
@@ -118,6 +131,10 @@ public class GameAudio {
 
     static boolean shouldTriggerFootstep(float accumulatedDistance, float threshold) {
         return accumulatedDistance >= threshold;
+    }
+
+    static boolean isLandingEdge(boolean onGround, boolean prevOnGround, boolean flying, boolean swimming) {
+        return onGround && !prevOnGround && !flying && !swimming;
     }
 
     static float footstepThreshold(boolean sneaking) {
