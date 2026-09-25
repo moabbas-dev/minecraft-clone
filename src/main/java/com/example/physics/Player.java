@@ -84,9 +84,14 @@ public class Player {
     @Getter
     private float pitch = 0f;
     private float verticalVelocity = 0f;
+    @Getter
     private boolean onGround = false;
     @Getter
     private boolean flying = false;
+    /** Mirrors the local `sneaking` condition update() already computes each tick (held shift,
+     *  not flying) - stored so callers outside Player (e.g. footstep audio) can read it too. */
+    @Getter
+    private boolean sneaking = false;
     private boolean wasInWater = false;
     /** Feet in water (possibly only partially submerged) - see {@link #updateWaterState}. */
     @Getter
@@ -209,7 +214,7 @@ public class Player {
             lastWPressTime = now;
         }
 
-        boolean sneaking = input.isKeyDown(GLFW_KEY_LEFT_SHIFT) && !flying;
+        sneaking = input.isKeyDown(GLFW_KEY_LEFT_SHIFT) && !flying;
         // Sprint stops the moment you're not actively holding W forward, or start sneaking -
         // matches vanilla (double-tap W to start, release W or sneak to stop). Ctrl still works
         // as a direct hold-to-sprint alternative alongside the double-tap toggle.

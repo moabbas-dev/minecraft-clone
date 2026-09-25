@@ -10,6 +10,11 @@ test-output/
 # Real Minecraft textures copied from the user's own local game assets for personal use -
 # never commit/publish these, they're Mojang's copyrighted files, not ours to redistribute.
 textures/
+
+# Same policy as textures/ above - real Minecraft sound assets, copied locally from the user's
+# own minecraft-sounds/ dump for personal use, never committed/redistributed.
+sounds/
+
 !**/src/main/**/target/
 !**/src/test/**/target/
 .kotlin
@@ -41,6 +46,8 @@ textures/
 build/
 !**/src/main/**/build/
 !**/src/test/**/build/
+
+minecraft-sounds/
 
 ### VS Code ###
 .vscode/

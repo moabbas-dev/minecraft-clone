@@ -1,5 +1,6 @@
 package com.example.game;
 
+import com.example.audio.GameAudio;
 import com.example.engine.*;
 import com.example.physics.Player;
 import com.example.testctl.GameAccess;
@@ -93,6 +94,7 @@ public class Game implements GameAccess {
     private SelectWorldScreen selectWorldScreen;
     private WorldCreateScreen worldCreateScreen;
     private PauseScreen pauseScreen;
+    private GameAudio gameAudio;
 
     private final Map<Long, ChunkRenderData> renderData = new ConcurrentHashMap<>();
 
@@ -184,6 +186,9 @@ public class Game implements GameAccess {
         sunMoonMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
         rainMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
         heldItemMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
+
+        gameAudio = new GameAudio();
+        gameAudio.init(); // never throws - degrades to silent no-ops if no device/OpenAL fails
 
         titleScreen = new TitleScreen(new TitleScreen.Listener() {
             @Override
@@ -475,6 +480,7 @@ public class Game implements GameAccess {
         updateRainParticles(dt);
         saplingGrowth.update(world, dt);
         windTime += dt;
+        gameAudio.update(dt, player, world, weather);
 
         updateHotbarSelection();
         if (hotbarLabelTimer > 0f) hotbarLabelTimer = Math.max(0f, hotbarLabelTimer - dt);
@@ -640,9 +646,14 @@ public class Game implements GameAccess {
             float breakTime = targetType.handBreakSeconds();
             if (breakTime >= 0) {
                 breakingProgress += dt;
-                if (swingTimer <= 0f) swingTimer = SWING_DURATION; // repeat the punch while actively mining
+                Vector3f blockCenter = new Vector3f(hit.x() + 0.5f, hit.y() + 0.5f, hit.z() + 0.5f);
+                if (swingTimer <= 0f) {
+                    swingTimer = SWING_DURATION; // repeat the punch while actively mining
+                    gameAudio.playDig(targetType, blockCenter); // one hit-tick per repeated swing
+                }
                 if (breakingProgress >= breakTime) {
                     world.setBlock(hit.x(), hit.y(), hit.z(), BlockType.AIR);
+                    gameAudio.playDig(targetType, blockCenter); // final destruction sound
                     breakingProgress = 0;
                     breakingTarget = null;
                 }
@@ -660,10 +671,12 @@ public class Game implements GameAccess {
                     world.setBlock(hit.placeX(), hit.placeY(), hit.placeZ(), place);
                     saplingGrowth.registerPlanted(hit.placeX(), hit.placeY(), hit.placeZ(), sapling);
                     swingTimer = SWING_DURATION;
+                    gameAudio.playPlace(place, new Vector3f(hit.placeX() + 0.5f, hit.placeY() + 0.5f, hit.placeZ() + 0.5f));
                 }
             } else if (!blockIntersectsPlayer(hit.placeX(), hit.placeY(), hit.placeZ())) {
                 world.setBlock(hit.placeX(), hit.placeY(), hit.placeZ(), place);
                 swingTimer = SWING_DURATION;
+                gameAudio.playPlace(place, new Vector3f(hit.placeX() + 0.5f, hit.placeY() + 0.5f, hit.placeZ() + 0.5f));
             }
         }
     }
@@ -1428,6 +1441,7 @@ public class Game implements GameAccess {
         rainMesh.destroy();
         heldItemMesh.destroy();
         chunkShader.destroy();
+        gameAudio.cleanup();
         window.destroy();
     }
 }
