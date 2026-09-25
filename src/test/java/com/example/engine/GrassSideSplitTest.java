@@ -24,12 +24,11 @@ class GrassSideSplitTest {
     }
 
     @Test
-    void baseAndOverlayNeverBothCoverTheSamePixelAndTheirUnionIsTheWholeTile() {
+    void theBaseIsFullyOpaqueSoNothingIsSeeThroughAndTheOverlayCoversOnlyGrass() {
         int[][] out = GrassSideSplit.split(tile(), 4, 0.5f);
         for (int i = 0; i < 16; i++) {
-            boolean baseOpaque = (out[0][i] >>> 24) != 0;
-            boolean overlayOpaque = (out[1][i] >>> 24) != 0;
-            assertTrue(baseOpaque ^ overlayOpaque, "pixel " + i + " must be opaque in exactly one of base/overlay");
+            assertEquals(0xFF, out[0][i] >>> 24, "base pixel " + i + " must be opaque (no see-through slivers)");
+            assertEquals(i < 4, (out[1][i] >>> 24) != 0, "overlay is opaque exactly on grass pixels");
         }
     }
 
@@ -43,7 +42,7 @@ class GrassSideSplitTest {
                 assertEquals(0xFF, px >>> 24);
                 assertEquals((px >> 16) & 0xFF, (px >> 8) & 0xFF, "overlay must be gray so the tint sets the hue");
                 assertEquals((px >> 8) & 0xFF, px & 0xFF);
-                assertEquals(0, out[0][i] >>> 24, "grass pixels must be transparent in the base");
+                assertEquals(DIRT, out[0][i], "grass pixels are backed with the dirt below in the base");
             } else {
                 assertEquals(src[i], out[0][i], "dirt pixels are unchanged in the base");
             }

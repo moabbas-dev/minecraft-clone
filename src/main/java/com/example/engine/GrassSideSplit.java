@@ -6,10 +6,10 @@ package com.example.engine;
  * does (vanilla does the same with its separate grass_block_side_overlay texture; this project
  * ships only the combined side image, so the overlay is derived from it).
  *
- * The two outputs never overlap: a "grass" pixel is opaque only in the overlay (as a grayscale
- * value, so multiplying by the biome tint reproduces a natural green) and transparent in the
- * base; every other pixel is the reverse. The renderer draws both and the union is exactly the
- * original tile - with the tint applied to just the grass part. Pure integer/array math, no GL.
+ * The overlay is opaque only on grass pixels (as a grayscale value, so multiplying by the biome
+ * tint reproduces a natural green). The base is fully opaque: dirt pixels are unchanged and the
+ * grass pixels are backed with the dirt below them, so the overlay drawn in front reproduces
+ * the original tile with the tint applied to just the grass part, and no pixel is ever see-through. Pure integer/array math, no GL.
  */
 final class GrassSideSplit {
     private GrassSideSplit() {
@@ -52,8 +52,10 @@ final class GrassSideSplit {
                 if (isGrassPixel(argb[i])) {
                     int gray = clamp255(Math.round(luma(argb[i]) * scale * 255f));
                     overlay[i] = 0xFF000000 | (gray << 16) | (gray << 8) | gray;
-                    // Transparent in the base, but keep an RGB that matches the dirt below it so
-                    // mip-mapping never blends a stray green into the edges.
+                    // Under the overlay the base is opaque dirt (copied from the nearest dirt pixel
+                    // below), never transparent: the overlay sits a hair in front of the base,
+                    // so a transparent base would leave a see-through sliver along the block
+                    // edges where the two faces don't quite meet (the blue-line glitch).
                     int below = argb[i];
                     for (int yy = y + 1; yy < size; yy++) {
                         if (!isGrassPixel(argb[yy * size + x])) {
@@ -61,7 +63,7 @@ final class GrassSideSplit {
                             break;
                         }
                     }
-                    base[i] = 0x00000000 | (below & 0x00FFFFFF);
+                    base[i] = 0xFF000000 | (below & 0x00FFFFFF);
                 } else {
                     overlay[i] = (mean << 16) | (mean << 8) | mean; // alpha 0
                 }
