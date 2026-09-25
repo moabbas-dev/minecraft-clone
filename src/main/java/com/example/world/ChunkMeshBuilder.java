@@ -154,19 +154,37 @@ public class ChunkMeshBuilder {
                     float[] topTint = isBiomeTintedLeaves || isWater || isSpruceLeaves || isCherryLeaves ? sideTint
                             : type == BlockType.GRASS_BLOCK ? chunk.getGrassTint(lx, lz) : NEUTRAL_TINT;
                     float windWeight = windWeightFor(type);
+                    // Grass: the side's tintable fringe overlay (biome-colored, same tint as the top face).
+                    float[] overlayUv = faces.sideOverlay() != null ? atlas.getUv(faces.sideOverlay()) : null;
 
                     if (shouldDrawFace(type, up))
                         emitFace(target, Face.TOP, lx, ly, lz, atlas.getUv(faces.top()), SHADE_TOP, chunk, world, lx, ly + 1, lz, topY, topTint, windWeight);
                     if (shouldDrawFace(type, down))
                         emitFace(target, Face.BOTTOM, lx, ly, lz, atlas.getUv(faces.bottom()), SHADE_BOTTOM, chunk, world, lx, ly - 1, lz, topY, sideTint, windWeight);
-                    if (shouldDrawFace(type, north))
+                    if (shouldDrawFace(type, north)) {
                         emitFace(target, Face.NORTH, lx, ly, lz, atlas.getUv(faces.side()), SHADE_NORTH_SOUTH, chunk, world, lx, ly, lz - 1, topY, sideTint, windWeight);
-                    if (shouldDrawFace(type, south))
+                        if (overlayUv != null) {
+                            emitFace(target, Face.NORTH, lx, ly, lz, overlayUv, SHADE_NORTH_SOUTH, chunk, world, lx, ly, lz - 1, topY, topTint, windWeight, OVERLAY_OFFSET);
+                        }
+                    }
+                    if (shouldDrawFace(type, south)) {
                         emitFace(target, Face.SOUTH, lx, ly, lz, atlas.getUv(faces.side()), SHADE_NORTH_SOUTH, chunk, world, lx, ly, lz + 1, topY, sideTint, windWeight);
-                    if (shouldDrawFace(type, east))
+                        if (overlayUv != null) {
+                            emitFace(target, Face.SOUTH, lx, ly, lz, overlayUv, SHADE_NORTH_SOUTH, chunk, world, lx, ly, lz + 1, topY, topTint, windWeight, OVERLAY_OFFSET);
+                        }
+                    }
+                    if (shouldDrawFace(type, east)) {
                         emitFace(target, Face.EAST, lx, ly, lz, atlas.getUv(faces.side()), SHADE_EAST_WEST, chunk, world, lx + 1, ly, lz, topY, sideTint, windWeight);
-                    if (shouldDrawFace(type, west))
+                        if (overlayUv != null) {
+                            emitFace(target, Face.EAST, lx, ly, lz, overlayUv, SHADE_EAST_WEST, chunk, world, lx + 1, ly, lz, topY, topTint, windWeight, OVERLAY_OFFSET);
+                        }
+                    }
+                    if (shouldDrawFace(type, west)) {
                         emitFace(target, Face.WEST, lx, ly, lz, atlas.getUv(faces.side()), SHADE_EAST_WEST, chunk, world, lx - 1, ly, lz, topY, sideTint, windWeight);
+                        if (overlayUv != null) {
+                            emitFace(target, Face.WEST, lx, ly, lz, overlayUv, SHADE_EAST_WEST, chunk, world, lx - 1, ly, lz, topY, topTint, windWeight, OVERLAY_OFFSET);
+                        }
+                    }
                 }
             }
         }
@@ -266,9 +284,20 @@ public class ChunkMeshBuilder {
 
     private enum Face {TOP, BOTTOM, NORTH, SOUTH, EAST, WEST}
 
+    /** How far a side overlay sits outside the block face. It is opaque only where the base is
+     *  transparent, so it can never visibly overlap; the offset just makes it win the depth test
+     *  at mip distances where the base's edge texels average to a partly-opaque value. */
+    private static final float OVERLAY_OFFSET = 0.002f;
+
     private void emitFace(FloatBuffer buf, Face face, int x, int y, int z, float[] uv, float directionalShade,
                            Chunk chunk, World world, int neighborLx, int neighborLy, int neighborLz, float topY,
                            float[] tint, float windWeight) {
+        emitFace(buf, face, x, y, z, uv, directionalShade, chunk, world, neighborLx, neighborLy, neighborLz, topY, tint, windWeight, 0f);
+    }
+
+    private void emitFace(FloatBuffer buf, Face face, int x, int y, int z, float[] uv, float directionalShade,
+                           Chunk chunk, World world, int neighborLx, int neighborLy, int neighborLz, float topY,
+                           float[] tint, float windWeight, float outwardOffset) {
         float skyShade = (sampleSkyLight(chunk, world, neighborLx, neighborLy, neighborLz) / 15f) * directionalShade;
         float blockLight = sampleBlockLight(chunk, world, neighborLx, neighborLy, neighborLz) / 15f;
 
@@ -305,8 +334,17 @@ public class ChunkMeshBuilder {
             };
             default -> throw new IllegalStateException();
         }
+        float ox = 0f, oy = 0f, oz = 0f;
+        switch (face) {
+            case TOP -> oy = outwardOffset;
+            case BOTTOM -> oy = -outwardOffset;
+            case NORTH -> oz = -outwardOffset;
+            case SOUTH -> oz = outwardOffset;
+            case EAST -> ox = outwardOffset;
+            case WEST -> ox = -outwardOffset;
+        }
         for (float[] c : corners) {
-            buf.add(x + c[0], y + c[1], z + c[2], c[3], c[4], skyShade, blockLight, tint[0], tint[1], tint[2], windWeight);
+            buf.add(x + c[0] + ox, y + c[1] + oy, z + c[2] + oz, c[3], c[4], skyShade, blockLight, tint[0], tint[1], tint[2], windWeight);
         }
     }
 

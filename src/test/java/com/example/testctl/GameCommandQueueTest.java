@@ -80,9 +80,12 @@ class GameCommandQueueTest {
                 } catch (TimeoutException ignored) {
                 }
             }).start();
-            sleepQuietly(20); // keep submission order deterministic for this assertion
+            // Wait until this task is really in the queue before starting the next thread - a fixed
+            // sleep is not enough when the machine is busy and thread start-up is slow.
+            long deadline = System.nanoTime() + 5_000_000_000L;
+            while (queue.pending() < i + 1 && System.nanoTime() < deadline) sleepQuietly(1);
+            assertEquals(i + 1, queue.pending(), "task " + i + " was never enqueued");
         }
-        sleepQuietly(50);
         queue.drain();
         assertEquals(List.of(0, 1, 2, 3, 4), order);
     }

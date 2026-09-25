@@ -38,6 +38,11 @@ public final class GameCommandQueue {
         }
     }
 
+    /** Tasks enqueued but not yet run (lets tests wait for a submission deterministically instead of sleeping). */
+    public int pending() {
+        return queue.size();
+    }
+
     /** Called once per frame by Game's main loop, on the GL thread, before render(). */
     public void drain() {
         Runnable r;

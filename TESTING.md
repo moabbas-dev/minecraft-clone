@@ -29,6 +29,9 @@ or downgrades a failing assertion.
 | `com.example.entity` | `ItemEntityManager`: drop physics (never tunnels/sinks), pickup delay, full/partial/duplicate pickup, merging, lifetime, entity cap, freezing in unloaded chunks | No |
 | `com.example.fx` | `ParticleSystem`: burst size, expiry, pool cap, vertex output | No |
 | `com.example.game` (`MiningControllerTest`, `BlockPlacerTest`, `ItemModelBuilderTest`) | The break transaction (one drop per break, cancel/target-change/invalidation, crack stage progression) and transactional placement (consume only after success) | No |
+| `com.example.inventory` (`RecipesTest`, `InventoryMenuTest`) | Block-only crafting recipes (2x2 / 3x3 shaped matching), cursor pick/place/merge/swap/split, taking crafted results, item conservation, close-returns-everything with overflow | No |
+| `com.example.ui` (`InventoryLayoutTest`) | Inventory screen geometry: slot hit-testing, no overlaps, everything inside the panel | No |
+| `com.example.engine` (`GrassSideSplitTest`) | Splitting grass_block_side into a dirt base and a biome-tintable grayscale fringe overlay | No |
 | `com.example.world.unit` (`BlockDropsTest`) | Drop table rules | No |
 | `com.example.engine` (`CrackOverlayTest`) | Procedural crack stage images only (cumulative, deterministic); the overlay's GL parts are manual-only | No |
 | `com.example.audio` | Material mapping, manifest validation, registry metadata, trigger predicates (never touches OpenAL) | No |

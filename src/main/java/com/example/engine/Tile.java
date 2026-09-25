@@ -15,5 +15,9 @@ public enum Tile {
     DARK_OAK_LOG_SIDE, DARK_OAK_LOG_TOP, DARK_OAK_LEAVES,
     CHERRY_LOG_SIDE, CHERRY_LOG_TOP, CHERRY_LEAVES,
     MUD, MANGROVE_ROOTS_SIDE, MANGROVE_ROOTS_TOP,
-    OAK_SAPLING
+    OAK_SAPLING,
+    /** Tintable grayscale grass fringe split off GRASS_SIDE at atlas build time - see GrassSideSplit. */
+    GRASS_SIDE_OVERLAY,
+    /** Plain skin tone for the first-person hand shown when nothing is held. */
+    SKIN
 }

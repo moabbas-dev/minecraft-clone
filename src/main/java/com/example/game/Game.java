@@ -5,12 +5,14 @@ import com.example.entity.ItemEntity;
 import com.example.entity.ItemEntityManager;
 import com.example.fx.ParticleSystem;
 import com.example.inventory.Inventory;
+import com.example.inventory.InventoryMenu;
 import com.example.inventory.ItemStack;
 import com.example.engine.*;
 import com.example.physics.Player;
 import com.example.testctl.GameAccess;
 import com.example.testctl.GameCommandQueue;
 import com.example.testctl.TestController;
+import com.example.ui.InventoryLayout;
 import com.example.ui.PauseScreen;
 import com.example.ui.SelectWorldScreen;
 import com.example.ui.TitleScreen;
@@ -83,7 +85,7 @@ public class Game implements GameAccess {
      *  tuning, not an official Minecraft value. */
     private static final float WIND_STRENGTH = 1f;
 
-    private enum GameState {TITLE, SELECT_WORLD, WORLD_CREATE, IN_GAME, PAUSED}
+    private enum GameState {TITLE, SELECT_WORLD, WORLD_CREATE, IN_GAME, PAUSED, INVENTORY}
 
     private Window window;
     private Input input;
@@ -112,6 +114,8 @@ public class Game implements GameAccess {
     /** The single source of truth for item counts and the selected hotbar slot - the hotbar UI,
      *  held-item view model, and block placement all read it; nothing keeps a second copy. */
     private Inventory inventory = new Inventory();
+    /** Non-null only while the inventory/crafting screen is open (state == INVENTORY). */
+    private InventoryMenu menu;
     private final Random gameplayRandom = new Random();
     private final MiningController mining = new MiningController(gameplayRandom);
     private final ItemEntityManager itemEntities = new ItemEntityManager(Inventory.DEFAULT_MAX_STACK);
@@ -483,6 +487,7 @@ public class Game implements GameAccess {
             case SELECT_WORLD -> selectWorldScreen.update(dt, input, window.getWidth(), window.getHeight());
             case WORLD_CREATE -> worldCreateScreen.update(dt, input, window.getWidth(), window.getHeight());
             case IN_GAME -> updateInGame(dt, now);
+            case INVENTORY -> updateInventoryScreen();
             case PAUSED -> {
                 if (input.consumeKeyPressed(GLFW_KEY_ESCAPE)) {
                     resumeGame();
@@ -501,6 +506,10 @@ public class Game implements GameAccess {
         }
         if (input.consumeKeyPressed(GLFW_KEY_F3)) {
             debugOverlay = !debugOverlay;
+        }
+        if (input.consumeKeyPressed(GLFW_KEY_E)) {
+            openInventory(2);
+            return;
         }
 
         player.look(input.getMouseDeltaX(), input.getMouseDeltaY());
@@ -679,12 +688,120 @@ public class Game implements GameAccess {
             use = true;
         }
         if (use && hit != null) {
+            // Using a crafting table opens the 3x3 crafting screen instead of placing a block
+            // (sneaking still places, like vanilla).
+            if (hit.type() == BlockType.CRAFTING_TABLE && !player.isSneaking()) {
+                openInventory(3);
+                return;
+            }
             BlockPlacer.Result placed = BlockPlacer.tryPlace(world, inventory, hit, this::blockIntersectsPlayer, saplingGrowth);
             if (placed.placed()) {
                 swingTimer = SWING_DURATION;
                 gameAudio.playPlace(placed.type(), new Vector3f(placed.x() + 0.5f, placed.y() + 0.5f, placed.z() + 0.5f));
             }
         }
+    }
+
+    // ---- inventory / crafting screen ----
+
+    private void openInventory(int gridSize) {
+        if (state != GameState.IN_GAME) throw new IllegalStateException("not in game");
+        menu = new InventoryMenu(inventory, gridSize);
+        mining.cancel();
+        state = GameState.INVENTORY;
+        window.releaseMouse();
+        input.resyncMousePosition();
+    }
+
+    private void closeInventory() {
+        if (menu == null) throw new IllegalStateException("inventory is not open");
+        for (ItemStack leftover : menu.close()) dropIntoWorld(leftover); // never discard what didn't fit
+        menu = null;
+        state = GameState.IN_GAME;
+        window.captureMouse();
+        input.resyncMousePosition();
+    }
+
+    private void updateInventoryScreen() {
+        if (input.consumeKeyPressed(GLFW_KEY_E) || input.consumeKeyPressed(GLFW_KEY_ESCAPE)) {
+            closeInventory();
+            return;
+        }
+        boolean left = input.consumeMousePressed(GLFW_MOUSE_BUTTON_LEFT);
+        boolean right = input.consumeMousePressed(GLFW_MOUSE_BUTTON_RIGHT);
+        if (left || right) {
+            float mx = (float) input.getMouseX(), my = (float) input.getMouseY();
+            InventoryLayout layout = new InventoryLayout(window.getWidth(), window.getHeight(), menu.getGridSize());
+            handleInventoryClick(layout.slotAt(mx, my), right, layout.panel().contains(mx, my));
+        }
+    }
+
+    /** One click on the screen: a slot does its slot action; empty space outside the panel throws
+     *  the cursor stack (all on left click, one on right click) into the world. */
+    private void handleInventoryClick(int slot, boolean right, boolean insidePanel) {
+        if (slot >= 0) {
+            menu.click(slot, right);
+        } else if (!insidePanel) {
+            ItemStack thrown = menu.dropFromCursor(right);
+            if (!thrown.isEmpty()) dropIntoWorld(thrown);
+        }
+    }
+
+    /** Spawns a stack as dropped item entities just in front of the player. */
+    private void dropIntoWorld(ItemStack stack) {
+        Vector3f at = player.eyePosition().add(player.frontVector().mul(0.8f));
+        itemEntities.spawn(stack.type(), stack.count(), at, gameplayRandom);
+    }
+
+    private void renderInventoryScreen() {
+        if (menu == null) return;
+        int w = window.getWidth(), h = window.getHeight();
+        InventoryLayout layout = new InventoryLayout(w, h, menu.getGridSize());
+        float mx = (float) input.getMouseX(), my = (float) input.getMouseY();
+        int hovered = layout.slotAt(mx, my);
+
+        uiRenderer.drawColorQuad(0, 0, w, h, 0f, 0f, 0f, 0.55f);
+        InventoryLayout.Rect p = layout.panel();
+        uiRenderer.drawColorQuad(p.x() - 3, p.y() - 3, p.w() + 6, p.h() + 6, 0.05f, 0.05f, 0.05f, 0.95f);
+        uiRenderer.drawColorQuad(p.x(), p.y(), p.w(), p.h(), 0.34f, 0.34f, 0.36f, 0.97f);
+
+        String craftTitle = menu.getGridSize() == 3 ? "Crafting Table" : "Crafting";
+        font.drawText(uiRenderer, craftTitle, layout.leftX(), layout.craftingLabelY() + 2f, 0.7f, 0.12f, 0.12f, 0.12f, 1f);
+        font.drawText(uiRenderer, "Inventory", layout.leftX(), layout.inventoryLabelY() + 2f, 0.7f, 0.12f, 0.12f, 0.12f, 1f);
+        font.drawText(uiRenderer, "=>", layout.arrowX(), layout.arrowY() - 8f, 1.4f, 0.12f, 0.12f, 0.12f, 1f);
+
+        for (int s = 0; s < Inventory.DEFAULT_SLOT_COUNT; s++) drawMenuSlot(layout, s, hovered);
+        for (int i = 0; i < menu.getGridSize() * menu.getGridSize(); i++) drawMenuSlot(layout, InventoryMenu.GRID_BASE + i, hovered);
+        drawMenuSlot(layout, InventoryMenu.RESULT_SLOT, hovered);
+
+        ItemStack held = menu.getCursor();
+        if (!held.isEmpty()) {
+            drawBlockIcon(held.type(), mx - 20f, my - 20f, 40f);
+            if (held.count() > 1) drawStackCount(held.count(), mx - 20f, my - 20f, 40f);
+        } else if (hovered >= 0) {
+            ItemStack under = menu.stackAt(hovered);
+            if (!under.isEmpty()) {
+                String name = under.type().displayName;
+                float tw = font.measureText(name, 1.1f);
+                float tx = mx + 14f, ty = my - 6f;
+                uiRenderer.drawColorQuad(tx - 5f, ty - 3f, tw + 10f, font.lineHeight(1.1f) + 6f, 0.05f, 0.02f, 0.1f, 0.92f);
+                font.drawText(uiRenderer, name, tx, ty, 1.1f, 1f, 1f, 1f, 1f);
+            }
+        }
+    }
+
+    private void drawMenuSlot(InventoryLayout layout, int slot, int hovered) {
+        InventoryLayout.Rect r = layout.slotRect(slot);
+        ItemStack stack = menu.stackAt(slot);
+        boolean isResult = slot == InventoryMenu.RESULT_SLOT;
+        uiRenderer.drawColorQuad(r.x() - 1, r.y() - 1, r.w() + 2, r.h() + 2, 0.08f, 0.08f, 0.08f, 1f);
+        float shade = isResult && !stack.isEmpty() ? 0.62f : 0.5f;
+        uiRenderer.drawColorQuad(r.x(), r.y(), r.w(), r.h(), shade, shade, isResult && !stack.isEmpty() ? 0.45f : shade, 1f);
+        if (!stack.isEmpty()) {
+            drawBlockIcon(stack.type(), r.x(), r.y(), r.w());
+            if (stack.count() > 1) drawStackCount(stack.count(), r.x(), r.y(), r.w());
+        }
+        if (slot == hovered) uiRenderer.drawColorQuad(r.x(), r.y(), r.w(), r.h(), 1f, 1f, 1f, 0.28f);
     }
 
     /** Everything that follows one completed break: the sound, the dropped items, and the
@@ -722,7 +839,9 @@ public class Game implements GameAccess {
             float[] topTint = leafTint != null ? leafTint : t == BlockType.GRASS_BLOCK ? ChunkMeshBuilder.grassIconTint() : NEUTRAL_ICON_TINT;
             float[] sideTint = leafTint != null ? leafTint : NEUTRAL_ICON_TINT;
             return new ItemModelBuilder.Model(atlas.getUv(faces.top()), atlas.getUv(faces.bottom()), atlas.getUv(faces.side()),
-                    topTint, sideTint, ChunkMeshBuilder.isCrossShapedPlant(t));
+                    topTint, sideTint, ChunkMeshBuilder.isCrossShapedPlant(t),
+                    faces.sideOverlay() != null ? atlas.getUv(faces.sideOverlay()) : null,
+                    faces.sideOverlay() != null ? topTint : null);
         });
     }
 
@@ -759,7 +878,7 @@ public class Game implements GameAccess {
     private void render(float dt) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        if (world != null && (state == GameState.IN_GAME || state == GameState.PAUSED)) {
+        if (world != null && (state == GameState.IN_GAME || state == GameState.PAUSED || state == GameState.INVENTORY)) {
             renderWorld(dt);
         }
 
@@ -770,6 +889,7 @@ public class Game implements GameAccess {
             case SELECT_WORLD -> selectWorldScreen.render(uiRenderer, font, window.getWidth(), window.getHeight());
             case WORLD_CREATE -> worldCreateScreen.render(uiRenderer, font, window.getWidth(), window.getHeight());
             case IN_GAME -> renderHud();
+            case INVENTORY -> renderInventoryScreen();
             case PAUSED -> {
                 renderHud();
                 pauseScreen.render(uiRenderer, font, window.getWidth(), window.getHeight());
@@ -947,7 +1067,6 @@ public class Game implements GameAccess {
 
     private void renderHeldItem() {
         ItemStack heldStack = inventory.selected();
-        if (heldStack.isEmpty()) return; // an empty hand draws nothing
         glClear(GL_DEPTH_BUFFER_BIT);
 
         Matrix4f vmProjection = new Matrix4f().perspective((float) Math.toRadians(50f), window.aspectRatio(), 0.05f, 10f);
@@ -960,17 +1079,28 @@ public class Game implements GameAccess {
 
         float swingArc = swingTimer > 0f ? (float) Math.sin((1f - swingTimer / SWING_DURATION) * Math.PI) : 0f;
 
-        BlockType held = heldStack.type();
-        // Saplings (and any future cross/plant block) are a thin flat cross in-world, never a
-        // cube (see ChunkMeshBuilder.emitCrossPlant) - held in hand, they were rendering as the
-        // same solid cube every other block gets.
-        float[] verts = ChunkMeshBuilder.isCrossShapedPlant(held) ? buildCrossPlantHeldVerts(held) : buildHeldItemVerts(held);
-
-        Matrix4f model = new Matrix4f()
-                .translate(0.62f + bobX, -0.52f - bobY - swingArc * 0.12f, -1.1f - swingArc * 0.25f)
-                .rotateY((float) Math.toRadians(28f - swingArc * 35f))
-                .rotateX((float) Math.toRadians(-12f - swingArc * 25f))
-                .scale(0.5f);
+        float[] verts;
+        Matrix4f model;
+        if (heldStack.isEmpty()) {
+            // Nothing selected: the player's bare arm, reaching in from the lower right and
+            // swinging on break/place exactly like a held block does.
+            verts = armVerts();
+            model = new Matrix4f()
+                    .translate(0.5f + bobX, -0.55f - bobY - swingArc * 0.14f, -1.05f - swingArc * 0.3f)
+                    .rotateY((float) Math.toRadians(12f - swingArc * 20f))
+                    .rotateX((float) Math.toRadians(22f + swingArc * 30f));
+        } else {
+            BlockType held = heldStack.type();
+            // Saplings (and any future cross/plant block) are a thin flat cross in-world, never a
+            // cube (see ChunkMeshBuilder.emitCrossPlant) - held in hand, they were rendering as the
+            // same solid cube every other block gets.
+            verts = ChunkMeshBuilder.isCrossShapedPlant(held) ? buildCrossPlantHeldVerts(held) : buildHeldItemVerts(held);
+            model = new Matrix4f()
+                    .translate(0.62f + bobX, -0.52f - bobY - swingArc * 0.12f, -1.1f - swingArc * 0.25f)
+                    .rotateY((float) Math.toRadians(28f - swingArc * 35f))
+                    .rotateX((float) Math.toRadians(-12f - swingArc * 25f))
+                    .scale(0.5f);
+        }
 
         chunkShader.setUniform("uProjection", vmProjection);
         chunkShader.setUniform("uView", vmView);
@@ -981,6 +1111,18 @@ public class Game implements GameAccess {
 
         heldItemMesh.upload(verts);
         heldItemMesh.draw();
+    }
+
+    private float[] armVertsCache;
+
+    /** The bare-hand arm: a long thin box in skin tone, built once (its motion comes from the model matrix). */
+    private float[] armVerts() {
+        if (armVertsCache == null) {
+            float[] v = new float[ItemModelBuilder.BOX_VERTICES * ItemModelBuilder.FLOATS_PER_VERTEX];
+            ItemModelBuilder.emitBox(v, 0, 0.1f, 0.1f, 0.6f, atlas.getUv(Tile.SKIN), NEUTRAL_ICON_TINT);
+            armVertsCache = v;
+        }
+        return armVertsCache;
     }
 
     /** A standalone unit cube (-0.5..0.5) with all 6 faces always emitted - no neighbor culling needed for a held item. */
@@ -996,7 +1138,8 @@ public class Game implements GameAccess {
         float[] topTint = leafTint != null ? leafTint : block == BlockType.GRASS_BLOCK ? ChunkMeshBuilder.grassIconTint() : NEUTRAL_ICON_TINT;
         float[] sideTint = leafTint != null ? leafTint : NEUTRAL_ICON_TINT;
 
-        float[] verts = new float[6 * 6 * 11];
+        float[] overlay = faces.sideOverlay() != null ? atlas.getUv(faces.sideOverlay()) : null;
+        float[] verts = new float[(overlay != null ? 10 : 6) * 6 * 11];
         int idx = 0;
         idx = emitCubeFace(verts, idx, new float[]{-0.5f, 0.5f, -0.5f}, new float[]{-0.5f, 0.5f, 0.5f}, new float[]{0.5f, 0.5f, 0.5f}, new float[]{0.5f, 0.5f, -0.5f}, top, 1.0f, topTint);
         idx = emitCubeFace(verts, idx, new float[]{-0.5f, -0.5f, 0.5f}, new float[]{-0.5f, -0.5f, -0.5f}, new float[]{0.5f, -0.5f, -0.5f}, new float[]{0.5f, -0.5f, 0.5f}, bottom, 0.6f, sideTint);
@@ -1004,6 +1147,13 @@ public class Game implements GameAccess {
         idx = emitCubeFace(verts, idx, new float[]{0.5f, -0.5f, -0.5f}, new float[]{-0.5f, -0.5f, -0.5f}, new float[]{-0.5f, 0.5f, -0.5f}, new float[]{0.5f, 0.5f, -0.5f}, side, 0.85f, sideTint);
         idx = emitCubeFace(verts, idx, new float[]{0.5f, -0.5f, 0.5f}, new float[]{0.5f, -0.5f, -0.5f}, new float[]{0.5f, 0.5f, -0.5f}, new float[]{0.5f, 0.5f, 0.5f}, side, 0.7f, sideTint);
         idx = emitCubeFace(verts, idx, new float[]{-0.5f, -0.5f, -0.5f}, new float[]{-0.5f, -0.5f, 0.5f}, new float[]{-0.5f, 0.5f, 0.5f}, new float[]{-0.5f, 0.5f, -0.5f}, side, 0.7f, sideTint);
+        if (overlay != null) { // grass: biome-tinted fringe, drawn a hair outside the base faces
+            float k = 1.004f;
+            idx = emitCubeFace(verts, idx, new float[]{-0.5f * k, -0.5f * k, 0.5f * k}, new float[]{0.5f * k, -0.5f * k, 0.5f * k}, new float[]{0.5f * k, 0.5f * k, 0.5f * k}, new float[]{-0.5f * k, 0.5f * k, 0.5f * k}, overlay, 0.85f, topTint);
+            idx = emitCubeFace(verts, idx, new float[]{0.5f * k, -0.5f * k, -0.5f * k}, new float[]{-0.5f * k, -0.5f * k, -0.5f * k}, new float[]{-0.5f * k, 0.5f * k, -0.5f * k}, new float[]{0.5f * k, 0.5f * k, -0.5f * k}, overlay, 0.85f, topTint);
+            idx = emitCubeFace(verts, idx, new float[]{0.5f * k, -0.5f * k, 0.5f * k}, new float[]{0.5f * k, -0.5f * k, -0.5f * k}, new float[]{0.5f * k, 0.5f * k, -0.5f * k}, new float[]{0.5f * k, 0.5f * k, 0.5f * k}, overlay, 0.7f, topTint);
+            idx = emitCubeFace(verts, idx, new float[]{-0.5f * k, -0.5f * k, -0.5f * k}, new float[]{-0.5f * k, -0.5f * k, 0.5f * k}, new float[]{-0.5f * k, 0.5f * k, 0.5f * k}, new float[]{-0.5f * k, 0.5f * k, -0.5f * k}, overlay, 0.7f, topTint);
+        }
         return verts;
     }
 
@@ -1263,7 +1413,7 @@ public class Game implements GameAccess {
     /** Quantity in the slot's bottom-right corner, with a dark drop shadow so it reads over any icon. */
     private void drawStackCount(int count, float slotX, float slotY, float slotSize) {
         String text = Integer.toString(count);
-        float scale = 1.1f;
+        float scale = slotSize >= 44f ? 1.1f : 0.85f; // smaller slots (the inventory screen) get smaller digits
         float w = font.measureText(text, scale);
         float x = slotX + slotSize - w - 3f;
         float y = slotY + slotSize - font.lineHeight(scale) - 1f;
@@ -1437,6 +1587,11 @@ public class Game implements GameAccess {
         drawIconFace(pts[2], pts[4], pts[7], pts[6], topUv, 1.0f, topTint);  // top face (y=1)
         drawIconFace(pts[4], pts[7], pts[5], pts[1], sideUv, 0.75f, sideTint); // east face (x=1)
         drawIconFace(pts[6], pts[7], pts[5], pts[3], sideUv, 0.55f, sideTint); // south face (z=1)
+        if (faces.sideOverlay() != null) { // grass: the biome-tinted fringe on top of the dirt-only side
+            float[] overlayUv = atlas.getUv(faces.sideOverlay());
+            drawIconFace(pts[4], pts[7], pts[5], pts[1], overlayUv, 0.75f, topTint);
+            drawIconFace(pts[6], pts[7], pts[5], pts[3], overlayUv, 0.55f, topTint);
+        }
     }
 
     /** A single flat front-facing textured quad, centered in the slot - the correct icon shape
@@ -1498,6 +1653,28 @@ public class Game implements GameAccess {
     @Override
     public void selectSlot(int index) {
         inventory.selectSlot(index); // throws IllegalArgumentException when outside the hotbar
+    }
+
+    @Override
+    public void openInventoryScreen(int gridSize) {
+        if (gridSize != 2 && gridSize != 3) throw new IllegalArgumentException("gridSize must be 2 or 3");
+        openInventory(gridSize);
+    }
+
+    @Override
+    public void inventoryClick(int slot, boolean right) {
+        if (menu == null) throw new IllegalStateException("inventory is not open");
+        if (slot < 0) throw new IllegalArgumentException("slot must be >= 0");
+        try {
+            menu.click(slot, right);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("no such slot: " + slot);
+        }
+    }
+
+    @Override
+    public void closeInventoryScreen() {
+        closeInventory();
     }
 
     @Override
@@ -1600,6 +1777,12 @@ public class Game implements GameAccess {
         }
         sb.append("inventory.selectedSlot=").append(inventory.getSelectedSlot()).append('\n');
         sb.append("inventory.slots=").append(slots).append('\n');
+        sb.append("inventory.open=").append(menu != null).append('\n');
+        if (menu != null) {
+            sb.append("inventory.cursor=").append(menu.getCursor().isEmpty() ? "" : menu.getCursor().type().name() + "x" + menu.getCursor().count()).append('\n');
+            sb.append("inventory.craftGrid=").append(menu.gridSummary()).append('\n');
+            sb.append("inventory.craftResult=").append(menu.getResult().isEmpty() ? "" : menu.getResult().type().name() + "x" + menu.getResult().count()).append('\n');
+        }
         sb.append("items.dropped=").append(itemEntities.size()).append('\n');
         StringBuilder itemList = new StringBuilder();
         java.util.List<ItemEntity> dropped = itemEntities.entities();

@@ -38,6 +38,9 @@ public final class Commands {
             case "giveItem" -> giveItem(params);
             case "holdAttack" -> holdAttack(params);
             case "useItem" -> useItem();
+            case "openInventory" -> openInventory(params);
+            case "inventoryClick" -> inventoryClick(params);
+            case "closeInventory" -> closeInventory();
             case "lookAt" -> lookAt(params);
             case "screenshot" -> screenshot(params);
             case "state" -> state();
@@ -140,6 +143,40 @@ public final class Commands {
     private Result useItem() {
         game.useItem();
         return Result.ok("use queued");
+    }
+
+    private Result openInventory(Map<String, String> p) {
+        Integer size = p.containsKey("grid") ? parseInt(p, "grid") : Integer.valueOf(2);
+        if (size == null || (size != 2 && size != 3)) return Result.badRequest("openInventory grid must be 2 or 3");
+        try {
+            game.openInventoryScreen(size);
+        } catch (IllegalStateException e) {
+            return Result.badRequest(e.getMessage());
+        }
+        return Result.ok("inventory opened with a " + size + "x" + size + " crafting grid");
+    }
+
+    private Result inventoryClick(Map<String, String> p) {
+        Integer slot = parseInt(p, "slot");
+        String button = p.getOrDefault("button", "left").toLowerCase(Locale.ROOT);
+        if (slot == null || !(button.equals("left") || button.equals("right"))) {
+            return Result.badRequest("inventoryClick requires an integer 'slot' and button=left|right");
+        }
+        try {
+            game.inventoryClick(slot, button.equals("right"));
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return Result.badRequest(e.getMessage());
+        }
+        return Result.ok("clicked slot " + slot + " (" + button + ")");
+    }
+
+    private Result closeInventory() {
+        try {
+            game.closeInventoryScreen();
+        } catch (IllegalStateException e) {
+            return Result.badRequest(e.getMessage());
+        }
+        return Result.ok("inventory closed");
     }
 
     private Result lookAt(Map<String, String> p) {

@@ -16,11 +16,18 @@ final class ItemModelBuilder {
     static final int FLOATS_PER_VERTEX = 11;
     static final int CUBE_VERTICES = 36;
     static final int CROSS_VERTICES = 12;
+    /** A cube plus a tinted overlay quad on each of its 4 sides (grass). */
+    static final int CUBE_WITH_OVERLAY_VERTICES = CUBE_VERTICES + 4 * 6;
     /** Worst-case floats one item can write. */
-    static final int MAX_FLOATS_PER_ITEM = CUBE_VERTICES * FLOATS_PER_VERTEX;
+    static final int MAX_FLOATS_PER_ITEM = CUBE_WITH_OVERLAY_VERTICES * FLOATS_PER_VERTEX;
 
-    /** UVs are {u0,v0,u1,v1}; tints are {r,g,b}. */
-    record Model(float[] top, float[] bottom, float[] side, float[] topTint, float[] sideTint, boolean cross) {
+    /** UVs are {u0,v0,u1,v1}; tints are {r,g,b}. {@code sideOverlay}/{@code overlayTint} are
+     *  null except for grass, whose side has a separately tinted fringe drawn on top. */
+    record Model(float[] top, float[] bottom, float[] side, float[] topTint, float[] sideTint, boolean cross,
+                 float[] sideOverlay, float[] overlayTint) {
+        Model(float[] top, float[] bottom, float[] side, float[] topTint, float[] sideTint, boolean cross) {
+            this(top, bottom, side, topTint, sideTint, cross, null, null);
+        }
     }
 
     // Face corner signs (x,y,z each -1 or +1) in bottom-left, bottom-right, top-right, top-left
@@ -44,6 +51,46 @@ final class ItemModelBuilder {
             int[][] c = FACES[f];
             float shadedSky = sky * FACE_SHADE[f];
             n = quad(out, n, cx, cy, cz, half, cos, sin, c[0], c[1], c[2], c[3], uv, shadedSky, blockLight, tint);
+        }
+        if (m.sideOverlay() != null) {
+            // Slightly larger than the base cube so it wins the depth test on the (disjoint) pixels it covers.
+            for (int f = 2; f < 6; f++) {
+                int[][] c = FACES[f];
+                n = quad(out, n, cx, cy, cz, half * 1.01f, cos, sin, c[0], c[1], c[2], c[3], m.sideOverlay(),
+                        sky * FACE_SHADE[f], blockLight, m.overlayTint());
+            }
+        }
+        return n;
+    }
+
+    static final int BOX_VERTICES = 36;
+
+    /**
+     * An axis-aligned box centered on the origin with independent half-extents - the first-person
+     * arm. Written in the held-item lighting convention (sky 0, per-face brightness carried in the
+     * blockLight channel, which the shader does not scale by daylight), so the hand looks the same
+     * day or night like the held block does. Returns the new write index.
+     */
+    static int emitBox(float[] out, int n, float hx, float hy, float hz, float[] uv, float[] tint) {
+        for (int f = 0; f < 6; f++) {
+            int[][] c = FACES[f];
+            float shade = FACE_SHADE[f];
+            float u0 = uv[0], v0 = uv[1], u1 = uv[2], v1 = uv[3];
+            int[] order = {0, 1, 2, 0, 2, 3};
+            float[][] corner = {{u0, v1}, {u1, v1}, {u1, v0}, {u0, v0}};
+            for (int k : order) {
+                out[n++] = c[k][0] * hx;
+                out[n++] = c[k][1] * hy;
+                out[n++] = c[k][2] * hz;
+                out[n++] = corner[k][0];
+                out[n++] = corner[k][1];
+                out[n++] = 0f;
+                out[n++] = shade;
+                out[n++] = tint[0];
+                out[n++] = tint[1];
+                out[n++] = tint[2];
+                out[n++] = 0f;
+            }
         }
         return n;
     }

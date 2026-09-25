@@ -7,7 +7,11 @@ import java.util.Map;
 
 /** Maps each block type to its top/side/bottom atlas tiles. */
 public class BlockTextureMap {
-    public record Faces(Tile top, Tile side, Tile bottom) {
+    /** {@code sideOverlay} is null for almost every block; grass has a tintable overlay drawn on top of its side. */
+    public record Faces(Tile top, Tile side, Tile bottom, Tile sideOverlay) {
+        public Faces(Tile top, Tile side, Tile bottom) {
+            this(top, side, bottom, null);
+        }
     }
 
     private final Map<BlockType, Faces> map = new EnumMap<>(BlockType.class);
@@ -15,7 +19,7 @@ public class BlockTextureMap {
     public BlockTextureMap() {
         uniform(BlockType.STONE, Tile.STONE);
         uniform(BlockType.DIRT, Tile.DIRT);
-        put(BlockType.GRASS_BLOCK, Tile.GRASS_TOP, Tile.GRASS_SIDE, Tile.DIRT);
+        map.put(BlockType.GRASS_BLOCK, new Faces(Tile.GRASS_TOP, Tile.GRASS_SIDE, Tile.DIRT, Tile.GRASS_SIDE_OVERLAY));
         uniform(BlockType.COBBLESTONE, Tile.COBBLESTONE);
         uniform(BlockType.OAK_PLANKS, Tile.PLANKS);
         uniform(BlockType.BEDROCK, Tile.BEDROCK);

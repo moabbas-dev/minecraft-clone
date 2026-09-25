@@ -47,6 +47,16 @@ public interface GameAccess {
     /** Rotates the player to face a world point. @throws IllegalArgumentException if it is the eye position. */
     void lookAt(double x, double y, double z);
 
+    /** Opens the inventory/crafting screen with a 2x2 or 3x3 crafting grid.
+     *  @throws IllegalArgumentException for any other size; @throws IllegalStateException when not in-game. */
+    void openInventoryScreen(int gridSize);
+
+    /** A left or right click on a menu slot id (0-35 player slots, 100+i crafting grid, 1000 result). */
+    void inventoryClick(int slot, boolean rightButton);
+
+    /** Closes the screen, returning grid/cursor contents to the inventory (overflow drops in the world). */
+    void closeInventoryScreen();
+
     /** Captures the current frame to test-output/screenshots/&lt;name&gt;.png. Returns the file path. */
     String captureScreenshot(String name) throws IOException;
 

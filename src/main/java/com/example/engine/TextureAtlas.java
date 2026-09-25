@@ -117,10 +117,21 @@ public class TextureAtlas {
         BufferedImage atlas = new BufferedImage(COLS * CELL_PX, ROWS * CELL_PX, BufferedImage.TYPE_INT_ARGB);
         Graphics2D atlasG = atlas.createGraphics();
 
+        // The grass side is split into a dirt base and a tintable grayscale grass overlay (see
+        // GrassSideSplit) so the fringe follows biome color like the top face does. Those two
+        // tiles are written pixel-by-pixel (setRGB) rather than drawImage'd, because their
+        // transparent pixels carry a deliberate RGB that drawImage would discard.
+        int[][] grassSplit = GrassSideSplit.split(toArgb(loadOrDrawTile(Tile.GRASS_SIDE)), TILE_PX,
+                GrassSideSplit.meanLuma(toArgb(loadOrDrawTile(Tile.GRASS_TOP))));
         for (Tile tile : Tile.values()) {
-            BufferedImage img = loadOrDrawTile(tile);
             int[] origin = cellOrigin(tile);
-            atlasG.drawImage(img, origin[0], origin[1], null);
+            if (tile == Tile.GRASS_SIDE || tile == Tile.GRASS_SIDE_OVERLAY) {
+                int[] px = tile == Tile.GRASS_SIDE ? grassSplit[0] : grassSplit[1];
+                for (int y = 0; y < TILE_PX; y++)
+                    for (int x = 0; x < TILE_PX; x++) atlas.setRGB(origin[0] + x, origin[1] + y, px[y * TILE_PX + x]);
+                continue;
+            }
+            atlasG.drawImage(loadOrDrawTile(tile), origin[0], origin[1], null);
         }
         atlasG.dispose();
 
@@ -129,6 +140,10 @@ public class TextureAtlas {
         }
 
         textureId = upload(atlas);
+    }
+
+    private static int[] toArgb(BufferedImage img) {
+        return img.getRGB(0, 0, TILE_PX, TILE_PX, null, 0, TILE_PX);
     }
 
     private BufferedImage loadOrDrawTile(Tile tile) {
@@ -301,6 +316,7 @@ public class TextureAtlas {
             case CHERRY_LEAVES -> speckledNoise(img, rnd, new Color(247, 190, 213), new Color[]{new Color(240, 160, 195), new Color(252, 210, 225)}, 50);
             case MUD -> noisyFill(img, rnd, new Color(60, 48, 44), 10);
             case MANGROVE_ROOTS_SIDE, MANGROVE_ROOTS_TOP -> noisyFill(img, rnd, new Color(78, 52, 40), 14);
+            case SKIN -> noisyFill(img, rnd, new Color(208, 158, 124), 6);
             case OAK_SAPLING -> speckledNoise(img, rnd, new Color(60, 120, 40), new Color[]{new Color(50, 100, 32), new Color(75, 140, 50)}, 65);
         }
         g.dispose();

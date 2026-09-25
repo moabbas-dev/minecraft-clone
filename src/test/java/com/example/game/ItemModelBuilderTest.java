@@ -15,7 +15,36 @@ class ItemModelBuilderTest {
         float[] out = new float[ItemModelBuilder.MAX_FLOATS_PER_ITEM];
         int n = ItemModelBuilder.emitCube(out, 0, 5f, 6f, 7f, 0.125f, 1f, 0f, CUBE, 1f, 0f);
         assertEquals(ItemModelBuilder.CUBE_VERTICES * ItemModelBuilder.FLOATS_PER_VERTEX, n);
-        assertEquals(ItemModelBuilder.MAX_FLOATS_PER_ITEM, n);
+    }
+
+    @Test
+    void aGrassLikeModelAddsATintedOverlayQuadOnEachOfTheFourSides() {
+        float[] overlayUv = {0.5f, 0.5f, 0.625f, 0.625f};
+        float[] grassTint = {0.4f, 0.8f, 0.3f};
+        ItemModelBuilder.Model grass = new ItemModelBuilder.Model(UV, UV, UV, TINT, TINT, false, overlayUv, grassTint);
+        float[] out = new float[ItemModelBuilder.MAX_FLOATS_PER_ITEM];
+        int n = ItemModelBuilder.emitCube(out, 0, 0, 0, 0, 0.125f, 1f, 0f, grass, 1f, 0f);
+        assertEquals(ItemModelBuilder.CUBE_WITH_OVERLAY_VERTICES * ItemModelBuilder.FLOATS_PER_VERTEX, n);
+        int base = ItemModelBuilder.CUBE_VERTICES * ItemModelBuilder.FLOATS_PER_VERTEX;
+        assertEquals(grassTint[1], out[base + 8], 1e-6f, "overlay vertices carry the grass tint");
+        assertTrue(out[base + 3] >= overlayUv[0] && out[base + 3] <= overlayUv[2], "overlay vertices sample the overlay tile");
+    }
+
+    @Test
+    void anArmBoxWritesThirtySixVerticesWithinItsHalfExtents() {
+        float[] out = new float[ItemModelBuilder.BOX_VERTICES * ItemModelBuilder.FLOATS_PER_VERTEX];
+        int n = ItemModelBuilder.emitBox(out, 0, 0.14f, 0.2f, 0.6f, UV, TINT);
+        assertEquals(ItemModelBuilder.BOX_VERTICES * ItemModelBuilder.FLOATS_PER_VERTEX, n);
+        float maxX = 0, maxY = 0, maxZ = 0;
+        for (int i = 0; i < n; i += ItemModelBuilder.FLOATS_PER_VERTEX) {
+            maxX = Math.max(maxX, Math.abs(out[i]));
+            maxY = Math.max(maxY, Math.abs(out[i + 1]));
+            maxZ = Math.max(maxZ, Math.abs(out[i + 2]));
+            assertTrue(out[i + 3] >= UV[0] && out[i + 3] <= UV[2]);
+        }
+        assertEquals(0.14f, maxX, 1e-6f);
+        assertEquals(0.2f, maxY, 1e-6f);
+        assertEquals(0.6f, maxZ, 1e-6f);
     }
 
     @Test
@@ -55,7 +84,7 @@ class ItemModelBuilderTest {
         float[] out = new float[ItemModelBuilder.MAX_FLOATS_PER_ITEM * 2];
         int n = ItemModelBuilder.emitCube(out, 0, 0, 0, 0, 0.125f, 1f, 0f, CUBE, 1f, 0f);
         int m = ItemModelBuilder.emitCube(out, n, 5, 0, 0, 0.125f, 1f, 0f, CUBE, 1f, 0f);
-        assertEquals(ItemModelBuilder.MAX_FLOATS_PER_ITEM * 2, m);
+        assertEquals(ItemModelBuilder.CUBE_VERTICES * ItemModelBuilder.FLOATS_PER_VERTEX * 2, m);
     }
 
     @Test

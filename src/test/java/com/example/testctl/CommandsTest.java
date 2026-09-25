@@ -37,6 +37,13 @@ class CommandsTest {
         int useCalls;
         Double lookX, lookY, lookZ;
         boolean throwOnLook;
+        Integer openedGrid;
+        boolean throwOnOpen;
+        Integer clickedSlot;
+        Boolean clickedRight;
+        boolean throwOnClick;
+        int closeCalls;
+        boolean throwOnClose;
 
         @Override
         public void teleport(float x, float y, float z, Float yawDegrees, Float pitchDegrees) {
@@ -101,6 +108,25 @@ class CommandsTest {
             lookX = x;
             lookY = y;
             lookZ = z;
+        }
+
+        @Override
+        public void openInventoryScreen(int gridSize) {
+            if (throwOnOpen) throw new IllegalStateException("not in game");
+            openedGrid = gridSize;
+        }
+
+        @Override
+        public void inventoryClick(int slot, boolean rightButton) {
+            if (throwOnClick) throw new IllegalArgumentException("no such slot: " + slot);
+            clickedSlot = slot;
+            clickedRight = rightButton;
+        }
+
+        @Override
+        public void closeInventoryScreen() {
+            if (throwOnClose) throw new IllegalStateException("inventory is not open");
+            closeCalls++;
         }
 
         @Override
@@ -330,6 +356,39 @@ class CommandsTest {
         assertEquals(400, commands.execute("lookAt", params("x", "1", "y", "2")).status());
         fake.throwOnLook = true;
         assertEquals(400, commands.execute("lookAt", params("x", "1", "y", "2", "z", "3")).status());
+    }
+
+    @Test
+    void openInventoryDefaultsToTwoByTwoAcceptsThreeAndRejectsOtherSizes() {
+        assertEquals(200, commands.execute("openInventory", params()).status());
+        assertEquals(2, fake.openedGrid);
+        assertEquals(200, commands.execute("openInventory", params("grid", "3")).status());
+        assertEquals(3, fake.openedGrid);
+        assertEquals(400, commands.execute("openInventory", params("grid", "4")).status());
+        assertEquals(400, commands.execute("openInventory", params("grid", "x")).status());
+        fake.throwOnOpen = true;
+        assertEquals(400, commands.execute("openInventory", params()).status(), "not in game must be a clean 400");
+    }
+
+    @Test
+    void inventoryClickParsesSlotAndButtonAndReportsBadSlots() {
+        assertEquals(200, commands.execute("inventoryClick", params("slot", "5", "button", "right")).status());
+        assertEquals(5, fake.clickedSlot);
+        assertEquals(true, fake.clickedRight);
+        assertEquals(200, commands.execute("inventoryClick", params("slot", "1000")).status());
+        assertEquals(false, fake.clickedRight, "button defaults to left");
+        assertEquals(400, commands.execute("inventoryClick", params("button", "left")).status());
+        assertEquals(400, commands.execute("inventoryClick", params("slot", "2", "button", "middle")).status());
+        fake.throwOnClick = true;
+        assertEquals(400, commands.execute("inventoryClick", params("slot", "999")).status());
+    }
+
+    @Test
+    void closeInventoryDispatchesAndReportsWhenNothingIsOpen() {
+        assertEquals(200, commands.execute("closeInventory", params()).status());
+        assertEquals(1, fake.closeCalls);
+        fake.throwOnClose = true;
+        assertEquals(400, commands.execute("closeInventory", params()).status());
     }
 
     @Test
