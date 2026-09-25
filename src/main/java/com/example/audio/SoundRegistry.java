@@ -45,6 +45,8 @@ public class SoundRegistry {
         register(new SoundGroup("step.snow", files("step", "snow", 4), AudioCategory.PLAYER, 0.5f, 0.9f, 1.1f, true, 16f));
         register(new SoundGroup("step.wood", files("step", "wood", 6), AudioCategory.PLAYER, 0.5f, 0.9f, 1.1f, true, 16f));
 
+        register(new SoundGroup("item.pickup", new String[]{"random/pop.ogg"}, AudioCategory.PLAYER, 0.35f, 0.9f, 1.5f, false, 0f));
+
         register(new SoundGroup("ambient.cave", files("ambient/cave", "cave", 19), AudioCategory.AMBIENT, 0.6f, 0.95f, 1.05f, true, 32f));
         register(new SoundGroup("ambient.rain", files("ambient/weather", "rain", 8), AudioCategory.WEATHER, 0.5f, 1f, 1f, false, 0f));
         register(new SoundGroup("weather.thunder", files("ambient/weather", "thunder", 3), AudioCategory.WEATHER, 0.9f, 0.95f, 1.05f, false, 0f));

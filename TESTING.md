@@ -25,6 +25,13 @@ or downgrades a failing assertion.
 | `com.example.physics.gameplay` | Real `Player.update` driven by a fixed timestep + a `FakeInputState` - walking, sprinting, jumping/landing, wall collision | No |
 | `com.example.world.integration` | `WorldIO` save/load round-trips (`@TempDir`, never touches the real `saves/`), world-generation determinism and chunk-boundary consistency, `Weather` state cycling | No |
 | `com.example.game` (`DayNightTest`) | `Game`'s pure day/night helpers (`sunDirection`, `computeDaylightFactor`, `computeSkyColor`) | No |
+| `com.example.inventory` | `Inventory`/`ItemStack`: add/merge/split, stack limits, full/partial insertion, removal, selection, save/load round-trip | No |
+| `com.example.entity` | `ItemEntityManager`: drop physics (never tunnels/sinks), pickup delay, full/partial/duplicate pickup, merging, lifetime, entity cap, freezing in unloaded chunks | No |
+| `com.example.fx` | `ParticleSystem`: burst size, expiry, pool cap, vertex output | No |
+| `com.example.game` (`MiningControllerTest`, `BlockPlacerTest`, `ItemModelBuilderTest`) | The break transaction (one drop per break, cancel/target-change/invalidation, crack stage progression) and transactional placement (consume only after success) | No |
+| `com.example.world.unit` (`BlockDropsTest`) | Drop table rules | No |
+| `com.example.engine` (`CrackOverlayTest`) | Procedural crack stage images only (cumulative, deterministic); the overlay's GL parts are manual-only | No |
+| `com.example.audio` | Material mapping, manifest validation, registry metadata, trigger predicates (never touches OpenAL) | No |
 
 None of the above needs LWJGL/GLFW/OpenGL. That's not an accident of test design - `Player`,
 `World`/`Chunk`, `Raycast`, `Weather`, `TerrainGenerator`/`Biome`/`BiomeColors`, `SimplexNoise`,
@@ -54,8 +61,10 @@ directly. No other part of `Game` was changed or is unit-tested this round - see
   `Window`'s constructor calls `glfwShowWindow` unconditionally, so even a "headless" attempt
   pops a real window on a machine with a display, and does nothing useful on one without a
   display at all. Not attempted this round.
-- **A live test controller** (in-process hook, HTTP, or WebSocket into a running `Game`) - was
-  in scope of the original request but deliberately deferred. `Game` today has no test hooks, no
+- **A live test controller** - now exists (`-Dtest.controller=true`, see `com.example.testctl`), with
+  `giveItem`, `holdAttack`, `useItem` and `lookAt` so mining, pickup and placement can be driven live
+  through the same code path real input uses. It is a manual tool, not an automated test. The original
+  note follows for history: it was in scope of the original request but deliberately deferred. `Game` today has no test hooks, no
   injected clock, and creates its GL context at construction; adding a controller means giving it
   those first. The gameplay logic a controller would let you drive (movement, world state,
   raycasting, weather) is already reachable directly through the packages above without one.

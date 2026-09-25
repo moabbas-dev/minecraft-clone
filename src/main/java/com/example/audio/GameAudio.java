@@ -176,6 +176,13 @@ public class GameAudio {
         engine.playOneShot(registry.definitionOf(id), registry.buffersFor(id), worldPos, PLACEMENT_PITCH_MULTIPLIER, 1f);
     }
 
+    /** Item collected into the inventory. Non-positional (it happens at the player). The caller
+     *  invokes this at most once per update no matter how many stacks transferred, so a pile
+     *  being collected in one frame is one sound, not a burst. */
+    public void playPickup() {
+        engine.playOneShot(registry.definitionOf("item.pickup"), registry.buffersFor("item.pickup"), null);
+    }
+
     private void updateCaveAmbience(float dt, Player player, World world) {
         caveAmbientTimer -= dt;
         if (caveAmbientTimer > 0f) return;

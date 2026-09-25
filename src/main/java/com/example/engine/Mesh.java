@@ -1,5 +1,9 @@
 package com.example.engine;
 
+import org.lwjgl.system.MemoryUtil;
+
+import java.nio.FloatBuffer;
+
 import static org.lwjgl.opengl.GL33.*;
 
 /**
@@ -11,6 +15,8 @@ public class Mesh {
     private final int vboId;
     private final int[] attribSizes;
     private int vertexCount;
+    /** Reused staging buffer for {@link #upload(float[], int)} - grown on demand, freed in destroy(). */
+    private FloatBuffer staging;
 
     public Mesh(int[] attribSizes) {
         this.attribSizes = attribSizes;
@@ -38,6 +44,26 @@ public class Mesh {
         glBufferData(GL_ARRAY_BUFFER, data, GL_DYNAMIC_DRAW);
     }
 
+    /**
+     * Uploads only the first {@code floatCount} floats of {@code data}, so callers can keep one
+     * big reusable scratch array for per-frame dynamic geometry (dropped items, particles, crack
+     * overlay) instead of allocating an exactly-sized array every frame.
+     */
+    public void upload(float[] data, int floatCount) {
+        int stride = 0;
+        for (int s : attribSizes) stride += s;
+        vertexCount = stride == 0 ? 0 : floatCount / stride;
+        if (vertexCount == 0) return;
+        if (staging == null || staging.capacity() < floatCount) {
+            if (staging != null) MemoryUtil.memFree(staging);
+            staging = MemoryUtil.memAllocFloat(Math.max(floatCount, 4096));
+        }
+        staging.clear();
+        staging.put(data, 0, vertexCount * stride).flip();
+        glBindBuffer(GL_ARRAY_BUFFER, vboId);
+        glBufferData(GL_ARRAY_BUFFER, staging, GL_DYNAMIC_DRAW);
+    }
+
     public void draw() {
         if (vertexCount == 0) return;
         glBindVertexArray(vaoId);
@@ -50,6 +76,10 @@ public class Mesh {
     }
 
     public void destroy() {
+        if (staging != null) {
+            MemoryUtil.memFree(staging);
+            staging = null;
+        }
         glDeleteBuffers(vboId);
         glDeleteVertexArrays(vaoId);
     }

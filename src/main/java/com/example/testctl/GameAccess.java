@@ -33,6 +33,20 @@ public interface GameAccess {
      *  the matching number key. @throws IllegalArgumentException if index is out of range. */
     void selectSlot(int index);
 
+    /** Adds items (by BlockType enum name, case-insensitive) to the inventory through its normal
+     *  add API and returns how many actually fit. @throws IllegalArgumentException for an unknown
+     *  or non-item type or a negative count. */
+    int giveItem(String blockTypeName, int count);
+
+    /** Holds (or releases) the attack button through the same path real mouse input takes. */
+    void holdAttack(boolean held);
+
+    /** Queues one use/place click, consumed by the next interaction update. */
+    void useItem();
+
+    /** Rotates the player to face a world point. @throws IllegalArgumentException if it is the eye position. */
+    void lookAt(double x, double y, double z);
+
     /** Captures the current frame to test-output/screenshots/&lt;name&gt;.png. Returns the file path. */
     String captureScreenshot(String name) throws IOException;
 

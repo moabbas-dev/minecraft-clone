@@ -1,6 +1,11 @@
 package com.example.game;
 
 import com.example.audio.GameAudio;
+import com.example.entity.ItemEntity;
+import com.example.entity.ItemEntityManager;
+import com.example.fx.ParticleSystem;
+import com.example.inventory.Inventory;
+import com.example.inventory.ItemStack;
 import com.example.engine.*;
 import com.example.physics.Player;
 import com.example.testctl.GameAccess;
@@ -21,8 +26,11 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.EnumMap;
 import java.util.Iterator;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static org.lwjgl.glfw.GLFW.*;
@@ -101,9 +109,26 @@ public class Game implements GameAccess {
     private String currentWorldFolder;
     private WorldSettings currentSettings;
 
-    private int selectedIndex = 0;
-    private int[] breakingTarget = null;
-    private float breakingProgress = 0f;
+    /** The single source of truth for item counts and the selected hotbar slot - the hotbar UI,
+     *  held-item view model, and block placement all read it; nothing keeps a second copy. */
+    private Inventory inventory = new Inventory();
+    private final Random gameplayRandom = new Random();
+    private final MiningController mining = new MiningController(gameplayRandom);
+    private final ItemEntityManager itemEntities = new ItemEntityManager(Inventory.DEFAULT_MAX_STACK);
+    private final ParticleSystem particles = new ParticleSystem();
+    private CrackOverlay crackOverlay;
+    private Mesh itemMesh;
+    private Mesh particleMesh;
+    /** Reused every frame - dropped items and particles never allocate per-frame vertex arrays. */
+    private final float[] itemScratch = new float[ItemEntityManager.MAX_ENTITIES * ItemModelBuilder.MAX_FLOATS_PER_ITEM];
+    private final float[] particleScratch = new float[ParticleSystem.maxVertexFloats()];
+    private final Map<BlockType, ItemModelBuilder.Model> itemModels = new EnumMap<>(BlockType.class);
+    private static final Matrix4f IDENTITY = new Matrix4f();
+    /** Test-controller-only input overrides (see GameAccess.holdAttack/useItem) - the controller
+     *  has no synthetic keyboard/mouse, so these let it drive mining and placement through the
+     *  exact same code path real input takes. Both are only ever touched on the main thread. */
+    private boolean forcedAttackHeld = false;
+    private int forcedUseRequests = 0;
     /** Seconds left to show the selected-block name label above the hotbar - reset to
      *  HOTBAR_LABEL_DURATION whenever selectedIndex actually changes (see
      *  updateHotbarSelection), counted down every frame, drawn only while > 0. */
@@ -186,6 +211,9 @@ public class Game implements GameAccess {
         sunMoonMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
         rainMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
         heldItemMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
+        itemMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
+        particleMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
+        crackOverlay = new CrackOverlay(CHUNK_VERTEX_LAYOUT);
 
         gameAudio = new GameAudio();
         gameAudio.init(); // never throws - degrades to silent no-ops if no device/OpenAL fails
@@ -313,9 +341,7 @@ public class Game implements GameAccess {
         }
         player = new Player(new Vector3f(spawnLocalX + 0.5f, spawnY, spawnLocalZ + 0.5f));
 
-        selectedIndex = 0;
-        breakingTarget = null;
-        breakingProgress = 0;
+        resetGameplayState(new Inventory());
         weather = new Weather(seed);
         initRainParticles();
 
@@ -356,9 +382,7 @@ public class Game implements GameAccess {
         saplingGrowth.registerChunk(spawnChunk); // rescans for any saplings that were saved mid-growth
 
         player = new Player(new Vector3f(meta.playerPos()));
-        selectedIndex = Math.max(0, Math.min(BlockType.PLACEABLE.length - 1, meta.selectedIndex()));
-        breakingTarget = null;
-        breakingProgress = 0;
+        resetGameplayState(meta.inventory() != null ? meta.inventory() : new Inventory());
         weather = new Weather(meta.seed());
         initRainParticles();
 
@@ -382,7 +406,7 @@ public class Game implements GameAccess {
     private void saveWorld() {
         if (world == null || currentWorldFolder == null) return;
         File dir = WorldIO.worldDir(currentWorldFolder);
-        WorldIO.saveMeta(dir, currentSettings, world.seed, player.position.x, player.position.y, player.position.z, dayTime, selectedIndex);
+        WorldIO.saveMeta(dir, currentSettings, world.seed, player.position.x, player.position.y, player.position.z, dayTime, inventory.getSelectedSlot(), inventory);
         for (Chunk c : world.chunkMap().values()) {
             if (c.isGenerated()) WorldIO.saveChunk(dir, c);
         }
@@ -400,6 +424,15 @@ public class Game implements GameAccess {
         state = GameState.IN_GAME;
     }
 
+    /** Fresh per-world gameplay state: the given inventory, no in-progress break, no dropped
+     *  items or particles carried over from the previous world. */
+    private void resetGameplayState(Inventory startingInventory) {
+        inventory = startingInventory;
+        mining.reset();
+        itemEntities.clear();
+        particles.clear();
+    }
+
     private void quitToTitle() {
         saveWorld();
         for (ChunkRenderData rd : renderData.values()) rd.destroy();
@@ -408,6 +441,9 @@ public class Game implements GameAccess {
         player = null;
         weather = null;
         saplingGrowth = null;
+        resetGameplayState(new Inventory());
+        forcedAttackHeld = false;
+        forcedUseRequests = 0;
         currentWorldFolder = null;
         currentSettings = null;
         window.releaseMouse();
@@ -486,32 +522,30 @@ public class Game implements GameAccess {
         if (hotbarLabelTimer > 0f) hotbarLabelTimer = Math.max(0f, hotbarLabelTimer - dt);
         updateChunkStreaming();
         handleInteraction(dt);
+        updateItemsAndEffects(dt);
 
         titleTimer += dt;
         if (titleTimer > 0.25) {
             titleTimer = 0;
-            BlockType sel = BlockType.PLACEABLE[selectedIndex];
+            ItemStack sel = inventory.selected();
             window.setTitle(String.format("Minecraft 1.8 Clone - Selected: %s (%.0f,%.0f,%.0f)%s",
-                    sel.displayName, player.position.x, player.position.y, player.position.z,
+                    sel.isEmpty() ? "-" : sel.type().displayName, player.position.x, player.position.y, player.position.z,
                     player.isFlying() ? " [flying]" : ""));
         }
     }
 
     private void updateHotbarSelection() {
-        int previousIndex = selectedIndex;
-        int len = BlockType.PLACEABLE.length;
+        int previous = inventory.getSelectedSlot();
         double scroll = input.getScrollDelta();
-        if (scroll > 0) selectedIndex = Math.floorMod(selectedIndex - 1, len);
-        else if (scroll < 0) selectedIndex = Math.floorMod(selectedIndex + 1, len);
+        if (scroll > 0) inventory.cycleSelection(-1);
+        else if (scroll < 0) inventory.cycleSelection(1);
 
         int[] numberKeys = {GLFW_KEY_1, GLFW_KEY_2, GLFW_KEY_3, GLFW_KEY_4, GLFW_KEY_5,
                 GLFW_KEY_6, GLFW_KEY_7, GLFW_KEY_8, GLFW_KEY_9};
-        for (int i = 0; i < numberKeys.length; i++) {
-            if (input.consumeKeyPressed(numberKeys[i]) && i < len) {
-                selectedIndex = i;
-            }
+        for (int i = 0; i < numberKeys.length && i < inventory.getHotbarSize(); i++) {
+            if (input.consumeKeyPressed(numberKeys[i])) inventory.selectSlot(i);
         }
-        if (selectedIndex != previousIndex) {
+        if (inventory.getSelectedSlot() != previous) {
             hotbarLabelTimer = HOTBAR_LABEL_DURATION;
         }
     }
@@ -631,67 +665,68 @@ public class Game implements GameAccess {
         Vector3f dir = player.frontVector();
         Raycast.Hit hit = Raycast.cast(world, eye, dir, REACH_DISTANCE);
 
-        if (hit == null) {
-            breakingTarget = null;
-            breakingProgress = 0;
-            return;
+        boolean attackHeld = input.isMouseDown(GLFW_MOUSE_BUTTON_LEFT) || forcedAttackHeld;
+        MiningController.Result mined = mining.tick(world, hit, attackHeld, dt);
+        if (mined.mining() && swingTimer <= 0f) {
+            swingTimer = SWING_DURATION; // repeat the punch while actively mining
+            gameAudio.playDig(hit.type(), new Vector3f(hit.x() + 0.5f, hit.y() + 0.5f, hit.z() + 0.5f)); // one hit-tick per swing
         }
+        if (mined.broken()) onBlockBroken(mined);
 
-        if (input.isMouseDown(GLFW_MOUSE_BUTTON_LEFT)) {
-            if (breakingTarget == null || breakingTarget[0] != hit.x() || breakingTarget[1] != hit.y() || breakingTarget[2] != hit.z()) {
-                breakingTarget = new int[]{hit.x(), hit.y(), hit.z()};
-                breakingProgress = 0;
-            }
-            BlockType targetType = world.getBlock(hit.x(), hit.y(), hit.z());
-            float breakTime = targetType.handBreakSeconds();
-            if (breakTime >= 0) {
-                breakingProgress += dt;
-                Vector3f blockCenter = new Vector3f(hit.x() + 0.5f, hit.y() + 0.5f, hit.z() + 0.5f);
-                if (swingTimer <= 0f) {
-                    swingTimer = SWING_DURATION; // repeat the punch while actively mining
-                    gameAudio.playDig(targetType, blockCenter); // one hit-tick per repeated swing
-                }
-                if (breakingProgress >= breakTime) {
-                    world.setBlock(hit.x(), hit.y(), hit.z(), BlockType.AIR);
-                    gameAudio.playDig(targetType, blockCenter); // final destruction sound
-                    breakingProgress = 0;
-                    breakingTarget = null;
-                }
-            }
-        } else {
-            breakingTarget = null;
-            breakingProgress = 0;
+        boolean use = input.consumeMousePressed(GLFW_MOUSE_BUTTON_RIGHT);
+        if (forcedUseRequests > 0) {
+            forcedUseRequests--;
+            use = true;
         }
-
-        if (input.consumeMousePressed(GLFW_MOUSE_BUTTON_RIGHT)) {
-            BlockType place = BlockType.PLACEABLE[selectedIndex];
-            SaplingSpecies sapling = SaplingSpecies.bySaplingBlock(place);
-            if (sapling != null) {
-                if (canPlantSapling(hit, sapling)) {
-                    world.setBlock(hit.placeX(), hit.placeY(), hit.placeZ(), place);
-                    saplingGrowth.registerPlanted(hit.placeX(), hit.placeY(), hit.placeZ(), sapling);
-                    swingTimer = SWING_DURATION;
-                    gameAudio.playPlace(place, new Vector3f(hit.placeX() + 0.5f, hit.placeY() + 0.5f, hit.placeZ() + 0.5f));
-                }
-            } else if (!blockIntersectsPlayer(hit.placeX(), hit.placeY(), hit.placeZ())) {
-                world.setBlock(hit.placeX(), hit.placeY(), hit.placeZ(), place);
+        if (use && hit != null) {
+            BlockPlacer.Result placed = BlockPlacer.tryPlace(world, inventory, hit, this::blockIntersectsPlayer, saplingGrowth);
+            if (placed.placed()) {
                 swingTimer = SWING_DURATION;
-                gameAudio.playPlace(place, new Vector3f(hit.placeX() + 0.5f, hit.placeY() + 0.5f, hit.placeZ() + 0.5f));
+                gameAudio.playPlace(placed.type(), new Vector3f(placed.x() + 0.5f, placed.y() + 0.5f, placed.z() + 0.5f));
             }
         }
     }
 
-    /** Saplings may only be planted directly on top of a valid ground block for their species -
-     *  the surface hit must be exactly one block below the new position (placing against a
-     *  side face doesn't count, same as real vanilla), never on top of an incompatible block -
-     *  the first placement-validation hook this project has needed for any block type. */
-    private boolean canPlantSapling(Raycast.Hit hit, SaplingSpecies sapling) {
-        if (!isDirectlyAboveGround(hit)) return false;
-        if (!sapling.validGround.contains(hit.type())) return false;
-        return !blockIntersectsPlayer(hit.placeX(), hit.placeY(), hit.placeZ());
+    /** Everything that follows one completed break: the sound, the dropped items, and the
+     *  particle burst. MiningController guarantees this runs exactly once per broken block; the
+     *  world change and drop roll already happened there, so nothing below can duplicate or
+     *  lose them - and the purely cosmetic burst is isolated so a failure there can't affect the rest. */
+    private void onBlockBroken(MiningController.Result r) {
+        Vector3f center = new Vector3f(r.x() + 0.5f, r.y() + 0.5f, r.z() + 0.5f);
+        gameAudio.playDig(r.brokenType(), center);
+        for (BlockDrops.Resolved drop : r.drops()) {
+            itemEntities.spawn(drop.item(), drop.count(), center, gameplayRandom);
+        }
+        try {
+            ItemModelBuilder.Model m = itemModelFor(r.brokenType());
+            float[] tile = r.brokenType() == BlockType.GRASS_BLOCK ? m.bottom() : m.side();
+            float sky = world.getSkyLight(r.x(), r.y() + 1, r.z()) / 15f;
+            float blk = world.getBlockLight(r.x(), r.y(), r.z()) / 15f;
+            particles.spawnBurst(center.x, center.y, center.z, tile, m.sideTint(), sky, blk, gameplayRandom);
+        } catch (RuntimeException e) {
+            log.warn("Break particles failed for {}: {}", r.brokenType(), e.toString());
+        }
     }
 
-    /** Pure geometric half of canPlantSapling, package-private so it's directly testable without
+    private void updateItemsAndEffects(float dt) {
+        itemEntities.update(world, dt);
+        if (itemEntities.collect(player.position, inventory) > 0) gameAudio.playPickup();
+        particles.update(dt);
+    }
+
+    /** Cached per-block-type UVs/tints for dropped items and particles (built once, on first use). */
+    private ItemModelBuilder.Model itemModelFor(BlockType type) {
+        return itemModels.computeIfAbsent(type, t -> {
+            BlockTextureMap.Faces faces = textureMap.facesFor(t);
+            float[] leafTint = ChunkMeshBuilder.leafIconTint(t);
+            float[] topTint = leafTint != null ? leafTint : t == BlockType.GRASS_BLOCK ? ChunkMeshBuilder.grassIconTint() : NEUTRAL_ICON_TINT;
+            float[] sideTint = leafTint != null ? leafTint : NEUTRAL_ICON_TINT;
+            return new ItemModelBuilder.Model(atlas.getUv(faces.top()), atlas.getUv(faces.bottom()), atlas.getUv(faces.side()),
+                    topTint, sideTint, ChunkMeshBuilder.isCrossShapedPlant(t));
+        });
+    }
+
+    /** Pure geometric half of the sapling-planting rule (see BlockPlacer), package-private so it's directly testable without
      *  a Player/GL context (unlike blockIntersectsPlayer, which no block type's placement has
      *  ever needed to unit-test in this codebase). */
     static boolean isDirectlyAboveGround(Raycast.Hit hit) {
@@ -838,6 +873,11 @@ public class Game implements GameAccess {
             rd.transparentMesh.draw();
         }
 
+        chunkShader.setUniform("uAlpha", 1f);
+        renderBlockCrack();
+        renderDroppedItems();
+        renderParticles();
+
         renderSunAndMoon(eye, sunDir, stormFactor, weather.isThundering());
         renderRain();
         renderHeldItem();
@@ -851,7 +891,63 @@ public class Game implements GameAccess {
      * clips into world geometry, with a walk/sprint sway plus a punch-style swing on
      * break/place - matches vanilla's held-item animation rather than an instant/static prop.
      */
+    /** The crack overlay on the block currently being mined - drawn only while a valid break is
+     *  in progress; MiningController's stage is the only input, so it resets automatically on
+     *  cancel, target change, invalidation and completion. */
+    private void renderBlockCrack() {
+        int stage = mining.crackStage();
+        if (stage < 0) return;
+        crackOverlay.update(mining.targetX(), mining.targetY(), mining.targetZ(), stage);
+        chunkShader.setUniform("uModel", IDENTITY);
+        crackOverlay.bind(0);
+        glEnable(GL_POLYGON_OFFSET_FILL);
+        glPolygonOffset(-1f, -1f);
+        crackOverlay.draw();
+        glDisable(GL_POLYGON_OFFSET_FILL);
+        atlas.bind(0);
+    }
+
+    /** All dropped items in one batched draw through the existing chunk shader/atlas. */
+    private void renderDroppedItems() {
+        java.util.List<ItemEntity> list = itemEntities.entities();
+        int n = 0;
+        for (int i = 0; i < list.size(); i++) {
+            ItemEntity e = list.get(i);
+            ItemModelBuilder.Model m = itemModelFor(e.getType());
+            float t = e.getAge();
+            float cos = (float) Math.cos(t * 1.6f), sin = (float) Math.sin(t * 1.6f);
+            float half = m.cross() ? 0.17f : 0.125f;
+            float bob = e.isOnGround() ? 0.05f + (float) Math.sin(t * 2.6f) * 0.03f : 0f;
+            float cy = e.position.y + half + bob;
+            int bx = (int) Math.floor(e.position.x), by = (int) Math.floor(cy), bz = (int) Math.floor(e.position.z);
+            float sky = world.getSkyLight(bx, by, bz) / 15f;
+            float blk = world.getBlockLight(bx, by, bz) / 15f;
+            n = m.cross()
+                    ? ItemModelBuilder.emitCross(itemScratch, n, e.position.x, cy, e.position.z, half, cos, sin, m, sky, blk)
+                    : ItemModelBuilder.emitCube(itemScratch, n, e.position.x, cy, e.position.z, half, cos, sin, m, sky, blk);
+        }
+        if (n == 0) return;
+        itemMesh.upload(itemScratch, n);
+        chunkShader.setUniform("uModel", IDENTITY);
+        itemMesh.draw();
+    }
+
+    private void renderParticles() {
+        if (particles.count() == 0) return;
+        Vector3f front = player.frontVector();
+        Vector3f right = new Vector3f(-front.z, 0, front.x);
+        if (right.lengthSquared() < 1e-6f) right.set(1, 0, 0);
+        right.normalize();
+        Vector3f up = new Vector3f(right).cross(front).normalize();
+        int floats = particles.buildVertices(particleScratch, right, up);
+        particleMesh.upload(particleScratch, floats);
+        chunkShader.setUniform("uModel", IDENTITY);
+        particleMesh.draw();
+    }
+
     private void renderHeldItem() {
+        ItemStack heldStack = inventory.selected();
+        if (heldStack.isEmpty()) return; // an empty hand draws nothing
         glClear(GL_DEPTH_BUFFER_BIT);
 
         Matrix4f vmProjection = new Matrix4f().perspective((float) Math.toRadians(50f), window.aspectRatio(), 0.05f, 10f);
@@ -864,7 +960,7 @@ public class Game implements GameAccess {
 
         float swingArc = swingTimer > 0f ? (float) Math.sin((1f - swingTimer / SWING_DURATION) * Math.PI) : 0f;
 
-        BlockType held = BlockType.PLACEABLE[selectedIndex];
+        BlockType held = heldStack.type();
         // Saplings (and any future cross/plant block) are a thin flat cross in-world, never a
         // cube (see ChunkMeshBuilder.emitCrossPlant) - held in hand, they were rendering as the
         // same solid cube every other block gets.
@@ -1131,9 +1227,7 @@ public class Game implements GameAccess {
         uiRenderer.drawColorQuad(cx - 5, cy - 1, 10, 2, 1, 1, 1, 0.9f);
         uiRenderer.drawColorQuad(cx - 1, cy - 5, 2, 10, 1, 1, 1, 0.9f);
 
-        int len = BlockType.PLACEABLE.length;
-        int visibleSlots = 9;
-        int windowStart = Math.max(0, Math.min(selectedIndex - 4, len - visibleSlots));
+        int visibleSlots = inventory.getHotbarSize();
         float slotSize = 44f;
         float margin = 4f;
         float totalWidth = visibleSlots * (slotSize + margin) - margin;
@@ -1142,16 +1236,19 @@ public class Game implements GameAccess {
 
         float selectedSlotX = startX;
         for (int i = 0; i < visibleSlots; i++) {
-            int idx = windowStart + i;
             float x = startX + i * (slotSize + margin);
-            boolean selected = idx == selectedIndex;
+            boolean selected = i == inventory.getSelectedSlot();
             if (selected) {
                 uiRenderer.drawColorQuad(x - 3, y - 3, slotSize + 6, slotSize + 6, 1f, 1f, 0.4f, 0.95f);
                 selectedSlotX = x;
             }
             uiRenderer.drawColorQuad(x, y, slotSize, slotSize, 0.1f, 0.1f, 0.1f, 0.55f);
 
-            drawBlockIcon(BlockType.PLACEABLE[idx], x, y, slotSize);
+            ItemStack stack = inventory.get(i);
+            if (!stack.isEmpty()) {
+                drawBlockIcon(stack.type(), x, y, slotSize);
+                if (stack.count() > 1) drawStackCount(stack.count(), x, y, slotSize);
+            }
         }
         drawHotbarLabel(selectedSlotX, y, slotSize);
 
@@ -1163,6 +1260,17 @@ public class Game implements GameAccess {
         renderDebugOverlay();
     }
 
+    /** Quantity in the slot's bottom-right corner, with a dark drop shadow so it reads over any icon. */
+    private void drawStackCount(int count, float slotX, float slotY, float slotSize) {
+        String text = Integer.toString(count);
+        float scale = 1.1f;
+        float w = font.measureText(text, scale);
+        float x = slotX + slotSize - w - 3f;
+        float y = slotY + slotSize - font.lineHeight(scale) - 1f;
+        font.drawText(uiRenderer, text, x + 1.5f, y + 1.5f, scale, 0.1f, 0.1f, 0.1f, 1f);
+        font.drawText(uiRenderer, text, x, y, scale, 1f, 1f, 1f, 1f);
+    }
+
     /** The selected block's display name, floating just above its hotbar slot for
      *  HOTBAR_LABEL_DURATION seconds after selection actually changes (see
      *  updateHotbarSelection), fading out over the last HOTBAR_LABEL_FADE_SECONDS rather than
@@ -1170,7 +1278,9 @@ public class Game implements GameAccess {
     private void drawHotbarLabel(float slotX, float slotY, float slotSize) {
         if (hotbarLabelTimer <= 0f) return;
         float alpha = Math.min(1f, hotbarLabelTimer / HOTBAR_LABEL_FADE_SECONDS);
-        String name = BlockType.PLACEABLE[selectedIndex].displayName;
+        ItemStack shown = inventory.selected();
+        if (shown.isEmpty()) return;
+        String name = shown.type().displayName;
         float scale = 1.1f;
         float textWidth = font.measureText(name, scale);
         float x = slotX + slotSize / 2f - textWidth / 2f;
@@ -1387,10 +1497,34 @@ public class Game implements GameAccess {
 
     @Override
     public void selectSlot(int index) {
-        if (index < 0 || index >= BlockType.PLACEABLE.length) {
-            throw new IllegalArgumentException("slot index out of range: " + index);
-        }
-        selectedIndex = index;
+        inventory.selectSlot(index); // throws IllegalArgumentException when outside the hotbar
+    }
+
+    @Override
+    public int giveItem(String blockTypeName, int count) {
+        if (world == null) throw new IllegalStateException("no active world");
+        return inventory.add(BlockType.valueOf(blockTypeName.toUpperCase(Locale.ROOT)), count);
+    }
+
+    @Override
+    public void holdAttack(boolean held) {
+        forcedAttackHeld = held;
+    }
+
+    @Override
+    public void useItem() {
+        forcedUseRequests++;
+    }
+
+    @Override
+    public void lookAt(double x, double y, double z) {
+        if (player == null) throw new IllegalStateException("no active world");
+        Vector3f eye = player.eyePosition();
+        double dx = x - eye.x, dy = y - eye.y, dz = z - eye.z;
+        double len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (len < 1e-6) throw new IllegalArgumentException("target is at the eye position");
+        player.setYaw((float) Math.atan2(dx, -dz));
+        player.setPitch((float) Math.asin(dy / len));
     }
 
     @Override
@@ -1457,6 +1591,28 @@ public class Game implements GameAccess {
         sb.append("time.dayTime=").append(String.format("%.4f", dayTime)).append('\n');
 
         long dirtyChunks = world.chunkMap().values().stream().filter(Chunk::isMeshDirty).count();
+        StringBuilder slots = new StringBuilder();
+        for (int i = 0; i < inventory.slotCount(); i++) {
+            ItemStack st = inventory.get(i);
+            if (st.isEmpty()) continue;
+            if (slots.length() > 0) slots.append(',');
+            slots.append(i).append(':').append(st.type().name()).append('x').append(st.count());
+        }
+        sb.append("inventory.selectedSlot=").append(inventory.getSelectedSlot()).append('\n');
+        sb.append("inventory.slots=").append(slots).append('\n');
+        sb.append("items.dropped=").append(itemEntities.size()).append('\n');
+        StringBuilder itemList = new StringBuilder();
+        java.util.List<ItemEntity> dropped = itemEntities.entities();
+        for (int i = 0; i < Math.min(8, dropped.size()); i++) {
+            ItemEntity e = dropped.get(i);
+            if (itemList.length() > 0) itemList.append(';');
+            itemList.append(e.getType().name()).append('x').append(e.getCount())
+                    .append(String.format("@%.2f,%.2f,%.2f", e.position.x, e.position.y, e.position.z))
+                    .append(e.isOnGround() ? ":ground" : ":air");
+        }
+        sb.append("items.list=").append(itemList).append('\n');
+        sb.append("particles.active=").append(particles.count()).append('\n');
+        sb.append("mining.crackStage=").append(mining.crackStage()).append('\n');
         sb.append("chunks.loaded=").append(world.chunkMap().size()).append('\n');
         sb.append("chunks.meshDirty=").append(dirtyChunks).append('\n');
         return sb.toString();
@@ -1483,6 +1639,9 @@ public class Game implements GameAccess {
         sunMoonMesh.destroy();
         rainMesh.destroy();
         heldItemMesh.destroy();
+        itemMesh.destroy();
+        particleMesh.destroy();
+        crackOverlay.destroy();
         chunkShader.destroy();
         gameAudio.cleanup();
         window.destroy();

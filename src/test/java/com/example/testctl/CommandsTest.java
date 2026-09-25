@@ -30,6 +30,13 @@ class CommandsTest {
         boolean throwOnSetBlock;
         Integer selectedSlot;
         boolean throwOnSelectSlot;
+        String givenType;
+        Integer givenCount;
+        boolean throwOnGive;
+        Boolean attackHeld;
+        int useCalls;
+        Double lookX, lookY, lookZ;
+        boolean throwOnLook;
 
         @Override
         public void teleport(float x, float y, float z, Float yawDegrees, Float pitchDegrees) {
@@ -68,6 +75,32 @@ class CommandsTest {
         public void selectSlot(int index) {
             if (throwOnSelectSlot) throw new IllegalArgumentException("slot index out of range: " + index);
             selectedSlot = index;
+        }
+
+        @Override
+        public int giveItem(String blockTypeName, int count) {
+            if (throwOnGive) throw new IllegalArgumentException("unknown block type: " + blockTypeName);
+            givenType = blockTypeName;
+            givenCount = count;
+            return count;
+        }
+
+        @Override
+        public void holdAttack(boolean held) {
+            attackHeld = held;
+        }
+
+        @Override
+        public void useItem() {
+            useCalls++;
+        }
+
+        @Override
+        public void lookAt(double x, double y, double z) {
+            if (throwOnLook) throw new IllegalArgumentException("target is at the eye position");
+            lookX = x;
+            lookY = y;
+            lookZ = z;
         }
 
         @Override
@@ -253,6 +286,50 @@ class CommandsTest {
         fake.throwOnSelectSlot = true;
         Commands.Result r = commands.execute("selectSlot", params("index", "999"));
         assertEquals(400, r.status());
+    }
+
+    @Test
+    void giveItemDispatchesAndReportsHowManyFit() {
+        Commands.Result r = commands.execute("giveItem", params("type", "stone", "count", "5"));
+        assertEquals(200, r.status());
+        assertEquals("stone", fake.givenType);
+        assertEquals(5, fake.givenCount);
+    }
+
+    @Test
+    void giveItemRejectsMissingOrInvalidParamsAndGameErrors() {
+        assertEquals(400, commands.execute("giveItem", params("type", "stone")).status());
+        assertEquals(400, commands.execute("giveItem", params("count", "5")).status());
+        assertEquals(400, commands.execute("giveItem", params("type", "stone", "count", "many")).status());
+        assertNull(fake.givenType);
+        fake.throwOnGive = true;
+        assertEquals(400, commands.execute("giveItem", params("type", "nope", "count", "1")).status());
+    }
+
+    @Test
+    void holdAttackAcceptsOnlyTrueOrFalse() {
+        assertEquals(200, commands.execute("holdAttack", params("held", "true")).status());
+        assertEquals(true, fake.attackHeld);
+        assertEquals(200, commands.execute("holdAttack", params("held", "FALSE")).status());
+        assertEquals(false, fake.attackHeld);
+        assertEquals(400, commands.execute("holdAttack", params("held", "maybe")).status());
+        assertEquals(400, commands.execute("holdAttack", params()).status());
+    }
+
+    @Test
+    void useItemQueuesOneClickPerCall() {
+        commands.execute("useItem", params());
+        commands.execute("useItem", params());
+        assertEquals(2, fake.useCalls);
+    }
+
+    @Test
+    void lookAtDispatchesAndRejectsBadInput() {
+        assertEquals(200, commands.execute("lookAt", params("x", "1", "y", "2", "z", "3")).status());
+        assertEquals(1.0, fake.lookX);
+        assertEquals(400, commands.execute("lookAt", params("x", "1", "y", "2")).status());
+        fake.throwOnLook = true;
+        assertEquals(400, commands.execute("lookAt", params("x", "1", "y", "2", "z", "3")).status());
     }
 
     @Test

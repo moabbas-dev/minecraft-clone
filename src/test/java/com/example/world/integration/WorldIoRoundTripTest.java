@@ -31,6 +31,33 @@ class WorldIoRoundTripTest {
     }
 
     @Test
+    void inventoryRoundTripsThroughWorldDat(@TempDir File tempDir) {
+        com.example.inventory.Inventory inv = new com.example.inventory.Inventory();
+        inv.add(BlockType.COBBLESTONE, 70);
+        inv.add(BlockType.OAK_SAPLING_STAGE_0, 2);
+        inv.selectSlot(3);
+        WorldIO.saveMeta(tempDir, new WorldSettings("Inv", WorldSettings.WorldType.SURVIVAL), 1L, 0f, 64f, 0f, 0f, 3, inv);
+
+        WorldIO.LoadedMeta loaded = WorldIO.loadMeta(tempDir);
+        assertNotNull(loaded);
+        assertNotNull(loaded.inventory());
+        assertEquals(70, loaded.inventory().count(BlockType.COBBLESTONE));
+        assertEquals(2, loaded.inventory().count(BlockType.OAK_SAPLING_STAGE_0));
+        assertEquals(3, loaded.inventory().getSelectedSlot());
+    }
+
+    @Test
+    void savesWrittenBeforeInventoriesExistedStillLoadWithAnEmptyInventory(@TempDir File tempDir) {
+        // The legacy 8-argument saveMeta writes exactly the old on-disk format (no inventory section).
+        WorldIO.saveMeta(tempDir, new WorldSettings("Old", WorldSettings.WorldType.SURVIVAL), 9L, 1f, 2f, 3f, 0.5f, 7);
+        WorldIO.LoadedMeta loaded = WorldIO.loadMeta(tempDir);
+        assertNotNull(loaded, "an old-format save must not be treated as corrupt");
+        assertNull(loaded.inventory());
+        assertEquals(9L, loaded.seed());
+        assertEquals(7, loaded.selectedIndex());
+    }
+
+    @Test
     void loadMetaOnMissingFileReturnsNullInsteadOfThrowing(@TempDir File tempDir) {
         assertNull(WorldIO.loadMeta(new File(tempDir, "does-not-exist")));
     }

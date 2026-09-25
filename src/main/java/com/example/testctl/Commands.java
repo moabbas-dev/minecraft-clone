@@ -35,6 +35,10 @@ public final class Commands {
             case "newTestWorld" -> newTestWorld(params);
             case "setBlock" -> setBlock(params);
             case "selectSlot" -> selectSlot(params);
+            case "giveItem" -> giveItem(params);
+            case "holdAttack" -> holdAttack(params);
+            case "useItem" -> useItem();
+            case "lookAt" -> lookAt(params);
             case "screenshot" -> screenshot(params);
             case "state" -> state();
             case "shutdown" -> shutdown();
@@ -108,6 +112,45 @@ public final class Commands {
             return Result.badRequest(e.getMessage());
         }
         return Result.ok("selected slot " + index);
+    }
+
+    private Result giveItem(Map<String, String> p) {
+        String type = p.get("type");
+        Integer count = parseInt(p, "count");
+        if (type == null || type.isBlank() || count == null) {
+            return Result.badRequest("giveItem requires a 'type' (BlockType name) and an integer 'count'");
+        }
+        try {
+            int added = game.giveItem(type, count);
+            return Result.ok("added " + added + " of " + count + " " + type.toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            return Result.badRequest("cannot give " + type + " x" + count + ": " + e.getMessage());
+        }
+    }
+
+    private Result holdAttack(Map<String, String> p) {
+        String held = p.get("held");
+        if (held == null || !(held.equalsIgnoreCase("true") || held.equalsIgnoreCase("false"))) {
+            return Result.badRequest("holdAttack requires held=true or held=false");
+        }
+        game.holdAttack(Boolean.parseBoolean(held));
+        return Result.ok("attack held = " + held.toLowerCase(Locale.ROOT));
+    }
+
+    private Result useItem() {
+        game.useItem();
+        return Result.ok("use queued");
+    }
+
+    private Result lookAt(Map<String, String> p) {
+        Float x = parseFloat(p, "x"), y = parseFloat(p, "y"), z = parseFloat(p, "z");
+        if (x == null || y == null || z == null) return Result.badRequest("lookAt requires numeric x, y, z params");
+        try {
+            game.lookAt(x, y, z);
+        } catch (IllegalArgumentException e) {
+            return Result.badRequest(e.getMessage());
+        }
+        return Result.ok("looking at " + x + "," + y + "," + z);
     }
 
     private Result screenshot(Map<String, String> p) {

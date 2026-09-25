@@ -1,5 +1,6 @@
 package com.example.world;
 
+import com.example.inventory.Inventory;
 import org.joml.Vector3f;
 
 import java.io.*;
@@ -17,8 +18,16 @@ public class WorldIO {
     public record SavedWorld(String folderName, String displayName, WorldSettings.WorldType type, long lastPlayed) {
     }
 
-    public record LoadedMeta(long seed, WorldSettings settings, Vector3f playerPos, float dayTime, int selectedIndex) {
+    /** {@code inventory} is null for saves written before inventories existed (they load as empty). */
+    public record LoadedMeta(long seed, WorldSettings settings, Vector3f playerPos, float dayTime, int selectedIndex,
+                             Inventory inventory) {
+        public LoadedMeta(long seed, WorldSettings settings, Vector3f playerPos, float dayTime, int selectedIndex) {
+            this(seed, settings, playerPos, dayTime, selectedIndex, null);
+        }
     }
+
+    /** Marks the optional inventory section appended after the original world.dat fields. */
+    private static final int INVENTORY_MAGIC = 0x494E5601;
 
     public static String sanitizeFolderName(String name) {
         String cleaned = name.trim().replaceAll("[\\\\/:*?\"<>|]", "_");
@@ -43,6 +52,11 @@ public class WorldIO {
     }
 
     public static void saveMeta(File dir, WorldSettings settings, long seed, float px, float py, float pz, float dayTime, int selectedIndex) {
+        saveMeta(dir, settings, seed, px, py, pz, dayTime, selectedIndex, null);
+    }
+
+    public static void saveMeta(File dir, WorldSettings settings, long seed, float px, float py, float pz, float dayTime,
+                                int selectedIndex, Inventory inventory) {
         dir.mkdirs();
         try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(new File(dir, "world.dat"))))) {
             out.writeLong(seed);
@@ -53,6 +67,10 @@ public class WorldIO {
             out.writeFloat(pz);
             out.writeFloat(dayTime);
             out.writeInt(selectedIndex);
+            if (inventory != null) {
+                out.writeInt(INVENTORY_MAGIC);
+                inventory.write(out);
+            }
         } catch (IOException e) {
             System.err.println("Failed to save world metadata: " + e.getMessage());
         }
@@ -68,7 +86,13 @@ public class WorldIO {
             float px = in.readFloat(), py = in.readFloat(), pz = in.readFloat();
             float dayTime = in.readFloat();
             int selectedIndex = in.readInt();
-            return new LoadedMeta(seed, new WorldSettings(name, type), new Vector3f(px, py, pz), dayTime, selectedIndex);
+            Inventory inventory = null;
+            try { // absent in saves from before inventories existed - just end-of-file, not an error
+                if (in.readInt() == INVENTORY_MAGIC) inventory = Inventory.read(in);
+            } catch (EOFException ignored) {
+                // old-format save: no inventory section
+            }
+            return new LoadedMeta(seed, new WorldSettings(name, type), new Vector3f(px, py, pz), dayTime, selectedIndex, inventory);
         } catch (IOException e) {
             System.err.println("Failed to load world metadata from " + dir + ": " + e.getMessage());
             return null;
