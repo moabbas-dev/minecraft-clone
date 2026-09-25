@@ -33,6 +33,7 @@ public final class Commands {
             case "setTime" -> setTime(params);
             case "setWeather" -> setWeather(params);
             case "newTestWorld" -> newTestWorld(params);
+            case "spawnTree" -> spawnTree(params);
             case "setBlock" -> setBlock(params);
             case "selectSlot" -> selectSlot(params);
             case "giveItem" -> giveItem(params);
@@ -84,10 +85,29 @@ public final class Commands {
     }
 
     private Result newTestWorld(Map<String, String> p) {
+        if ("flat".equalsIgnoreCase(p.get("type"))) {
+            game.newFlatTestWorld();
+            return Result.ok("new flat test world created");
+        }
         Long seed = parseLong(p, "seed");
         long resolved = seed != null ? seed : System.currentTimeMillis();
         game.newTestWorld(resolved);
         return Result.ok("new test world created with seed " + resolved);
+    }
+
+    private Result spawnTree(Map<String, String> p) {
+        Integer x = parseInt(p, "x"), y = parseInt(p, "y"), z = parseInt(p, "z");
+        Long seed = p.containsKey("seed") ? parseLong(p, "seed") : Long.valueOf(0);
+        String species = p.get("species");
+        if (x == null || y == null || z == null || seed == null || species == null || species.isBlank()) {
+            return Result.badRequest("spawnTree requires species (a TreeSpecies name) and integer x, y, z (optional integer seed)");
+        }
+        try {
+            game.spawnTree(species, x, y, z, seed);
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return Result.badRequest(e.getMessage());
+        }
+        return Result.ok("spawned " + species.toUpperCase(Locale.ROOT) + " at " + x + "," + y + "," + z + " seed " + seed);
     }
 
     private Result setBlock(Map<String, String> p) {

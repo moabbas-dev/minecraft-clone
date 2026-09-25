@@ -69,6 +69,22 @@ class CommandsTest {
             this.seed = seed;
         }
 
+        boolean flatWorld;
+        String spawnedSpecies;
+        long spawnedSeed;
+
+        @Override
+        public void newFlatTestWorld() {
+            flatWorld = true;
+        }
+
+        @Override
+        public void spawnTree(String species, int x, int y, int z, long seed) {
+            if (species.equals("NOPE")) throw new IllegalArgumentException("No enum constant");
+            spawnedSpecies = species;
+            spawnedSeed = seed;
+        }
+
         @Override
         public void setBlock(int x, int y, int z, String blockTypeName) {
             if (throwOnSetBlock) throw new IllegalArgumentException("unknown block type: " + blockTypeName);
@@ -239,6 +255,21 @@ class CommandsTest {
     void newTestWorldUsesProvidedSeed() {
         commands.execute("newTestWorld", params("seed", "42"));
         assertEquals(42L, fake.seed);
+    }
+
+    @Test
+    void newTestWorldFlatTypeStartsAFlatWorld() {
+        assertEquals(200, commands.execute("newTestWorld", params("type", "flat")).status());
+        assertTrue(fake.flatWorld);
+    }
+
+    @Test
+    void spawnTreeDispatchesAndValidates() {
+        assertEquals(200, commands.execute("spawnTree", params("species", "BIRCH", "x", "8", "y", "4", "z", "8", "seed", "5")).status());
+        assertEquals("BIRCH", fake.spawnedSpecies);
+        assertEquals(5L, fake.spawnedSeed);
+        assertEquals(400, commands.execute("spawnTree", params("species", "BIRCH", "x", "8")).status());
+        assertEquals(400, commands.execute("spawnTree", params("species", "NOPE", "x", "8", "y", "4", "z", "8")).status());
     }
 
     @Test

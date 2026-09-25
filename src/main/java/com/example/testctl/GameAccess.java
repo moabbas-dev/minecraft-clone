@@ -21,6 +21,15 @@ public interface GameAccess {
     /** Starts a fresh world for testing, overriding the normal random-seed path with a fixed one. */
     void newTestWorld(long seed);
 
+    /** Starts a fresh superflat world (grass at y=3), for lining trees up side by side. */
+    void newFlatTestWorld();
+
+    /** Generates one tree of the named {@code TreeSpecies} with its trunk base at (x, y, z) using
+     *  the real placement code and a fixed seed, then refreshes the meshes. The tree must fit in
+     *  the chunk containing (x, z) exactly like generated trees do (place it near a chunk centre).
+     *  @throws IllegalArgumentException for an unknown species. */
+    void spawnTree(String species, int x, int y, int z, long seed);
+
     /** Sets a single world block by BlockType enum name (case-insensitive) - the one narrow,
      *  named-enum-only write surface exposed here (no arbitrary code/expression evaluation).
      *  If the placed block is a sapling stage block, it's registered with growth tracking the

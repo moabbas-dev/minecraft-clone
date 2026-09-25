@@ -179,12 +179,14 @@ class DarkOakBranchTest {
     }
 
     @Test
-    void onlyDarkOakEverPlacesALogOutsideItsOwnSingleTrunkColumn() {
-        // "Species-specific branch behavior" as a real regression guard: every other species
-        // must be completely unaffected - not one extra log block anywhere but their own single
-        // trunk column (x,z).
+    void speciesWithoutBranchesNeverPlaceALogOutsideTheirSingleTrunkColumn() {
+        // Branch geometry is per-species opt-in: dark oak and the branch-driven canopies (jungle,
+        // acacia, cherry, mangrove) have it; oak, birch, spruce and swamp oak must still be exactly
+        // one trunk column - not one extra log block anywhere else.
+        java.util.Set<TreeSpecies> branched = java.util.EnumSet.of(TreeSpecies.DARK_OAK, TreeSpecies.JUNGLE,
+                TreeSpecies.ACACIA, TreeSpecies.CHERRY, TreeSpecies.MANGROVE);
         for (TreeSpecies s : TreeSpecies.values()) {
-            if (s == TreeSpecies.DARK_OAK) continue;
+            if (branched.contains(s)) continue;
             Chunk chunk = new Chunk(0, 0);
             s.place(chunk, BX, BASE_Y, BZ, new Random(1));
             for (int x = 0; x < Chunk.SIZE_X; x++) {

@@ -1640,6 +1640,23 @@ public class Game implements GameAccess {
     }
 
     @Override
+    public void newFlatTestWorld() {
+        startNewWorld(new WorldSettings("Flat Test World", WorldSettings.WorldType.FLAT), 0L);
+    }
+
+    @Override
+    public void spawnTree(String speciesName, int x, int y, int z, long seed) {
+        if (world == null) throw new IllegalStateException("no active world");
+        TreeSpecies species = TreeSpecies.valueOf(speciesName.toUpperCase(java.util.Locale.ROOT));
+        int cx = World.worldToChunk(x), cz = World.worldToChunk(z);
+        Chunk chunk = world.getChunk(cx, cz);
+        if (chunk == null || !chunk.isGenerated()) throw new IllegalStateException("chunk not loaded yet");
+        species.place(chunk, World.worldToLocal(x), y, World.worldToLocal(z), new Random(seed));
+        chunk.markMeshDirty();
+        world.markNeighborChunksDirty(cx, cz);
+    }
+
+    @Override
     public void setBlock(int x, int y, int z, String blockTypeName) {
         if (world == null) throw new IllegalStateException("no active world");
         BlockType type = BlockType.valueOf(blockTypeName.toUpperCase(java.util.Locale.ROOT));

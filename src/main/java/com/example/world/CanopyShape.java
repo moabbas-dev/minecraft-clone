@@ -7,18 +7,22 @@ package com.example.world;
  * species' private shape-generator method.
  */
 public enum CanopyShape {
-    /** Square-ish, roughly spherical layered canopy - OAK, BIRCH. */
+    /** Square-ish, roughly spherical layered canopy - OAK. */
     ROUND_LAYERED,
+    /** Vertically stretched oval, narrow, bare trunk below - BIRCH. */
+    TALL_OVAL,
     /** Tapers from a wide base to a point - SPRUCE. */
     CONICAL,
-    /** Large, mostly-flat broad layers - JUNGLE. */
-    BROAD_FLAT,
-    /** Thin canopy sitting only at the very top of a short trunk - ACACIA. */
-    UMBRELLA_TOP,
-    /** Low, wide, randomly-notched outline - SWAMP_OAK, MANGROVE. */
+    /** Large overlapping leaf masses on log branches - JUNGLE. */
+    BRANCH_CLUSTERS,
+    /** Bent/forked trunk carrying broad, shallow, offset leaf platforms - ACACIA. */
+    FORKED_UMBRELLA,
+    /** Low, wide, lumpy lobes with one drooping side - SWAMP_OAK. */
     IRREGULAR_LOW,
     /** Wide layers spanning a thick multi-block trunk footprint - DARK_OAK. */
     THICK_BROAD,
-    /** Genuinely circular-distance (not square-trimmed) layers - CHERRY. */
-    CIRCULAR
+    /** Several rounded lobes around short branches, soft gaps and hanging edges - CHERRY. */
+    LOBED_ROUND,
+    /** Irregular, branch-driven sprawl with uneven lobes and sparse hanging strands - MANGROVE. */
+    BRANCH_SPRAWL
 }
