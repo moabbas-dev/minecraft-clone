@@ -37,6 +37,15 @@ public class TextureAtlas {
 
     private static final Map<Tile, String> REAL_TEXTURE_PATHS = new EnumMap<>(Tile.class);
 
+    /** Cutout tiles (binary alpha - fully opaque leaf/sprout pixels, fully transparent holes)
+     *  whose transparent pixels get {@link LeafEdgeDilate} applied before upload, so mipmapping
+     *  never blends the black behind a hole into a leaf edge (the "pale blue line" glitch). Every
+     *  real leaf species plus the sapling sprite - anything else with a real texture (e.g. GLASS)
+     *  is a deliberate partial-alpha look, not a cutout, and is left as-is. */
+    private static final java.util.Set<Tile> CUTOUT_FOLIAGE = java.util.EnumSet.of(
+            Tile.LEAVES, Tile.BIRCH_LEAVES, Tile.SPRUCE_LEAVES, Tile.JUNGLE_LEAVES, Tile.ACACIA_LEAVES,
+            Tile.MANGROVE_LEAVES, Tile.DARK_OAK_LEAVES, Tile.CHERRY_LEAVES, Tile.OAK_SAPLING);
+
     static {
         REAL_TEXTURE_PATHS.put(Tile.STONE, "textures/block/stone.png");
         REAL_TEXTURE_PATHS.put(Tile.DIRT, "textures/block/dirt.png");
@@ -127,6 +136,15 @@ public class TextureAtlas {
             int[] origin = cellOrigin(tile);
             if (tile == Tile.GRASS_SIDE || tile == Tile.GRASS_SIDE_OVERLAY) {
                 int[] px = tile == Tile.GRASS_SIDE ? grassSplit[0] : grassSplit[1];
+                for (int y = 0; y < TILE_PX; y++)
+                    for (int x = 0; x < TILE_PX; x++) atlas.setRGB(origin[0] + x, origin[1] + y, px[y * TILE_PX + x]);
+                continue;
+            }
+            if (CUTOUT_FOLIAGE.contains(tile)) {
+                // Graphics2D.drawImage alpha-composites (SRC_OVER): a fully-transparent source
+                // pixel would leave the atlas canvas's own blank (black, alpha 0) pixel in place,
+                // discarding whatever dilated RGB we computed - so this writes pixels directly.
+                int[] px = LeafEdgeDilate.dilate(toArgb(loadOrDrawTile(tile)), TILE_PX);
                 for (int y = 0; y < TILE_PX; y++)
                     for (int x = 0; x < TILE_PX; x++) atlas.setRGB(origin[0] + x, origin[1] + y, px[y * TILE_PX + x]);
                 continue;
