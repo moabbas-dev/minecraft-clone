@@ -545,8 +545,14 @@ public class Game implements GameAccess {
             case SELECT_WORLD -> selectWorldScreen.update(dt, input, window.getWidth(), window.getHeight());
             case WORLD_CREATE -> worldCreateScreen.update(dt, input, window.getWidth(), window.getHeight());
             case IN_GAME -> updateInGame(dt, now);
-            case INVENTORY -> updateInventoryScreen();
-            case COOKING -> updateCookingScreen();
+            case INVENTORY -> {
+                tickCookingStations(dt); // a GUI screen isn't the pause menu - real vanilla keeps furnaces (and everything else) ticking while any non-pause screen is open
+                updateInventoryScreen();
+            }
+            case COOKING -> {
+                tickCookingStations(dt);
+                updateCookingScreen();
+            }
             case PAUSED -> {
                 if (input.consumeKeyPressed(GLFW_KEY_ESCAPE)) {
                     resumeGame();
@@ -584,20 +590,7 @@ public class Game implements GameAccess {
         weather.update(dt);
         updateRainParticles(dt);
         saplingGrowth.update(world, dt);
-        // Fixed-step accumulator: cooking stations advance in real, constant-rate simulated
-        // ticks (20/second, matching real vanilla's own rate and this milestone's own "200
-        // ticks/100 ticks" numbers), never directly by render dt/frame count - the same behavior
-        // at 30fps and 144fps. A stalled/slow frame just runs the while loop more times in one
-        // call rather than skipping ticks. Runs here (IN_GAME only) rather than somewhere shared
-        // across the INVENTORY/COOKING screen states too - matches this project's own existing
-        // precedent that opening any menu already pauses weather/day-night/sapling growth the
-        // same way (a documented, consistent limitation, not a new inconsistency this feature
-        // introduces - see the final report).
-        tickAccumulator += dt;
-        while (tickAccumulator >= TICK_SECONDS) {
-            tickAccumulator -= TICK_SECONDS;
-            cookingStations.tickAll(world);
-        }
+        tickCookingStations(dt);
         windTime += dt;
         gameAudio.update(dt, player, world, weather);
 
@@ -909,6 +902,22 @@ public class Game implements GameAccess {
     }
 
     // ---- cooking station screen (Furnace / Blast Furnace / Smoker) ----
+
+    /** Fixed-step accumulator: cooking stations advance in real, constant-rate simulated ticks
+     *  (20/second, matching real vanilla's own rate and this milestone's own "200 ticks/100
+     *  ticks" numbers), never directly by render dt/frame count - the same behavior at 30fps and
+     *  144fps. A stalled/slow frame just runs the while loop more times in one call rather than
+     *  skipping ticks. Called for IN_GAME, INVENTORY, and COOKING alike (see {@link #update}) -
+     *  real vanilla only stops world ticking at the actual pause menu (singleplayer's own pause
+     *  behavior), not while a chest/crafting-table/furnace screen is open, so a furnace keeps
+     *  smelting whether or not the player is looking at it. */
+    private void tickCookingStations(float dt) {
+        tickAccumulator += dt;
+        while (tickAccumulator >= TICK_SECONDS) {
+            tickAccumulator -= TICK_SECONDS;
+            cookingStations.tickAll(world);
+        }
+    }
 
     /** Null for anything that isn't one of the 3 cooking-station blocks. */
     private static CookingStationType cookingStationTypeOf(BlockType type) {

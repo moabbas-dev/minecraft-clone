@@ -120,6 +120,12 @@ the process, reloaded the world, and confirmed the station's exact mid-cook stat
 fuel, output count, burn fraction) survived the round trip. All of this matched the unit tests'
 own numbers exactly, so the wiring in `Game` (placement hook, break hook, fixed-tick
 accumulator, GUI open/close, save/load) is confirmed correct, not just the isolated logic.
+Also confirmed live: with the furnace's own screen left open the whole time (no close/reopen),
+`cookFraction` kept advancing on its own - cooking only stops at the real pause menu
+(`GameState.PAUSED`), matching real vanilla's "GUIs don't pause the world, the pause menu does"
+behavior exactly (see `Game.tickCookingStations`, called for `IN_GAME`, `INVENTORY`, and
+`COOKING` alike - this replaced an earlier, incorrect version of this feature that paused
+cooking while its own screen was open).
 
 ## Policy: tests are part of the feature, not a follow-up
 
