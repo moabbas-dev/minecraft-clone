@@ -127,10 +127,41 @@ class RecipesTest {
     }
 
     @Test
-    void ironToolsHaveNoRecipeYetNoSmeltingExistsToProduceAnIronIngot() {
-        // Using IRON_BLOCK (the closest "iron" material this project can place in a grid) in the
-        // pickaxe shape must not accidentally craft an iron pickaxe - no such recipe is registered.
+    void ironToolsNeedARealIronIngotNotJustAnyIronLookingBlock() {
+        // IRON_BLOCK (9 ingots' worth, but still the wrong material) must not accidentally
+        // craft an iron pickaxe - only IRON_INGOT itself does, now that smelting exists (see
+        // com.example.cooking) to actually produce one.
         BlockType[] shape = grid(3, 3, 0, BlockType.IRON_BLOCK, 1, BlockType.IRON_BLOCK, 2, BlockType.IRON_BLOCK, 4, S, 7, S);
         assertTrue(Recipes.craft(shape, 3, 3).isEmpty());
+    }
+
+    @Test
+    void ironToolsCraftFromRealIronIngots() {
+        BlockType[] pickaxe = grid(3, 3, 0, BlockType.IRON_INGOT, 1, BlockType.IRON_INGOT, 2, BlockType.IRON_INGOT, 4, S, 7, S);
+        assertEquals(new ItemStack(BlockType.IRON_PICKAXE, 1), Recipes.craft(pickaxe, 3, 3));
+        BlockType[] shovel = grid(3, 3, 0, BlockType.IRON_INGOT, 3, S, 6, S);
+        assertEquals(new ItemStack(BlockType.IRON_SHOVEL, 1), Recipes.craft(shovel, 3, 3));
+    }
+
+    @Test
+    void aBlastFurnaceCraftsFromIronFurnaceAndSmoothStone() {
+        BlockType[] shape = grid(3, 3,
+                0, BlockType.IRON_INGOT, 1, BlockType.IRON_INGOT, 2, BlockType.IRON_INGOT,
+                3, BlockType.IRON_INGOT, 4, BlockType.FURNACE, 5, BlockType.IRON_INGOT,
+                6, BlockType.SMOOTH_STONE, 7, BlockType.SMOOTH_STONE, 8, BlockType.SMOOTH_STONE);
+        assertEquals(new ItemStack(BlockType.BLAST_FURNACE, 1), Recipes.craft(shape, 3, 3));
+    }
+
+    @Test
+    void aSmokerCraftsFromAnyLogSpeciesAroundAFurnace() {
+        BlockType[] shape = grid(3, 3, 1, BlockType.OAK_LOG, 3, BlockType.BIRCH_LOG,
+                4, BlockType.FURNACE, 5, BlockType.SPRUCE_LOG, 7, BlockType.JUNGLE_LOG);
+        assertEquals(new ItemStack(BlockType.SMOKER, 1), Recipes.craft(shape, 3, 3));
+    }
+
+    @Test
+    void neitherNewStationFitsTheTwoByTwoGridOnlyTheCraftingTable() {
+        BlockType[] shape = grid(2, 2, 0, BlockType.IRON_INGOT, 1, BlockType.FURNACE);
+        assertTrue(Recipes.craft(shape, 2, 2).isEmpty());
     }
 }

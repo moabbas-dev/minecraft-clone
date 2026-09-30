@@ -1,6 +1,7 @@
 package com.example.world;
 
 import com.example.inventory.Inventory;
+import com.example.inventory.ItemStack;
 import org.joml.Vector3f;
 
 import java.io.*;
@@ -162,6 +163,76 @@ public class WorldIO {
 
     private static File chunkFile(File dir, int cx, int cz) {
         return new File(new File(dir, "chunks"), cx + "_" + cz + ".chunk");
+    }
+
+    /** Plain snapshot of one placed cooking station - see {@code com.example.cooking.
+     *  CookingStationManager.Snapshot}, which this mirrors field-for-field. {@code stationTypeName}
+     *  is a String (not the enum) for the same reason {@link SurvivalSnapshot} avoids the
+     *  {@code survival} package: {@code world} never depends on {@code cooking}. */
+    public record CookingStationSnapshot(int x, int y, int z, String stationTypeName, ItemStack input,
+                                          ItemStack fuel, ItemStack output, int burnTimeRemainingTicks,
+                                          int totalBurnTimeTicks, int cookProgressTicks, float storedExperience) {
+    }
+
+    private static void writeStack(DataOutputStream out, ItemStack stack) throws IOException {
+        out.writeInt(stack.isEmpty() ? 0 : stack.type().id);
+        out.writeInt(stack.count());
+    }
+
+    private static ItemStack readStack(DataInputStream in) throws IOException {
+        int id = in.readInt();
+        int count = in.readInt();
+        return new ItemStack(BlockType.byId(id), count); // ItemStack's own ctor normalizes AIR/count<=0 to EMPTY
+    }
+
+    /** One file per world (not per-chunk) - every cooking station a world has ever had, however
+     *  many chunks they're spread across. Simpler than slicing snapshots per chunk, and correct:
+     *  {@code CookingStationManager} only ever skips *ticking* a station in an unloaded chunk
+     *  (see its own docs), it never needs its data evicted from memory at this project's scale. */
+    public static void saveCookingStations(File dir, List<CookingStationSnapshot> stations) {
+        dir.mkdirs();
+        try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(new File(dir, "cooking_stations.dat"))))) {
+            out.writeInt(stations.size());
+            for (CookingStationSnapshot s : stations) {
+                out.writeInt(s.x());
+                out.writeInt(s.y());
+                out.writeInt(s.z());
+                out.writeUTF(s.stationTypeName());
+                writeStack(out, s.input());
+                writeStack(out, s.fuel());
+                writeStack(out, s.output());
+                out.writeInt(s.burnTimeRemainingTicks());
+                out.writeInt(s.totalBurnTimeTicks());
+                out.writeInt(s.cookProgressTicks());
+                out.writeFloat(s.storedExperience());
+            }
+        } catch (IOException e) {
+            System.err.println("Failed to save cooking stations: " + e.getMessage());
+        }
+    }
+
+    /** Empty list if the world has no cooking-stations file yet (a save from before this
+     *  milestone, or a world that never had one placed) - never null, never throws. */
+    public static List<CookingStationSnapshot> loadCookingStations(File dir) {
+        File file = new File(dir, "cooking_stations.dat");
+        List<CookingStationSnapshot> result = new ArrayList<>();
+        if (!file.isFile()) return result;
+        try (DataInputStream in = new DataInputStream(new BufferedInputStream(new FileInputStream(file)))) {
+            int count = in.readInt();
+            for (int i = 0; i < count; i++) {
+                int x = in.readInt(), y = in.readInt(), z = in.readInt();
+                String typeName = in.readUTF();
+                ItemStack input = readStack(in);
+                ItemStack fuel = readStack(in);
+                ItemStack output = readStack(in);
+                int burn = in.readInt(), totalBurn = in.readInt(), progress = in.readInt();
+                float xp = in.readFloat();
+                result.add(new CookingStationSnapshot(x, y, z, typeName, input, fuel, output, burn, totalBurn, progress, xp));
+            }
+        } catch (IOException e) {
+            System.err.println("Failed to load cooking stations from " + dir + ": " + e.getMessage());
+        }
+        return result;
     }
 
     public static void deleteWorld(String folderName) {

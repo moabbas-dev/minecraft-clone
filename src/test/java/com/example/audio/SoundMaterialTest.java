@@ -1,22 +1,25 @@
 package com.example.audio;
 
 import com.example.world.BlockType;
-import com.example.world.FoodRegistry;
-import com.example.world.ToolEffectiveness;
 import org.junit.jupiter.api.Test;
+
+import java.util.Arrays;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class SoundMaterialTest {
 
     @Test
-    void everyRealBlockTypeExceptAirAndWaterHasAMaterial() {
-        // Tools/STICK/food are never a world block at all (never placed, never mined) - the
-        // same "never solid-collision-walkable or player-breakable" null case materialFor()'s
-        // own docs already carve out for AIR/WATER, just reached a different way.
+    void everyPlaceableBlockHasAMaterialAndWaterDoesToo() {
+        // Every non-placeable item (tools/stick/food/ingots/ores-as-items/nuggets/raw materials
+        // - see ToolEffectiveness/FoodRegistry/BlockType) is never a world block at all: never
+        // placed, never mined, never solid-collision-walkable - the same null case
+        // materialFor()'s own docs already carve out for AIR, just reached a different way.
+        // WATER is the one real block that's still deliberately unmapped (see materialFor's docs).
+        List<BlockType> placeable = Arrays.asList(BlockType.PLACEABLE);
         for (BlockType type : BlockType.values()) {
-            if (type == BlockType.AIR || type == BlockType.WATER || type == BlockType.STICK
-                    || ToolEffectiveness.isTool(type) || FoodRegistry.isFood(type)) continue;
+            if (type == BlockType.AIR || type == BlockType.WATER || !placeable.contains(type)) continue;
             assertNotNull(SoundMaterial.materialFor(type), type + " must have a sound material");
         }
     }

@@ -4,7 +4,6 @@ import com.example.world.BlockDrops;
 import com.example.world.BlockType;
 import org.junit.jupiter.api.Test;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 
@@ -63,14 +62,25 @@ class BlockDropsTest {
     }
 
     @Test
-    void everyBreakableBlockDropsOnlyPlaceableItemsSoTheInventoryNeverHoldsSomethingUnusable() {
-        List<BlockType> placeable = Arrays.asList(BlockType.PLACEABLE);
+    void everyDropIsARealItemWithAPositiveCount() {
+        // Not "every drop must be placeable" (that stopped being true the moment a real block -
+        // COAL_ORE - started dropping a real non-placeable item, COAL, exactly like vanilla's
+        // own raw-material drops) - just the invariant that actually matters: a resolved drop is
+        // never AIR and never a non-positive count.
         for (BlockType type : BlockType.values()) {
             for (BlockDrops.Resolved r : roll(type)) {
-                assertTrue(placeable.contains(r.item()), type + " drops non-placeable " + r.item());
+                assertNotEquals(BlockType.AIR, r.item(), type + " must never drop AIR");
                 assertTrue(r.count() > 0);
             }
         }
+    }
+
+    @Test
+    void coalOreDropsTheCoalItemNotTheOreBlock() {
+        // Coal ore is harvest-gated (any pickaxe - see ToolEffectivenessTest), so a bare-hand
+        // roll is correctly empty; a pickaxe is what actually exercises the drop-table change.
+        assertEquals(List.of(new BlockDrops.Resolved(BlockType.COAL, 1)),
+                BlockDrops.resolve(BlockType.COAL_ORE, new Random(1), BlockType.WOODEN_PICKAXE));
     }
 
     @Test

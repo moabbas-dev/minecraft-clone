@@ -66,45 +66,63 @@ public class InventoryMenu {
     }
 
     private void leftClick(Inventory inv, int idx) {
+        cursor = leftClickSlot(inv, idx, cursor);
+    }
+
+    private void rightClick(Inventory inv, int idx) {
+        cursor = rightClickSlot(inv, idx, cursor);
+    }
+
+    /**
+     * The pick-up/place-all/merge/swap primitive behind a left click on any {@link Inventory}
+     * slot, factored out so other menus (see {@code com.example.cooking.CookingMenu}) can reuse
+     * the exact same rule instead of duplicating it. Pure: reads/writes only {@code inv}'s one
+     * slot and returns what the cursor becomes - the caller owns storing that.
+     */
+    public static ItemStack leftClickSlot(Inventory inv, int idx, ItemStack cursor) {
         ItemStack s = inv.get(idx);
         int max = inv.getMaxStack();
         if (cursor.isEmpty()) {
             if (!s.isEmpty()) {
-                cursor = s;
                 inv.set(idx, ItemStack.EMPTY);
+                return s;
             }
+            return cursor;
         } else if (s.isEmpty()) {
             inv.set(idx, cursor);
-            cursor = ItemStack.EMPTY;
+            return ItemStack.EMPTY;
         } else if (s.type() == cursor.type()) {
             int move = Math.min(max - s.count(), cursor.count());
             inv.set(idx, s.withCount(s.count() + move));
-            cursor = cursor.withCount(cursor.count() - move);
+            return cursor.withCount(cursor.count() - move);
         } else {
             inv.set(idx, cursor);
-            cursor = s;
+            return s;
         }
     }
 
-    private void rightClick(Inventory inv, int idx) {
+    /** Same as {@link #leftClickSlot}, for a right click (pick up half / place one). */
+    public static ItemStack rightClickSlot(Inventory inv, int idx, ItemStack cursor) {
         ItemStack s = inv.get(idx);
         int max = inv.getMaxStack();
         if (cursor.isEmpty()) {
             if (!s.isEmpty()) {
                 int take = (s.count() + 1) / 2;
-                cursor = new ItemStack(s.type(), take);
                 inv.set(idx, s.withCount(s.count() - take));
+                return new ItemStack(s.type(), take);
             }
+            return cursor;
         } else if (s.isEmpty()) {
             inv.set(idx, new ItemStack(cursor.type(), 1));
-            cursor = cursor.withCount(cursor.count() - 1);
+            return cursor.withCount(cursor.count() - 1);
         } else if (s.type() == cursor.type() && s.count() < max) {
             inv.set(idx, s.withCount(s.count() + 1));
-            cursor = cursor.withCount(cursor.count() - 1);
+            return cursor.withCount(cursor.count() - 1);
         } else if (s.type() != cursor.type()) {
             inv.set(idx, cursor);
-            cursor = s;
+            return s;
         }
+        return cursor;
     }
 
     private void takeResult() {

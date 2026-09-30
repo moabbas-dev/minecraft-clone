@@ -154,6 +154,25 @@ class CommandsTest {
             closeCalls++;
         }
 
+        Integer cookingScreenX, cookingScreenY, cookingScreenZ;
+        boolean throwOnOpenCooking;
+        Integer advancedTicks;
+        boolean throwOnAdvanceTicks;
+
+        @Override
+        public void openCookingScreen(int x, int y, int z) {
+            if (throwOnOpenCooking) throw new IllegalStateException("no cooking station at " + x + "," + y + "," + z);
+            cookingScreenX = x;
+            cookingScreenY = y;
+            cookingScreenZ = z;
+        }
+
+        @Override
+        public void advanceSimulationTicks(int ticks) {
+            if (throwOnAdvanceTicks) throw new IllegalStateException("no active world");
+            advancedTicks = ticks;
+        }
+
         @Override
         public String captureScreenshot(String name) throws IOException {
             if (throwOnScreenshot) throw new IOException("disk full");
@@ -474,6 +493,27 @@ class CommandsTest {
         assertEquals(1, fake.closeCalls);
         fake.throwOnClose = true;
         assertEquals(400, commands.execute("closeInventory", params()).status());
+    }
+
+    @Test
+    void openCookingScreenParsesCoordinatesAndReportsWhenNoStationIsThere() {
+        assertEquals(200, commands.execute("openCookingScreen", params("x", "5", "y", "6", "z", "7")).status());
+        assertEquals(5, fake.cookingScreenX);
+        assertEquals(6, fake.cookingScreenY);
+        assertEquals(7, fake.cookingScreenZ);
+        assertEquals(400, commands.execute("openCookingScreen", params("x", "5", "y", "6")).status(), "missing z");
+        fake.throwOnOpenCooking = true;
+        assertEquals(400, commands.execute("openCookingScreen", params("x", "0", "y", "0", "z", "0")).status());
+    }
+
+    @Test
+    void advanceSimulationTicksParsesTicksAndRejectsNegative() {
+        assertEquals(200, commands.execute("advanceSimulationTicks", params("ticks", "200")).status());
+        assertEquals(200, fake.advancedTicks);
+        assertEquals(400, commands.execute("advanceSimulationTicks", params("ticks", "-1")).status());
+        assertEquals(400, commands.execute("advanceSimulationTicks", params()).status());
+        fake.throwOnAdvanceTicks = true;
+        assertEquals(400, commands.execute("advanceSimulationTicks", params("ticks", "1")).status());
     }
 
     @Test

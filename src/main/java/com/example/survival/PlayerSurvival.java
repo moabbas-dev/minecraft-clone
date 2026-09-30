@@ -43,6 +43,12 @@ public class PlayerSurvival {
     private final HungerComponent hunger = new HungerComponent();
     @Getter
     private Difficulty difficulty;
+    /** Total XP earned so far - see {@link #addExperience}. This project has no leveling curve
+     *  or XP-bar HUD (no XP system existed before the cooking milestone); this is the "clean
+     *  integration point" that request explicitly asks for in place of building one, so cooking
+     *  XP has somewhere real (and testable) to go. */
+    @Getter
+    private float experience = 0f;
 
     private final Vector3f lastPosition = new Vector3f();
     private boolean positionInitialized = false;
@@ -197,5 +203,11 @@ public class PlayerSurvival {
     public boolean eat(BlockType foodType) {
         FoodProperties food = FoodRegistry.propertiesFor(foodType);
         return food != null && hunger.eat(food);
+    }
+
+    /** Adds XP (e.g. from taking cooked/smelted output - see {@code CookingMenu}) - a plain
+     *  running float total, safe for the fractional amounts a partial output take produces. */
+    public void addExperience(float amount) {
+        if (amount > 0f) experience += amount;
     }
 }

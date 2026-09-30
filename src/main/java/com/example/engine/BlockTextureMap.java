@@ -87,6 +87,39 @@ public class BlockTextureMap {
         uniform(BlockType.APPLE, Tile.APPLE);
         uniform(BlockType.BREAD, Tile.BREAD);
         uniform(BlockType.COOKED_BEEF, Tile.COOKED_BEEF);
+
+        // Cooking/smelting milestone.
+        put(BlockType.BLAST_FURNACE, Tile.BLAST_FURNACE_TOP, Tile.BLAST_FURNACE_SIDE, Tile.BLAST_FURNACE_TOP);
+        put(BlockType.SMOKER, Tile.SMOKER_TOP, Tile.SMOKER_SIDE, Tile.SMOKER_TOP);
+        uniform(BlockType.COPPER_ORE, Tile.COPPER_ORE);
+        uniform(BlockType.SMOOTH_STONE, Tile.SMOOTH_STONE);
+        uniform(BlockType.COAL, Tile.COAL);
+        uniform(BlockType.CHARCOAL, Tile.CHARCOAL);
+        uniform(BlockType.IRON_INGOT, Tile.IRON_INGOT);
+        uniform(BlockType.GOLD_INGOT, Tile.GOLD_INGOT);
+        uniform(BlockType.COPPER_INGOT, Tile.COPPER_INGOT);
+        uniform(BlockType.IRON_NUGGET, Tile.IRON_NUGGET);
+        uniform(BlockType.BRICK, Tile.BRICK);
+        uniform(BlockType.RAW_IRON, Tile.RAW_IRON);
+        uniform(BlockType.RAW_GOLD, Tile.RAW_GOLD);
+        uniform(BlockType.RAW_COPPER, Tile.RAW_COPPER);
+        uniform(BlockType.RAW_BEEF, Tile.RAW_BEEF);
+        uniform(BlockType.RAW_PORKCHOP, Tile.RAW_PORKCHOP);
+        uniform(BlockType.COOKED_PORKCHOP, Tile.COOKED_PORKCHOP);
+        uniform(BlockType.RAW_CHICKEN, Tile.RAW_CHICKEN);
+        uniform(BlockType.COOKED_CHICKEN, Tile.COOKED_CHICKEN);
+        uniform(BlockType.RAW_MUTTON, Tile.RAW_MUTTON);
+        uniform(BlockType.COOKED_MUTTON, Tile.COOKED_MUTTON);
+        uniform(BlockType.RAW_RABBIT, Tile.RAW_RABBIT);
+        uniform(BlockType.COOKED_RABBIT, Tile.COOKED_RABBIT);
+        uniform(BlockType.COD, Tile.COD);
+        uniform(BlockType.COOKED_COD, Tile.COOKED_COD);
+        uniform(BlockType.SALMON, Tile.SALMON);
+        uniform(BlockType.COOKED_SALMON, Tile.COOKED_SALMON);
+        uniform(BlockType.POTATO, Tile.POTATO);
+        uniform(BlockType.BAKED_POTATO, Tile.BAKED_POTATO);
+        uniform(BlockType.KELP, Tile.KELP);
+        uniform(BlockType.DRIED_KELP, Tile.DRIED_KELP);
     }
 
     private void uniform(BlockType type, Tile tile) {

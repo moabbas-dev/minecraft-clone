@@ -29,7 +29,8 @@ public enum SoundMaterial {
                 BlockType.IRON_ORE, BlockType.COAL_ORE, BlockType.DIAMOND_ORE, BlockType.SANDSTONE,
                 BlockType.GOLD_BLOCK, BlockType.IRON_BLOCK, BlockType.BRICKS, BlockType.MOSSY_COBBLESTONE,
                 BlockType.OBSIDIAN, BlockType.DIAMOND_BLOCK, BlockType.FURNACE, BlockType.NETHERRACK,
-                BlockType.GLOWSTONE, BlockType.TERRACOTTA, BlockType.ICE, BlockType.TNT
+                BlockType.GLOWSTONE, BlockType.TERRACOTTA, BlockType.ICE, BlockType.TNT,
+                BlockType.BLAST_FURNACE, BlockType.SMOKER, BlockType.COPPER_ORE, BlockType.SMOOTH_STONE
         }) {
             BY_BLOCK.put(b, STONE);
         }

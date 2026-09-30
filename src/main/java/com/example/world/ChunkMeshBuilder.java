@@ -256,8 +256,15 @@ public class ChunkMeshBuilder {
      *  is never placed in the world at all so has no in-world model of its own to speak of.
      *  Deliberately a separate flag from {@link #isCrossShapedPlant}: that one also gates this
      *  class's own real world-mesh pass, which a tool should never reach in normal play. */
+    /** Smelting-output/raw-material items with no other category to claim them (not a tool, not
+     *  food) - see BlockType's own docs on the cooking/smelting milestone. */
+    private static final java.util.Set<BlockType> SMELTING_ITEMS = java.util.EnumSet.of(
+            BlockType.COAL, BlockType.CHARCOAL, BlockType.IRON_INGOT, BlockType.GOLD_INGOT, BlockType.COPPER_INGOT,
+            BlockType.IRON_NUGGET, BlockType.BRICK, BlockType.RAW_IRON, BlockType.RAW_GOLD, BlockType.RAW_COPPER);
+
     public static boolean isFlatIconItem(BlockType type) {
-        return isCrossShapedPlant(type) || ToolEffectiveness.isTool(type) || FoodRegistry.isFood(type);
+        return isCrossShapedPlant(type) || ToolEffectiveness.isTool(type) || FoodRegistry.isFood(type)
+                || SMELTING_ITEMS.contains(type);
     }
 
     /**

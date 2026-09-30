@@ -68,7 +68,8 @@ public final class ToolEffectiveness {
             BlockType.STONE, BlockType.COBBLESTONE, BlockType.MOSSY_COBBLESTONE, BlockType.SANDSTONE,
             BlockType.BRICKS, BlockType.OBSIDIAN, BlockType.COAL_ORE, BlockType.IRON_ORE,
             BlockType.GOLD_ORE, BlockType.DIAMOND_ORE, BlockType.GOLD_BLOCK, BlockType.IRON_BLOCK,
-            BlockType.DIAMOND_BLOCK, BlockType.NETHERRACK, BlockType.TERRACOTTA, BlockType.FURNACE);
+            BlockType.DIAMOND_BLOCK, BlockType.NETHERRACK, BlockType.TERRACOTTA, BlockType.FURNACE,
+            BlockType.COPPER_ORE, BlockType.SMOOTH_STONE, BlockType.BLAST_FURNACE, BlockType.SMOKER);
 
     /** Blocks an axe speeds up: every log species, planks, and the wood-family furniture blocks. */
     private static final Set<BlockType> AXE_BLOCKS = EnumSet.of(
@@ -90,6 +91,7 @@ public final class ToolEffectiveness {
             // here since this project has no gold-tier tool and gold is otherwise unobtainable
             // survival-wise anyway (documented simplification, not a claim about real vanilla).
             BlockType.GOLD_ORE, Tier.STONE.harvestLevel,
+            BlockType.COPPER_ORE, Tier.STONE.harvestLevel,
             BlockType.DIAMOND_ORE, Tier.IRON.harvestLevel);
 
     public static boolean isTool(BlockType type) {

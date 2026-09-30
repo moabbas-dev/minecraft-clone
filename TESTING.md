@@ -29,7 +29,7 @@ or downgrades a failing assertion.
 | `com.example.entity` | `ItemEntityManager`: drop physics (never tunnels/sinks), pickup delay, full/partial/duplicate pickup, merging, lifetime, entity cap, freezing in unloaded chunks | No |
 | `com.example.fx` | `ParticleSystem`: burst size, expiry, pool cap, vertex output | No |
 | `com.example.game` (`MiningControllerTest`, `BlockPlacerTest`, `ItemModelBuilderTest`) | The break transaction (one drop per break, cancel/target-change/invalidation, crack stage progression) and transactional placement (consume only after success) | No |
-| `com.example.inventory` (`RecipesTest`, `InventoryMenuTest`) | Crafting recipes (2x2 / 3x3 shaped matching, including mirrored axe heads), cursor pick/place/merge/swap/split, taking crafted results, item conservation, close-returns-everything with overflow. Now covers wood/stone tools + sticks too (see `com.example.world.unit`'s `ToolEffectivenessTest` for their mining behavior); iron tools have no recipe yet (no furnace smelting) | No |
+| `com.example.inventory` (`RecipesTest`, `InventoryMenuTest`) | Crafting recipes (2x2 / 3x3 shaped matching, including mirrored axe heads), cursor pick/place/merge/swap/split, taking crafted results, item conservation, close-returns-everything with overflow. Covers wood/stone/iron tools + sticks (see `com.example.world.unit`'s `ToolEffectivenessTest` for their mining behavior) and the Blast Furnace/Smoker recipes; `InventoryMenu.leftClickSlot`/`rightClickSlot` were made public static so `CookingMenu` reuses them, verified non-breaking here | No |
 | `com.example.ui` (`InventoryLayoutTest`) | Inventory screen geometry: slot hit-testing, no overlaps, everything inside the panel | No |
 | `com.example.engine` (`GrassSideSplitTest`) | Splitting grass_block_side into a dirt base and a biome-tintable grayscale fringe overlay | No |
 | `com.example.engine` (`LeafEdgeDilateTest`) | Filling every leaf/sapling tile's fully-transparent pixels with the nearest opaque pixel's color before mipmapping, so a distant leaf edge fades out instead of picking up a dark/blue halo (never touches alpha) | No |
@@ -42,6 +42,13 @@ or downgrades a failing assertion.
 | `com.example.physics.gameplay` (`PlayerSurvivalTest`) | `PlayerSurvival` driving a real `Player` + real gravity: sprint/swim/jump/flying exhaustion, block-break/damage exhaustion, regen (gated on food, costs exhaustion), starvation (ticks, stops at each `Difficulty`'s floor), real fall damage from an actual drop, eating a real food item, death freezing further hunger/regen/starvation, reset/loadState. Also `PlayerMovementGameplayTest`'s `canSprint=false` override test | No |
 | `com.example.world.unit` (`FoodRegistryTest`) | The 3 requested foods' exact nutrition/saturation values, and that none are placeable | No |
 | `com.example.world.integration` (`WorldIoRoundTripTest` additions) | Health/hunger/saturation/exhaustion and difficulty round-trip through `world.dat`, and an old save with no survival section still loads (falls back to full health/NORMAL) | No |
+| `com.example.cooking` (`CookingRecipeRegistryTest`) | Every furnace/blast-furnace/smoker recipe's accept/reject list, output/count/XP correctness, uniqueness of inputs | No |
+| `com.example.cooking` (`FuelRegistryTest`) | Fuel burn-tick values, non-fuel items report 0 | No |
+| `com.example.cooking` (`CookingStationStateTest`) | The tick state machine: burn/cook progress, output safety (never overwrites incompatible output, never wastes fuel with no valid input, never consumes input without producing output), the exact "8 items per coal in every station type" fuel-efficiency invariant, and that specialized stations are only faster, never more efficient (first item at tick 100 vs. 200) | No |
+| `com.example.cooking` (`CookingStationManagerTest`) | Create/get/remove by position, snapshot/restore round-trip, and that `tickAll` only advances stations in loaded+generated chunks | No |
+| `com.example.cooking` (`CookingMenuTest`) | Input/fuel slot pick-place (reusing `InventoryMenu`'s now-public static click helpers), output slot is take-only and grants proportional XP on a partial take, `close()` returns only the cursor and leaves the station's own contents untouched | No |
+| `com.example.ui` (`CookingLayoutTest`) | Cooking screen geometry: slot hit-testing, no overlaps, everything inside the panel | No |
+| `com.example.testctl` (`CommandsTest` additions) | `openCookingScreen`/`advanceSimulationTicks` parsing, validation, and error dispatch | No |
 
 None of the above needs LWJGL/GLFW/OpenGL. That's not an accident of test design - `Player`,
 `World`/`Chunk`, `Raycast`, `Weather`, `TerrainGenerator`/`Biome`/`BiomeColors`, `SimplexNoise`,
@@ -72,8 +79,10 @@ directly. No other part of `Game` was changed or is unit-tested this round - see
   pops a real window on a machine with a display, and does nothing useful on one without a
   display at all. Not attempted this round.
 - **A live test controller** - now exists (`-Dtest.controller=true`, see `com.example.testctl`), with
-  `giveItem`, `holdAttack`, `useItem` and `lookAt` so mining, pickup and placement can be driven live
-  through the same code path real input uses. It is a manual tool, not an automated test. The original
+  `giveItem`, `holdAttack`, `useItem`, `lookAt`, `openCookingScreen` and `advanceSimulationTicks` (fast-
+  forwards cooking-station ticks without waiting real time) so mining, pickup, placement, and now
+  cooking/smelting can be driven live through the same code path real input uses. It is a manual tool,
+  not an automated test. The original
   note follows for history: it was in scope of the original request but deliberately deferred. `Game` today has no test hooks, no
   injected clock, and creates its GL context at construction; adding a controller means giving it
   those first. The gameplay logic a controller would let you drive (movement, world state,
@@ -94,6 +103,23 @@ For anything touching rendering, the window, or real-time feel: launch with
 `mvn -o exec:java`, play through the change, and note what you checked in the PR description.
 This is the same method used throughout this project's earlier rounds (sprint feel, lighting,
 biome blending) when a screenshot or hands-on check was the only way to confirm something.
+
+**Cooking/smelting milestone - live-controller pass actually performed:** launched with
+`-Dtest.controller=true`, then via real HTTP calls: placed a real Furnace through the normal
+place-block path (confirmed the block-entity was registered at the exact placement coordinates,
+not just written to the world grid); opened its screen; moved coal and iron ore from the
+inventory into the fuel/input slots through the same click primitives real input uses;
+`advanceSimulationTicks(200)` completed exactly one smelt (1 iron ore -> 1 iron ingot, 1 coal
+consumed, burn fraction 0.875 = 1400/1600 ticks remaining - matches the fuel-scaling math
+exactly); took the output slot and confirmed XP (0.7) was granted to `PlayerSurvival`; closed
+the screen and confirmed the taken ingot returned to the inventory; confirmed ordinary real-time
+play (not just the fast-forward command) also advances cooking correctly; mined the furnace with
+a pickaxe and confirmed every one of its contents (the block itself, remaining fuel, remaining
+output) dropped as real item entities - nothing lost, nothing duplicated; saved, fully restarted
+the process, reloaded the world, and confirmed the station's exact mid-cook state (remaining
+fuel, output count, burn fraction) survived the round trip. All of this matched the unit tests'
+own numbers exactly, so the wiring in `Game` (placement hook, break hook, fixed-tick
+accumulator, GUI open/close, save/load) is confirmed correct, not just the isolated logic.
 
 ## Policy: tests are part of the feature, not a follow-up
 

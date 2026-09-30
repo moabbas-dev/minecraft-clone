@@ -66,11 +66,22 @@ public interface GameAccess {
      *  @throws IllegalArgumentException for any other size; @throws IllegalStateException when not in-game. */
     void openInventoryScreen(int gridSize);
 
-    /** A left or right click on a menu slot id (0-35 player slots, 100+i crafting grid, 1000 result). */
+    /** A left or right click on a menu slot id (0-35 player slots, 100+i crafting grid, 1000
+     *  result, or - whichever screen is actually open - 200/201/202 for a cooking station's
+     *  input/fuel/output). */
     void inventoryClick(int slot, boolean rightButton);
 
     /** Closes the screen, returning grid/cursor contents to the inventory (overflow drops in the world). */
     void closeInventoryScreen();
+
+    /** Opens a Furnace/Blast Furnace/Smoker screen for the station at (x, y, z).
+     *  @throws IllegalStateException when not in-game or there's no station there. */
+    void openCookingScreen(int x, int y, int z);
+
+    /** Advances every cooking station's simulation by exactly {@code ticks} fixed 1/20s steps,
+     *  bypassing the real-time accumulator - lets a test finish a 200-tick smelt instantly
+     *  instead of waiting 10 real seconds. @throws IllegalStateException when not in-game. */
+    void advanceSimulationTicks(int ticks);
 
     /** Captures the current frame to test-output/screenshots/&lt;name&gt;.png. Returns the file path. */
     String captureScreenshot(String name) throws IOException;

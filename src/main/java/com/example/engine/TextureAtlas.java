@@ -50,7 +50,15 @@ public class TextureAtlas {
             // so it gets the same edge-halo fix, not just the species this was originally reported for.
             Tile.STICK, Tile.WOODEN_PICKAXE, Tile.STONE_PICKAXE, Tile.IRON_PICKAXE,
             Tile.WOODEN_AXE, Tile.STONE_AXE, Tile.IRON_AXE, Tile.WOODEN_SHOVEL, Tile.STONE_SHOVEL, Tile.IRON_SHOVEL,
-            Tile.APPLE, Tile.BREAD, Tile.COOKED_BEEF);
+            Tile.APPLE, Tile.BREAD, Tile.COOKED_BEEF,
+            // Cooking-milestone flat-icon items (not the 4 real block tiles - those are normal
+            // opaque cube textures, not cutouts).
+            Tile.COAL, Tile.CHARCOAL, Tile.IRON_INGOT, Tile.GOLD_INGOT, Tile.COPPER_INGOT,
+            Tile.IRON_NUGGET, Tile.BRICK, Tile.RAW_IRON, Tile.RAW_GOLD, Tile.RAW_COPPER,
+            Tile.RAW_BEEF, Tile.RAW_PORKCHOP, Tile.COOKED_PORKCHOP, Tile.RAW_CHICKEN, Tile.COOKED_CHICKEN,
+            Tile.RAW_MUTTON, Tile.COOKED_MUTTON, Tile.RAW_RABBIT, Tile.COOKED_RABBIT,
+            Tile.COD, Tile.COOKED_COD, Tile.SALMON, Tile.COOKED_SALMON,
+            Tile.POTATO, Tile.BAKED_POTATO, Tile.KELP, Tile.DRIED_KELP);
 
     static {
         REAL_TEXTURE_PATHS.put(Tile.STONE, "textures/block/stone.png");
@@ -361,6 +369,43 @@ public class TextureAtlas {
             case APPLE -> appleIcon(img, rnd);
             case BREAD -> breadIcon(img, rnd);
             case COOKED_BEEF -> cookedBeefIcon(img, rnd);
+
+            // ---- Cooking/smelting milestone ----
+            case BLAST_FURNACE_TOP -> speckledNoise(img, rnd, new Color(70, 78, 85), new Color[]{new Color(90, 40, 20), new Color(50, 55, 60)}, 20);
+            case BLAST_FURNACE_SIDE -> noisyFill(img, rnd, new Color(95, 100, 105), 12);
+            case SMOKER_TOP -> speckledNoise(img, rnd, new Color(70, 55, 45), new Color[]{new Color(30, 25, 22), new Color(90, 70, 55)}, 30);
+            case SMOKER_SIDE -> noisyFill(img, rnd, new Color(100, 78, 60), 12);
+            case COPPER_ORE -> oreTile(img, rnd, new Color(196, 120, 80));
+            case SMOOTH_STONE -> noisyFill(img, rnd, new Color(168, 168, 168), 6);
+
+            case COAL -> blockyIcon(img, rnd, new Color(25, 25, 25));
+            case CHARCOAL -> blockyIcon(img, rnd, new Color(45, 40, 38));
+            case BRICK -> blockyIcon(img, rnd, new Color(150, 80, 65));
+            case IRON_INGOT -> ingotIcon(img, rnd, new Color(216, 216, 216), new Color(240, 240, 240));
+            case GOLD_INGOT -> ingotIcon(img, rnd, new Color(247, 220, 79), new Color(255, 240, 150));
+            case COPPER_INGOT -> ingotIcon(img, rnd, new Color(196, 120, 80), new Color(220, 150, 110));
+            case IRON_NUGGET -> nuggetIcon(img, rnd, new Color(226, 226, 226));
+            case RAW_IRON -> rawOreIcon(img, rnd, new Color(176, 128, 104));
+            case RAW_GOLD -> rawOreIcon(img, rnd, new Color(222, 190, 80));
+            case RAW_COPPER -> rawOreIcon(img, rnd, new Color(180, 105, 70));
+
+            case RAW_BEEF -> meatIcon(img, rnd, new Color(196, 90, 90), null);
+            case RAW_PORKCHOP -> meatIcon(img, rnd, new Color(216, 130, 130), null);
+            case COOKED_PORKCHOP -> meatIcon(img, rnd, new Color(160, 100, 70), new Color(100, 55, 35));
+            case RAW_CHICKEN -> meatIcon(img, rnd, new Color(232, 200, 180), null);
+            case COOKED_CHICKEN -> meatIcon(img, rnd, new Color(190, 148, 90), new Color(130, 90, 50));
+            case RAW_MUTTON -> meatIcon(img, rnd, new Color(180, 100, 110), null);
+            case COOKED_MUTTON -> meatIcon(img, rnd, new Color(145, 92, 68), new Color(95, 55, 35));
+            case RAW_RABBIT -> meatIcon(img, rnd, new Color(190, 120, 120), null);
+            case COOKED_RABBIT -> meatIcon(img, rnd, new Color(155, 98, 72), new Color(100, 58, 36));
+            case COD -> fishIcon(img, rnd, new Color(190, 175, 140), null);
+            case COOKED_COD -> fishIcon(img, rnd, new Color(215, 195, 150), new Color(180, 150, 100));
+            case SALMON -> fishIcon(img, rnd, new Color(210, 120, 100), null);
+            case COOKED_SALMON -> fishIcon(img, rnd, new Color(195, 110, 70), new Color(140, 75, 45));
+            case POTATO -> potatoIcon(img, rnd, new Color(200, 170, 110));
+            case BAKED_POTATO -> potatoIcon(img, rnd, new Color(150, 105, 60));
+            case KELP -> kelpIcon(img, rnd, new Color(50, 110, 50));
+            case DRIED_KELP -> kelpIcon(img, rnd, new Color(70, 90, 45));
         }
         g.dispose();
         return img;
@@ -701,18 +746,107 @@ public class TextureAtlas {
 
     /** A brown rounded steak slab with a couple of darker grill-mark stripes. */
     private void cookedBeefIcon(BufferedImage img, Random rnd) {
+        meatIcon(img, rnd, new Color(150, 88, 60), new Color(90, 45, 30));
+    }
+
+    /** A rounded meat-slab shape, either raw (a plain flesh-tone base with no grill marks) or
+     *  cooked (the same shape with darker grill-mark speckling) - every raw/cooked meat and fish
+     *  pair reuses this one shape with different colors, rather than each getting its own. */
+    private void meatIcon(BufferedImage img, Random rnd, Color base, Color grillMark) {
         double cx = 8, cy = 8, rx = 6, ry = 5;
         for (int y = 0; y < TILE_PX; y++) {
             for (int x = 0; x < TILE_PX; x++) {
                 double nx = (x + 0.5 - cx) / rx, ny = (y + 0.5 - cy) / ry;
                 if (nx * nx + ny * ny <= 1.0) {
-                    boolean grillMark = (x + y) % 5 == 0;
-                    Color base = grillMark ? new Color(90, 45, 30) : new Color(150, 88, 60);
-                    img.setRGB(x, y, jitter(base, rnd, 10).getRGB());
+                    boolean mark = grillMark != null && (x + y) % 5 == 0;
+                    img.setRGB(x, y, jitter(mark ? grillMark : base, rnd, 10).getRGB());
                 } else {
                     img.setRGB(x, y, 0);
                 }
             }
+        }
+    }
+
+    /** A flat teardrop-ish fish shape (a smaller ellipse than the meat slab, with a small tail
+     *  triangle) - reused for both fish species, raw and cooked. */
+    private void fishIcon(BufferedImage img, Random rnd, Color base, Color mark) {
+        double cx = 7, cy = 8, rx = 5, ry = 3.2;
+        for (int y = 0; y < TILE_PX; y++) {
+            for (int x = 0; x < TILE_PX; x++) {
+                double nx = (x + 0.5 - cx) / rx, ny = (y + 0.5 - cy) / ry;
+                boolean body = nx * nx + ny * ny <= 1.0;
+                boolean tail = x >= 12 && x <= 14 && Math.abs(y - 8) <= (14 - x);
+                if (body || tail) {
+                    boolean marked = mark != null && (x + y) % 4 == 0;
+                    img.setRGB(x, y, jitter(marked ? mark : base, rnd, 8).getRGB());
+                } else {
+                    img.setRGB(x, y, 0);
+                }
+            }
+        }
+    }
+
+    /** A small rounded potato/tuber shape. */
+    private void potatoIcon(BufferedImage img, Random rnd, Color base) {
+        double cx = 8, cy = 9, rx = 4.5, ry = 4;
+        for (int y = 0; y < TILE_PX; y++) {
+            for (int x = 0; x < TILE_PX; x++) {
+                double nx = (x + 0.5 - cx) / rx, ny = (y + 0.5 - cy) / ry;
+                img.setRGB(x, y, nx * nx + ny * ny <= 1.0 ? jitter(base, rnd, 14).getRGB() : 0);
+            }
+        }
+    }
+
+    /** A thin vertical wavy strand, for kelp/dried kelp - everywhere the strand doesn't reach
+     *  stays transparent (a fresh BufferedImage already starts fully zeroed/transparent). */
+    private void kelpIcon(BufferedImage img, Random rnd, Color base) {
+        for (int y = 0; y < TILE_PX; y++) {
+            int sway = (int) Math.round(Math.sin(y * 0.6) * 1.8);
+            int cx = 8 + sway;
+            for (int dx = -1; dx <= 1; dx++) {
+                int x = cx + dx;
+                if (x >= 0 && x < TILE_PX) img.setRGB(x, y, jitter(base, rnd, 10).getRGB());
+            }
+        }
+    }
+
+    /** A simple rectangular ingot-bar shape with a lighter top-face highlight. */
+    private void ingotIcon(BufferedImage img, Random rnd, Color base, Color highlight) {
+        for (int y = 5; y <= 11; y++) {
+            for (int x = 3; x <= 12; x++) {
+                boolean topFace = y <= 6;
+                setPixel(img, x, y, jitter(topFace ? highlight : base, rnd, 10));
+            }
+        }
+    }
+
+    /** A small rounded nugget/pebble shape - a scaled-down version of the ingot's rounded end. */
+    private void nuggetIcon(BufferedImage img, Random rnd, Color base) {
+        double cx = 8, cy = 9, r = 3.2;
+        for (int y = 0; y < TILE_PX; y++) {
+            for (int x = 0; x < TILE_PX; x++) {
+                double d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy);
+                img.setRGB(x, y, d <= r ? jitter(base, rnd, 12).getRGB() : 0);
+            }
+        }
+    }
+
+    /** A rough, irregular raw-ore lump - larger and lumpier than the smooth ingot bar. */
+    private void rawOreIcon(BufferedImage img, Random rnd, Color base) {
+        double cx = 8, cy = 8;
+        for (int y = 0; y < TILE_PX; y++) {
+            for (int x = 0; x < TILE_PX; x++) {
+                double wobble = Math.sin(x * 1.3 + y * 0.7) * 1.2;
+                double r = 5.2 + wobble;
+                img.setRGB(x, y, Math.hypot(x + 0.5 - cx, y + 0.5 - cy) <= r ? jitter(base, rnd, 16).getRGB() : 0);
+            }
+        }
+    }
+
+    /** A small dark rectangular block - brick/coal/charcoal all reuse this with different colors. */
+    private void blockyIcon(BufferedImage img, Random rnd, Color base) {
+        for (int y = 4; y <= 12; y++) {
+            for (int x = 4; x <= 11; x++) setPixel(img, x, y, jitter(base, rnd, 14));
         }
     }
 

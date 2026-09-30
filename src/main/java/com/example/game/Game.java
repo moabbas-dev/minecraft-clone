@@ -1,6 +1,10 @@
 package com.example.game;
 
 import com.example.audio.GameAudio;
+import com.example.cooking.CookingMenu;
+import com.example.cooking.CookingStationManager;
+import com.example.cooking.CookingStationState;
+import com.example.cooking.CookingStationType;
 import com.example.entity.ItemEntity;
 import com.example.entity.ItemEntityManager;
 import com.example.fx.ParticleSystem;
@@ -14,6 +18,7 @@ import com.example.survival.PlayerSurvival;
 import com.example.testctl.GameAccess;
 import com.example.testctl.GameCommandQueue;
 import com.example.testctl.TestController;
+import com.example.ui.CookingLayout;
 import com.example.ui.InventoryLayout;
 import com.example.ui.PauseScreen;
 import com.example.ui.SelectWorldScreen;
@@ -32,6 +37,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.EnumMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
@@ -87,7 +93,7 @@ public class Game implements GameAccess {
      *  tuning, not an official Minecraft value. */
     private static final float WIND_STRENGTH = 1f;
 
-    private enum GameState {TITLE, SELECT_WORLD, WORLD_CREATE, IN_GAME, PAUSED, INVENTORY}
+    private enum GameState {TITLE, SELECT_WORLD, WORLD_CREATE, IN_GAME, PAUSED, INVENTORY, COOKING}
 
     private Window window;
     private Input input;
@@ -118,6 +124,15 @@ public class Game implements GameAccess {
     private Inventory inventory = new Inventory();
     /** Non-null only while the inventory/crafting screen is open (state == INVENTORY). */
     private InventoryMenu menu;
+    /** Non-null only while a Furnace/Blast Furnace/Smoker screen is open (state == COOKING). */
+    private CookingMenu cookingMenu;
+    /** Every placed cooking station in the current world - ticked from the fixed-step
+     *  accumulator below, completely independent of whether cookingMenu is open. */
+    private CookingStationManager cookingStations = new CookingStationManager();
+    private float tickAccumulator = 0f;
+    /** Real vanilla's own rate - 20 simulated ticks per second, independent of render FPS (see
+     *  updateInGame's accumulator loop and CookingStationManager/CookingStationState). */
+    private static final float TICK_SECONDS = 1f / 20f;
     /** Health/hunger/damage state - see resetGameplayState for when a fresh one replaces this. */
     private PlayerSurvival survival = new PlayerSurvival(Difficulty.NORMAL);
     private final Random gameplayRandom = new Random();
@@ -325,6 +340,7 @@ public class Game implements GameAccess {
         dayTime = 0.3f; // fresh worlds start shortly after sunrise
 
         saplingGrowth = new SaplingGrowth(seed);
+        cookingStations = new CookingStationManager(); // fresh world: nothing to restore
         Chunk spawnChunk = world.getOrCreateChunk(0, 0);
         world.generateChunk(spawnChunk);
         saplingGrowth.registerChunk(spawnChunk); // a no-op for a fresh world, kept for consistency with loadWorld
@@ -383,6 +399,8 @@ public class Game implements GameAccess {
         dayTime = meta.dayTime();
 
         saplingGrowth = new SaplingGrowth(meta.seed());
+        cookingStations = new CookingStationManager();
+        cookingStations.restoreAll(toManagerSnapshots(WorldIO.loadCookingStations(dir)));
         int spawnCx = World.worldToChunk((int) Math.floor(meta.playerPos().x));
         int spawnCz = World.worldToChunk((int) Math.floor(meta.playerPos().z));
         Chunk spawnChunk = world.getOrCreateChunk(spawnCx, spawnCz);
@@ -426,6 +444,29 @@ public class Game implements GameAccess {
         for (Chunk c : world.chunkMap().values()) {
             if (c.isGenerated()) WorldIO.saveChunk(dir, c);
         }
+        WorldIO.saveCookingStations(dir, toWorldIoSnapshots(cookingStations.snapshotAll()));
+    }
+
+    /** These two conversions exist purely because {@code world.WorldIO} deliberately doesn't
+     *  depend on the {@code cooking} package (same reasoning as SurvivalSnapshot) - the two
+     *  Snapshot records have identical fields, Game is just the one place that already depends
+     *  on both packages and can freely convert between them. */
+    private static List<WorldIO.CookingStationSnapshot> toWorldIoSnapshots(List<CookingStationManager.Snapshot> in) {
+        List<WorldIO.CookingStationSnapshot> out = new java.util.ArrayList<>(in.size());
+        for (CookingStationManager.Snapshot s : in) {
+            out.add(new WorldIO.CookingStationSnapshot(s.x(), s.y(), s.z(), s.stationTypeName(), s.input(), s.fuel(),
+                    s.output(), s.burnTimeRemainingTicks(), s.totalBurnTimeTicks(), s.cookProgressTicks(), s.storedExperience()));
+        }
+        return out;
+    }
+
+    private static List<CookingStationManager.Snapshot> toManagerSnapshots(List<WorldIO.CookingStationSnapshot> in) {
+        List<CookingStationManager.Snapshot> out = new java.util.ArrayList<>(in.size());
+        for (WorldIO.CookingStationSnapshot s : in) {
+            out.add(new CookingStationManager.Snapshot(s.x(), s.y(), s.z(), s.stationTypeName(), s.input(), s.fuel(),
+                    s.output(), s.burnTimeRemainingTicks(), s.totalBurnTimeTicks(), s.cookProgressTicks(), s.storedExperience()));
+        }
+        return out;
     }
 
     private void pauseGame() {
@@ -461,6 +502,7 @@ public class Game implements GameAccess {
         player = null;
         weather = null;
         saplingGrowth = null;
+        cookingStations = new CookingStationManager();
         resetGameplayState(new Inventory(), Difficulty.NORMAL);
         forcedAttackHeld = false;
         forcedUseRequests = 0;
@@ -504,6 +546,7 @@ public class Game implements GameAccess {
             case WORLD_CREATE -> worldCreateScreen.update(dt, input, window.getWidth(), window.getHeight());
             case IN_GAME -> updateInGame(dt, now);
             case INVENTORY -> updateInventoryScreen();
+            case COOKING -> updateCookingScreen();
             case PAUSED -> {
                 if (input.consumeKeyPressed(GLFW_KEY_ESCAPE)) {
                     resumeGame();
@@ -541,6 +584,20 @@ public class Game implements GameAccess {
         weather.update(dt);
         updateRainParticles(dt);
         saplingGrowth.update(world, dt);
+        // Fixed-step accumulator: cooking stations advance in real, constant-rate simulated
+        // ticks (20/second, matching real vanilla's own rate and this milestone's own "200
+        // ticks/100 ticks" numbers), never directly by render dt/frame count - the same behavior
+        // at 30fps and 144fps. A stalled/slow frame just runs the while loop more times in one
+        // call rather than skipping ticks. Runs here (IN_GAME only) rather than somewhere shared
+        // across the INVENTORY/COOKING screen states too - matches this project's own existing
+        // precedent that opening any menu already pauses weather/day-night/sapling growth the
+        // same way (a documented, consistent limitation, not a new inconsistency this feature
+        // introduces - see the final report).
+        tickAccumulator += dt;
+        while (tickAccumulator >= TICK_SECONDS) {
+            tickAccumulator -= TICK_SECONDS;
+            cookingStations.tickAll(world);
+        }
         windTime += dt;
         gameAudio.update(dt, player, world, weather);
 
@@ -722,10 +779,17 @@ public class Game implements GameAccess {
                     openInventory(3);
                     return;
                 }
+                CookingStationType stationType = cookingStationTypeOf(hit.type());
+                if (stationType != null && !player.isSneaking()) {
+                    openCookingScreenAt(hit.x(), hit.y(), hit.z());
+                    return;
+                }
                 BlockPlacer.Result placed = BlockPlacer.tryPlace(world, inventory, hit, this::blockIntersectsPlayer, saplingGrowth);
                 if (placed.placed()) {
                     swingTimer = SWING_DURATION;
                     gameAudio.playPlace(placed.type(), new Vector3f(placed.x() + 0.5f, placed.y() + 0.5f, placed.z() + 0.5f));
+                    CookingStationType placedStation = cookingStationTypeOf(placed.type());
+                    if (placedStation != null) cookingStations.create(placed.x(), placed.y(), placed.z(), placedStation);
                 }
             }
         }
@@ -844,6 +908,128 @@ public class Game implements GameAccess {
         if (slot == hovered) uiRenderer.drawColorQuad(r.x(), r.y(), r.w(), r.h(), 1f, 1f, 1f, 0.28f);
     }
 
+    // ---- cooking station screen (Furnace / Blast Furnace / Smoker) ----
+
+    /** Null for anything that isn't one of the 3 cooking-station blocks. */
+    private static CookingStationType cookingStationTypeOf(BlockType type) {
+        if (type == BlockType.FURNACE) return CookingStationType.FURNACE;
+        if (type == BlockType.BLAST_FURNACE) return CookingStationType.BLAST_FURNACE;
+        if (type == BlockType.SMOKER) return CookingStationType.SMOKER;
+        return null;
+    }
+
+    /** Opens the screen for the station at (x, y, z) - the block there must be a real, already-
+     *  registered cooking station (see onBlockBroken/BlockPlacer's own placement hook). */
+    private void openCookingScreenAt(int x, int y, int z) {
+        if (state != GameState.IN_GAME) throw new IllegalStateException("not in game");
+        CookingStationState station = cookingStations.get(x, y, z);
+        if (station == null) throw new IllegalStateException("no cooking station at " + x + "," + y + "," + z);
+        cookingMenu = new CookingMenu(inventory, station);
+        mining.cancel();
+        state = GameState.COOKING;
+        window.releaseMouse();
+        input.resyncMousePosition();
+    }
+
+    private void closeCookingScreen() {
+        if (cookingMenu == null) throw new IllegalStateException("no cooking screen is open");
+        ItemStack leftover = cookingMenu.close(); // the station's own contents are untouched - see CookingMenu's own docs
+        if (!leftover.isEmpty()) dropIntoWorld(leftover);
+        cookingMenu = null;
+        state = GameState.IN_GAME;
+        window.captureMouse();
+        input.resyncMousePosition();
+    }
+
+    private void updateCookingScreen() {
+        if (input.consumeKeyPressed(GLFW_KEY_E) || input.consumeKeyPressed(GLFW_KEY_ESCAPE)) {
+            closeCookingScreen();
+            return;
+        }
+        boolean left = input.consumeMousePressed(GLFW_MOUSE_BUTTON_LEFT);
+        boolean right = input.consumeMousePressed(GLFW_MOUSE_BUTTON_RIGHT);
+        if (left || right) {
+            float mx = (float) input.getMouseX(), my = (float) input.getMouseY();
+            CookingLayout layout = new CookingLayout(window.getWidth(), window.getHeight());
+            handleCookingClick(layout.slotAt(mx, my), right, layout.panel().contains(mx, my));
+        }
+    }
+
+    private void handleCookingClick(int slot, boolean right, boolean insidePanel) {
+        if (slot >= 0) {
+            cookingMenu.click(slot, right);
+            float xp = cookingMenu.takeEarnedExperience();
+            if (xp > 0f) survival.addExperience(xp); // granted the instant it's taken, never lost if the screen closes right after
+        } else if (!insidePanel) {
+            ItemStack thrown = cookingMenu.dropFromCursor(right);
+            if (!thrown.isEmpty()) dropIntoWorld(thrown);
+        }
+    }
+
+    private void renderCookingScreen() {
+        if (cookingMenu == null) return;
+        int w = window.getWidth(), h = window.getHeight();
+        CookingLayout layout = new CookingLayout(w, h);
+        float mx = (float) input.getMouseX(), my = (float) input.getMouseY();
+        int hovered = layout.slotAt(mx, my);
+        CookingStationState station = cookingMenu.getStation();
+
+        uiRenderer.drawColorQuad(0, 0, w, h, 0f, 0f, 0f, 0.55f);
+        InventoryLayout.Rect p = layout.panel();
+        uiRenderer.drawColorQuad(p.x() - 3, p.y() - 3, p.w() + 6, p.h() + 6, 0.05f, 0.05f, 0.05f, 0.95f);
+        uiRenderer.drawColorQuad(p.x(), p.y(), p.w(), p.h(), 0.34f, 0.34f, 0.36f, 0.97f);
+
+        font.drawText(uiRenderer, station.getType().displayName, layout.leftX(), layout.titleLabelY() + 2f, 0.7f, 0.12f, 0.12f, 0.12f, 1f);
+        font.drawText(uiRenderer, "Inventory", layout.leftX(), layout.inventoryLabelY() + 2f, 0.7f, 0.12f, 0.12f, 0.12f, 1f);
+        font.drawText(uiRenderer, "=>", layout.arrowX(), layout.arrowY() - 8f, 1.4f, 0.12f, 0.12f, 0.12f, 1f);
+
+        for (int s = 0; s < Inventory.DEFAULT_SLOT_COUNT; s++) drawCookingSlot(layout, cookingMenu, s, hovered);
+        drawCookingSlot(layout, cookingMenu, CookingMenu.INPUT_SLOT, hovered);
+        drawCookingSlot(layout, cookingMenu, CookingMenu.FUEL_SLOT, hovered);
+        drawCookingSlot(layout, cookingMenu, CookingMenu.OUTPUT_SLOT, hovered);
+
+        // Burn indicator: a vertical fill behind the fuel slot, and the cook-progress arrow
+        // filling left-to-right as it completes - no icon textures exist for either (see
+        // TextureAtlas's own docs), so both are plain colored quads, matching every other HUD
+        // element in this project.
+        InventoryLayout.Rect fuelRect = layout.slotRect(CookingMenu.FUEL_SLOT);
+        if (station.isBurning()) {
+            float fill = station.burnFraction() * fuelRect.h();
+            uiRenderer.drawColorQuad(fuelRect.x() - 6f, fuelRect.y() + fuelRect.h() - fill, 4f, fill, 0.95f, 0.55f, 0.15f, 0.9f);
+        }
+        float arrowW = font.measureText("=>", 1.4f);
+        if (station.cookFraction() > 0f) {
+            uiRenderer.drawColorQuad(layout.arrowX(), layout.arrowY() + 10f, arrowW * station.cookFraction(), 3f, 0.9f, 0.75f, 0.2f, 0.95f);
+        }
+
+        ItemStack held = cookingMenu.getCursor();
+        if (!held.isEmpty()) {
+            drawBlockIcon(held.type(), mx - 20f, my - 20f, 40f);
+            if (held.count() > 1) drawStackCount(held.count(), mx - 20f, my - 20f, 40f);
+        } else if (hovered >= 0) {
+            ItemStack under = cookingMenu.stackAt(hovered);
+            if (!under.isEmpty()) {
+                String name = under.type().displayName;
+                float tw = font.measureText(name, 1.1f);
+                float tx = mx + 14f, ty = my - 6f;
+                uiRenderer.drawColorQuad(tx - 5f, ty - 3f, tw + 10f, font.lineHeight(1.1f) + 6f, 0.05f, 0.02f, 0.1f, 0.92f);
+                font.drawText(uiRenderer, name, tx, ty, 1.1f, 1f, 1f, 1f, 1f);
+            }
+        }
+    }
+
+    private void drawCookingSlot(CookingLayout layout, CookingMenu menu, int slot, int hovered) {
+        InventoryLayout.Rect r = layout.slotRect(slot);
+        ItemStack stack = menu.stackAt(slot);
+        uiRenderer.drawColorQuad(r.x() - 1, r.y() - 1, r.w() + 2, r.h() + 2, 0.08f, 0.08f, 0.08f, 1f);
+        uiRenderer.drawColorQuad(r.x(), r.y(), r.w(), r.h(), 0.5f, 0.5f, 0.5f, 1f);
+        if (!stack.isEmpty()) {
+            drawBlockIcon(stack.type(), r.x(), r.y(), r.w());
+            if (stack.count() > 1) drawStackCount(stack.count(), r.x(), r.y(), r.w());
+        }
+        if (slot == hovered) uiRenderer.drawColorQuad(r.x(), r.y(), r.w(), r.h(), 1f, 1f, 1f, 0.28f);
+    }
+
     /** Everything that follows one completed break: the sound, the dropped items, and the
      *  particle burst. MiningController guarantees this runs exactly once per broken block; the
      *  world change and drop roll already happened there, so nothing below can duplicate or
@@ -854,6 +1040,16 @@ public class Game implements GameAccess {
         gameAudio.playDig(r.brokenType(), center);
         for (BlockDrops.Resolved drop : r.drops()) {
             itemEntities.spawn(drop.item(), drop.count(), center, gameplayRandom);
+        }
+        if (cookingStationTypeOf(r.brokenType()) != null) {
+            // Never delete a station's contents - drop input/fuel/output exactly like any other
+            // block's own drops, right where it stood.
+            CookingStationState broken = cookingStations.remove(r.x(), r.y(), r.z());
+            if (broken != null) {
+                for (ItemStack contents : broken.contents()) {
+                    itemEntities.spawn(contents.type(), contents.count(), center, gameplayRandom);
+                }
+            }
         }
         try {
             ItemModelBuilder.Model m = itemModelFor(r.brokenType());
@@ -919,7 +1115,7 @@ public class Game implements GameAccess {
     private void render(float dt) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        if (world != null && (state == GameState.IN_GAME || state == GameState.PAUSED || state == GameState.INVENTORY)) {
+        if (world != null && (state == GameState.IN_GAME || state == GameState.PAUSED || state == GameState.INVENTORY || state == GameState.COOKING)) {
             renderWorld(dt);
         }
 
@@ -931,6 +1127,7 @@ public class Game implements GameAccess {
             case WORLD_CREATE -> worldCreateScreen.render(uiRenderer, font, window.getWidth(), window.getHeight());
             case IN_GAME -> renderHud();
             case INVENTORY -> renderInventoryScreen();
+            case COOKING -> renderCookingScreen();
             case PAUSED -> {
                 renderHud();
                 pauseScreen.render(uiRenderer, font, window.getWidth(), window.getHeight());
@@ -1769,18 +1966,38 @@ public class Game implements GameAccess {
 
     @Override
     public void inventoryClick(int slot, boolean right) {
-        if (menu == null) throw new IllegalStateException("inventory is not open");
         if (slot < 0) throw new IllegalArgumentException("slot must be >= 0");
         try {
-            menu.click(slot, right);
+            if (cookingMenu != null) {
+                cookingMenu.click(slot, right);
+                float xp = cookingMenu.takeEarnedExperience();
+                if (xp > 0f) survival.addExperience(xp);
+            } else if (menu != null) {
+                menu.click(slot, right);
+            } else {
+                throw new IllegalStateException("inventory is not open");
+            }
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("no such slot: " + slot);
         }
     }
 
     @Override
+    public void openCookingScreen(int x, int y, int z) {
+        if (world == null) throw new IllegalStateException("no active world");
+        openCookingScreenAt(x, y, z);
+    }
+
+    @Override
     public void closeInventoryScreen() {
-        closeInventory();
+        if (cookingMenu != null) closeCookingScreen();
+        else closeInventory();
+    }
+
+    @Override
+    public void advanceSimulationTicks(int ticks) {
+        if (world == null) throw new IllegalStateException("no active world");
+        for (int i = 0; i < ticks; i++) cookingStations.tickAll(world);
     }
 
     @Override
@@ -1879,6 +2096,10 @@ public class Game implements GameAccess {
         survival.getHunger().forceState(foodLevel, saturation, exhaustion);
     }
 
+    private static String stackSummary(ItemStack stack) {
+        return stack.isEmpty() ? "" : stack.type().name() + "x" + stack.count();
+    }
+
     @Override
     public String stateSnapshot() {
         if (player == null || world == null || weather == null) {
@@ -1953,6 +2174,18 @@ public class Game implements GameAccess {
             sb.append("inventory.craftGrid=").append(menu.gridSummary()).append('\n');
             sb.append("inventory.craftResult=").append(menu.getResult().isEmpty() ? "" : menu.getResult().type().name() + "x" + menu.getResult().count()).append('\n');
         }
+        sb.append("cooking.open=").append(cookingMenu != null).append('\n');
+        if (cookingMenu != null) {
+            CookingStationState st = cookingMenu.getStation();
+            sb.append("cooking.station=").append(st.getX()).append(',').append(st.getY()).append(',').append(st.getZ())
+                    .append(' ').append(st.getType()).append('\n');
+            sb.append("cooking.input=").append(stackSummary(st.getInputStack())).append('\n');
+            sb.append("cooking.fuel=").append(stackSummary(st.getFuelStack())).append('\n');
+            sb.append("cooking.output=").append(stackSummary(st.getOutputStack())).append('\n');
+            sb.append("cooking.burning=").append(st.isBurning()).append(" burnFraction=").append(st.burnFraction())
+                    .append(" cookFraction=").append(st.cookFraction()).append('\n');
+        }
+        sb.append("survival.experience=").append(survival.getExperience()).append('\n');
         sb.append("items.dropped=").append(itemEntities.size()).append('\n');
         StringBuilder itemList = new StringBuilder();
         java.util.List<ItemEntity> dropped = itemEntities.entities();

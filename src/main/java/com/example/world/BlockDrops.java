@@ -63,8 +63,13 @@ public final class BlockDrops {
         // Fragile blocks that shatter without yielding anything.
         OVERRIDES.put(BlockType.GLASS, NOTHING);
         OVERRIDES.put(BlockType.ICE, NOTHING);
-        // Ores drop themselves: no coal/diamond/etc. item exists in this project yet, so the
-        // ore block is the only collectible form (default rule, listed here as a reminder).
+        // Iron/gold/copper/diamond ore still drop themselves: this project has no ore-block-
+        // drops-raw-material mechanic (see BlockType's own docs on RAW_IRON/RAW_GOLD/RAW_COPPER),
+        // so the ore block itself is the collectible, furnace-smeltable form.
+        // Coal ore is the one exception - real vanilla's own "Coal" item (see BlockType) needed a
+        // legitimate source for it to be usable as furnace fuel at all (this milestone's own
+        // requirement), matching real vanilla's actual behavior exactly.
+        OVERRIDES.put(BlockType.COAL_ORE, List.of(Drop.of(BlockType.COAL)));
     }
 
     /** The drop definitions for a block (empty = drops nothing). Never null. */

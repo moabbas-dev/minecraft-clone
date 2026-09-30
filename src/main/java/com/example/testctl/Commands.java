@@ -43,6 +43,8 @@ public final class Commands {
             case "openInventory" -> openInventory(params);
             case "inventoryClick" -> inventoryClick(params);
             case "closeInventory" -> closeInventory();
+            case "openCookingScreen" -> openCookingScreen(params);
+            case "advanceSimulationTicks" -> advanceSimulationTicks(params);
             case "lookAt" -> lookAt(params);
             case "screenshot" -> screenshot(params);
             case "damage" -> damage(params);
@@ -274,6 +276,32 @@ public final class Commands {
             return Result.badRequest(e.getMessage());
         }
         return Result.ok("inventory closed");
+    }
+
+    private Result openCookingScreen(Map<String, String> p) {
+        Integer x = parseInt(p, "x");
+        Integer y = parseInt(p, "y");
+        Integer z = parseInt(p, "z");
+        if (x == null || y == null || z == null) {
+            return Result.badRequest("openCookingScreen requires integer x, y, z");
+        }
+        try {
+            game.openCookingScreen(x, y, z);
+        } catch (IllegalStateException e) {
+            return Result.badRequest(e.getMessage());
+        }
+        return Result.ok("cooking screen opened at " + x + "," + y + "," + z);
+    }
+
+    private Result advanceSimulationTicks(Map<String, String> p) {
+        Integer ticks = parseInt(p, "ticks");
+        if (ticks == null || ticks < 0) return Result.badRequest("advanceSimulationTicks requires a non-negative integer 'ticks' param");
+        try {
+            game.advanceSimulationTicks(ticks);
+        } catch (IllegalStateException e) {
+            return Result.badRequest(e.getMessage());
+        }
+        return Result.ok("advanced " + ticks + " tick(s)");
     }
 
     private Result lookAt(Map<String, String> p) {

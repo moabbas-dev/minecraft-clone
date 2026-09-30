@@ -22,5 +22,16 @@ public enum Tile {
     SKIN,
     STICK, WOODEN_PICKAXE, STONE_PICKAXE, IRON_PICKAXE,
     WOODEN_AXE, STONE_AXE, IRON_AXE, WOODEN_SHOVEL, STONE_SHOVEL, IRON_SHOVEL,
-    APPLE, BREAD, COOKED_BEEF
+    APPLE, BREAD, COOKED_BEEF,
+
+    // Cooking/smelting milestone - new full blocks (top/side, like the existing FURNACE split).
+    BLAST_FURNACE_TOP, BLAST_FURNACE_SIDE, SMOKER_TOP, SMOKER_SIDE, COPPER_ORE, SMOOTH_STONE,
+
+    // Flat-icon items - no real texture dump exists for any of these (item textures, not block
+    // textures - same situation as the tools/food added earlier).
+    COAL, CHARCOAL, IRON_INGOT, GOLD_INGOT, COPPER_INGOT, IRON_NUGGET, BRICK,
+    RAW_IRON, RAW_GOLD, RAW_COPPER,
+    RAW_BEEF, RAW_PORKCHOP, COOKED_PORKCHOP, RAW_CHICKEN, COOKED_CHICKEN,
+    RAW_MUTTON, COOKED_MUTTON, RAW_RABBIT, COOKED_RABBIT,
+    COD, COOKED_COD, SALMON, COOKED_SALMON, POTATO, BAKED_POTATO, KELP, DRIED_KELP
 }

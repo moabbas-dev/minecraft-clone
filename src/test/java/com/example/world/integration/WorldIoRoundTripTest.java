@@ -103,6 +103,48 @@ class WorldIoRoundTripTest {
     }
 
     @Test
+    void cookingStationsRoundTripThroughTheirOwnFile(@TempDir File tempDir) {
+        var input = new com.example.inventory.ItemStack(BlockType.IRON_ORE, 3);
+        var fuel = new com.example.inventory.ItemStack(BlockType.COAL, 2);
+        var output = new com.example.inventory.ItemStack(BlockType.IRON_INGOT, 1);
+        WorldIO.CookingStationSnapshot snap = new WorldIO.CookingStationSnapshot(
+                5, 64, -3, "BLAST_FURNACE", input, fuel, output, 150, 400, 37, 0.7f);
+        WorldIO.saveCookingStations(tempDir, java.util.List.of(snap));
+
+        var loaded = WorldIO.loadCookingStations(tempDir);
+        assertEquals(1, loaded.size());
+        var back = loaded.get(0);
+        assertEquals(5, back.x());
+        assertEquals(64, back.y());
+        assertEquals(-3, back.z());
+        assertEquals("BLAST_FURNACE", back.stationTypeName());
+        assertEquals(input, back.input());
+        assertEquals(fuel, back.fuel());
+        assertEquals(output, back.output());
+        assertEquals(150, back.burnTimeRemainingTicks());
+        assertEquals(400, back.totalBurnTimeTicks());
+        assertEquals(37, back.cookProgressTicks());
+        assertEquals(0.7f, back.storedExperience());
+    }
+
+    @Test
+    void aWorldWithNoCookingStationsFileLoadsAnEmptyListNotNullOrAnError(@TempDir File tempDir) {
+        assertTrue(WorldIO.loadCookingStations(tempDir).isEmpty());
+    }
+
+    @Test
+    void emptyStacksInACookingStationRoundTripAsEmptyNotAPhantomItem(@TempDir File tempDir) {
+        WorldIO.CookingStationSnapshot snap = new WorldIO.CookingStationSnapshot(
+                0, 0, 0, "FURNACE", com.example.inventory.ItemStack.EMPTY, com.example.inventory.ItemStack.EMPTY,
+                com.example.inventory.ItemStack.EMPTY, 0, 0, 0, 0f);
+        WorldIO.saveCookingStations(tempDir, java.util.List.of(snap));
+        var back = WorldIO.loadCookingStations(tempDir).get(0);
+        assertTrue(back.input().isEmpty());
+        assertTrue(back.fuel().isEmpty());
+        assertTrue(back.output().isEmpty());
+    }
+
+    @Test
     void chunkRoundTripsExactBytes(@TempDir File tempDir) {
         Chunk chunk = new Chunk(2, -3);
         chunk.setLocal(0, 0, 0, BlockType.BEDROCK);

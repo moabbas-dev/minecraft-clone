@@ -101,7 +101,57 @@ public enum BlockType {
     // nothing legitimately produces it yet" situation already accepted for IRON_PICKAXE.
     APPLE(122, "Apple", false, true, -1f, 0f),
     BREAD(123, "Bread", false, true, -1f, 0f),
-    COOKED_BEEF(124, "Cooked Beef", false, true, -1f, 0f);
+    COOKED_BEEF(124, "Cooked Beef", false, true, -1f, 0f),
+
+    // ---- Cooking/smelting milestone (see com.example.cooking) ----
+
+    // New processing-station blocks - real placeable/minable blocks like the existing FURNACE.
+    BLAST_FURNACE(125, "Blast Furnace", true, false, 3.5f, 0f),
+    SMOKER(126, "Smoker", true, false, 3.5f, 0f),
+
+    // New real ore/decorative blocks - same convention as the existing ore blocks.
+    COPPER_ORE(127, "Copper Ore", true, false, 3.0f, 0f),
+    SMOOTH_STONE(128, "Smooth Stone", true, false, 2.0f, 0f),
+
+    // Smelting/cooking outputs and fuel that are items, not blocks - same non-placeable
+    // convention as the tools/food above. COAL is the real drop from mining COAL_ORE (see
+    // BlockDrops) - the one existing-item-drop change this milestone needed, since fuel has to
+    // be legitimately obtainable for the whole feature to be more than creative-only.
+    COAL(129, "Coal", false, true, -1f, 0f),
+    CHARCOAL(130, "Charcoal", false, true, -1f, 0f),
+    IRON_INGOT(131, "Iron Ingot", false, true, -1f, 0f),
+    GOLD_INGOT(132, "Gold Ingot", false, true, -1f, 0f),
+    COPPER_INGOT(133, "Copper Ingot", false, true, -1f, 0f),
+    IRON_NUGGET(134, "Iron Nugget", false, true, -1f, 0f),
+    BRICK(135, "Brick", false, true, -1f, 0f),
+    // Raw ore materials (real modern-vanilla items) - kept as real items with full smelting
+    // logic, but this project has no ore-block-drops-raw-material mechanic, so - like
+    // IRON_PICKAXE before them - they're obtainable only through the test controller for now.
+    RAW_IRON(136, "Raw Iron", false, true, -1f, 0f),
+    RAW_GOLD(137, "Raw Gold", false, true, -1f, 0f),
+    RAW_COPPER(138, "Raw Copper", false, true, -1f, 0f),
+
+    // Smoker/food raw+cooked pairs - no mob-drop or farming system exists, so (like APPLE/BREAD)
+    // these are real, fully cookable items obtainable only through the test controller for now.
+    RAW_BEEF(139, "Raw Beef", false, true, -1f, 0f), // cooks into the existing COOKED_BEEF
+    RAW_PORKCHOP(140, "Raw Porkchop", false, true, -1f, 0f),
+    COOKED_PORKCHOP(141, "Cooked Porkchop", false, true, -1f, 0f),
+    RAW_CHICKEN(142, "Raw Chicken", false, true, -1f, 0f),
+    COOKED_CHICKEN(143, "Cooked Chicken", false, true, -1f, 0f),
+    RAW_MUTTON(144, "Raw Mutton", false, true, -1f, 0f),
+    COOKED_MUTTON(145, "Cooked Mutton", false, true, -1f, 0f),
+    RAW_RABBIT(146, "Raw Rabbit", false, true, -1f, 0f),
+    COOKED_RABBIT(147, "Cooked Rabbit", false, true, -1f, 0f),
+    COD(148, "Raw Cod", false, true, -1f, 0f),
+    COOKED_COD(149, "Cooked Cod", false, true, -1f, 0f),
+    SALMON(150, "Raw Salmon", false, true, -1f, 0f),
+    COOKED_SALMON(151, "Cooked Salmon", false, true, -1f, 0f),
+    POTATO(152, "Potato", false, true, -1f, 0f),
+    BAKED_POTATO(153, "Baked Potato", false, true, -1f, 0f),
+    // Real vanilla Kelp is an underwater plant block that grows - this project has no
+    // underwater-plant/farming system, so it's simplified to a plain item, like the foods above.
+    KELP(154, "Kelp", false, true, -1f, 0f),
+    DRIED_KELP(155, "Dried Kelp", false, true, -1f, 0f);
 
     public final int id;
     public final String displayName;
@@ -165,8 +215,8 @@ public enum BlockType {
             DARK_OAK_LOG, DARK_OAK_LEAVES, CHERRY_LOG, CHERRY_LEAVES, MUD, MANGROVE_ROOTS,
             OAK_SAPLING_STAGE_0,
             SAND, GRAVEL, SANDSTONE, GLASS, BRICKS, MOSSY_COBBLESTONE, OBSIDIAN,
-            COAL_ORE, IRON_ORE, GOLD_ORE, DIAMOND_ORE, IRON_BLOCK, GOLD_BLOCK, DIAMOND_BLOCK,
-            BOOKSHELF, CRAFTING_TABLE, FURNACE, CHEST, TNT, ICE, SNOW_BLOCK, CLAY,
+            COAL_ORE, IRON_ORE, GOLD_ORE, DIAMOND_ORE, COPPER_ORE, IRON_BLOCK, GOLD_BLOCK, DIAMOND_BLOCK,
+            SMOOTH_STONE, BOOKSHELF, CRAFTING_TABLE, FURNACE, BLAST_FURNACE, SMOKER, CHEST, TNT, ICE, SNOW_BLOCK, CLAY,
             PUMPKIN, NETHERRACK, GLOWSTONE, TERRACOTTA, RED_SAND
     };
 }

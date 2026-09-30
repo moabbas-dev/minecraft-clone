@@ -54,13 +54,11 @@ public final class Recipes {
         return t -> t == b;
     }
 
-    /** Wood-handled tools take planks for the head; stone tools take cobblestone. Iron tools
-     *  (see BlockType/ToolEffectiveness) have no recipe here at all: an iron tool needs an iron
-     *  ingot, and this project has no furnace smelting yet to turn iron ore into one - the same
-     *  "the real item exists, but nothing legitimately crafts it yet" situation already accepted
-     *  for IRON_BLOCK/DIAMOND_BLOCK. Axe recipes are mirrored (both a left- and right-leaning
-     *  head) since Recipe.matches is exact-shape, not mirror-aware, and real vanilla accepts
-     *  both; pickaxe and shovel are already symmetric so need only one shape each.
+    /** Wood-handled tools take planks for the head; stone tools take cobblestone; iron tools
+     *  take an iron ingot (obtainable now that furnace smelting exists - see
+     *  com.example.cooking). Axe recipes are mirrored (both a left- and right-leaning head)
+     *  since Recipe.matches is exact-shape, not mirror-aware, and real vanilla accepts both;
+     *  pickaxe and shovel are already symmetric so need only one shape each.
      */
     private static Recipe tool(String[] rows, BlockType headMaterial, ItemStack result) {
         return new Recipe(rows, Map.of('H', only(headMaterial), 'S', only(BlockType.STICK)), result);
@@ -82,7 +80,22 @@ public final class Recipes {
             tool(new String[]{"HH", "HS", ".S"}, BlockType.COBBLESTONE, new ItemStack(BlockType.STONE_AXE, 1)),
             tool(new String[]{"HH", "SH", "S."}, BlockType.COBBLESTONE, new ItemStack(BlockType.STONE_AXE, 1)),
             tool(new String[]{"H", "S", "S"}, BlockType.OAK_PLANKS, new ItemStack(BlockType.WOODEN_SHOVEL, 1)),
-            tool(new String[]{"H", "S", "S"}, BlockType.COBBLESTONE, new ItemStack(BlockType.STONE_SHOVEL, 1))
+            tool(new String[]{"H", "S", "S"}, BlockType.COBBLESTONE, new ItemStack(BlockType.STONE_SHOVEL, 1)),
+            tool(new String[]{"HHH", ".S.", ".S."}, BlockType.IRON_INGOT, new ItemStack(BlockType.IRON_PICKAXE, 1)),
+            tool(new String[]{"HH", "HS", ".S"}, BlockType.IRON_INGOT, new ItemStack(BlockType.IRON_AXE, 1)),
+            tool(new String[]{"HH", "SH", "S."}, BlockType.IRON_INGOT, new ItemStack(BlockType.IRON_AXE, 1)),
+            tool(new String[]{"H", "S", "S"}, BlockType.IRON_INGOT, new ItemStack(BlockType.IRON_SHOVEL, 1)),
+
+            // Blast Furnace: 3 iron ingots on top, iron-furnace-iron in the middle, 3 smooth
+            // stone on the bottom - the request's own exact vanilla shape.
+            new Recipe(new String[]{"III", "IFI", "SSS"},
+                    Map.of('I', only(BlockType.IRON_INGOT), 'F', only(BlockType.FURNACE), 'S', only(BlockType.SMOOTH_STONE)),
+                    new ItemStack(BlockType.BLAST_FURNACE, 1)),
+            // Smoker: a log above/below/beside the furnace on every cardinal side, any species -
+            // the request's own exact vanilla shape, generalized to every log this project has.
+            new Recipe(new String[]{".L.", "LFL", ".L."},
+                    Map.of('L', Recipes::isLog, 'F', only(BlockType.FURNACE)),
+                    new ItemStack(BlockType.SMOKER, 1))
     );
 
     /** Number of registered recipes (for tests / debug output). */
