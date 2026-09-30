@@ -86,6 +86,24 @@ class PlayerMovementGameplayTest {
     }
 
     @Test
+    void canSprintFalseForciblyKeepsSprintingOffRegardlessOfInput() {
+        // The hunger-driven "sprint disabled at food<=6" rule (see PlayerSurvivalTest/
+        // HungerComponentTest) - Player itself just honors whatever the caller passes.
+        Player player = new Player(new Vector3f(0.5f, SPAWN_Y, 0.5f));
+        FakeInputState input = new FakeInputState();
+        input.setKeyDown(GLFW_KEY_W, true);
+        input.setKeyDown(GLFW_KEY_LEFT_CONTROL, true);
+        for (int i = 0; i < 30; i++) {
+            player.update(DT, input, world, i * DT, false);
+            assertFalse(player.isSprinting(), "canSprint=false must override the sprint key every tick");
+        }
+        for (int i = 30; i < 60; i++) {
+            player.update(DT, input, world, i * DT, true);
+        }
+        assertTrue(player.isSprinting(), "sprinting must resume once canSprint is true again");
+    }
+
+    @Test
     void playerLandsOnGroundAndNeverTunnelsBelowTheFloor() {
         float startHeight = SPAWN_Y + 20f;
         Player player = new Player(new Vector3f(0.5f, startHeight, 0.5f));

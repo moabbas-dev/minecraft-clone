@@ -44,7 +44,13 @@ public class TextureAtlas {
      *  is a deliberate partial-alpha look, not a cutout, and is left as-is. */
     private static final java.util.Set<Tile> CUTOUT_FOLIAGE = java.util.EnumSet.of(
             Tile.LEAVES, Tile.BIRCH_LEAVES, Tile.SPRUCE_LEAVES, Tile.JUNGLE_LEAVES, Tile.ACACIA_LEAVES,
-            Tile.MANGROVE_LEAVES, Tile.DARK_OAK_LEAVES, Tile.CHERRY_LEAVES, Tile.OAK_SAPLING);
+            Tile.MANGROVE_LEAVES, Tile.DARK_OAK_LEAVES, Tile.CHERRY_LEAVES, Tile.OAK_SAPLING,
+            // Every other flat-icon-only item (tools/stick, food - see ChunkMeshBuilder.isFlatIconItem)
+            // is the same kind of cutout tile rendered through the same mipmapped flat-icon quad,
+            // so it gets the same edge-halo fix, not just the species this was originally reported for.
+            Tile.STICK, Tile.WOODEN_PICKAXE, Tile.STONE_PICKAXE, Tile.IRON_PICKAXE,
+            Tile.WOODEN_AXE, Tile.STONE_AXE, Tile.IRON_AXE, Tile.WOODEN_SHOVEL, Tile.STONE_SHOVEL, Tile.IRON_SHOVEL,
+            Tile.APPLE, Tile.BREAD, Tile.COOKED_BEEF);
 
     static {
         REAL_TEXTURE_PATHS.put(Tile.STONE, "textures/block/stone.png");
@@ -350,6 +356,11 @@ public class TextureAtlas {
             case WOODEN_SHOVEL -> shovelIcon(img, rnd, TOOL_HEAD_WOOD);
             case STONE_SHOVEL -> shovelIcon(img, rnd, TOOL_HEAD_STONE);
             case IRON_SHOVEL -> shovelIcon(img, rnd, TOOL_HEAD_IRON);
+            // Food: also no real texture dump exists for these (item textures, not block
+            // textures) - simple flat-icon shapes, same procedural-fallback convention as tools.
+            case APPLE -> appleIcon(img, rnd);
+            case BREAD -> breadIcon(img, rnd);
+            case COOKED_BEEF -> cookedBeefIcon(img, rnd);
         }
         g.dispose();
         return img;
@@ -651,6 +662,57 @@ public class TextureAtlas {
         toolHandle(img, rnd);
         for (int x = 9; x <= 12; x++) {
             for (int y = 1; y <= 4; y++) setPixel(img, x, y, jitter(head, rnd, 10));
+        }
+    }
+
+    /** A small red disc with a brown stem and a green leaf - all transparent outside the disc,
+     *  matching the flat-icon rendering these items use (see ChunkMeshBuilder.isFlatIconItem). */
+    private void appleIcon(BufferedImage img, Random rnd) {
+        double cx = 8, cy = 9, r = 5.5;
+        for (int y = 0; y < TILE_PX; y++) {
+            for (int x = 0; x < TILE_PX; x++) {
+                double d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy);
+                if (d <= r) img.setRGB(x, y, jitter(new Color(196, 40, 40), rnd, 14).getRGB());
+                else img.setRGB(x, y, 0);
+            }
+        }
+        setPixel(img, 8, 3, new Color(90, 60, 30));
+        setPixel(img, 8, 2, new Color(90, 60, 30));
+        setPixel(img, 9, 2, new Color(60, 130, 40));
+        setPixel(img, 10, 2, new Color(60, 130, 40));
+    }
+
+    /** An oval tan loaf with darker crust lines - transparent outside the oval. */
+    private void breadIcon(BufferedImage img, Random rnd) {
+        double cx = 8, cy = 8, rx = 6.5, ry = 4.5;
+        for (int y = 0; y < TILE_PX; y++) {
+            for (int x = 0; x < TILE_PX; x++) {
+                double nx = (x + 0.5 - cx) / rx, ny = (y + 0.5 - cy) / ry;
+                if (nx * nx + ny * ny <= 1.0) {
+                    boolean crustLine = ((x + 2) % 4) == 0;
+                    Color base = crustLine ? new Color(160, 110, 55) : new Color(206, 158, 92);
+                    img.setRGB(x, y, jitter(base, rnd, 10).getRGB());
+                } else {
+                    img.setRGB(x, y, 0);
+                }
+            }
+        }
+    }
+
+    /** A brown rounded steak slab with a couple of darker grill-mark stripes. */
+    private void cookedBeefIcon(BufferedImage img, Random rnd) {
+        double cx = 8, cy = 8, rx = 6, ry = 5;
+        for (int y = 0; y < TILE_PX; y++) {
+            for (int x = 0; x < TILE_PX; x++) {
+                double nx = (x + 0.5 - cx) / rx, ny = (y + 0.5 - cy) / ry;
+                if (nx * nx + ny * ny <= 1.0) {
+                    boolean grillMark = (x + y) % 5 == 0;
+                    Color base = grillMark ? new Color(90, 45, 30) : new Color(150, 88, 60);
+                    img.setRGB(x, y, jitter(base, rnd, 10).getRGB());
+                } else {
+                    img.setRGB(x, y, 0);
+                }
+            }
         }
     }
 

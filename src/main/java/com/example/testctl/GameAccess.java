@@ -24,6 +24,12 @@ public interface GameAccess {
     /** Starts a fresh superflat world (grass at y=3), for lining trees up side by side. */
     void newFlatTestWorld();
 
+    /** Loads an already-saved world by its on-disk folder name (see {@code state}'s own
+     *  {@code world.folder} line) through the real load path - the only way this controller can
+     *  exercise a save/load round trip live, since the normal load flow is a menu screen with no
+     *  synthetic input support. @throws IllegalStateException if no such folder was ever saved. */
+    void loadTestWorld(String folderName);
+
     /** Generates one tree of the named {@code TreeSpecies} with its trunk base at (x, y, z) using
      *  the real placement code and a fixed seed, then refreshes the meshes. The tree must fit in
      *  the chunk containing (x, z) exactly like generated trees do (place it near a chunk centre).
@@ -68,6 +74,32 @@ public interface GameAccess {
 
     /** Captures the current frame to test-output/screenshots/&lt;name&gt;.png. Returns the file path. */
     String captureScreenshot(String name) throws IOException;
+
+    /** Applies damage through the real {@code PlayerSurvival.damage} pipeline (respects the hurt
+     *  cooldown - two calls close together may see the second one blocked, same as real combat
+     *  would). {@code source} is a {@code DamageSource} enum name (case-insensitive).
+     *  @throws IllegalArgumentException for an unknown source or a non-positive amount;
+     *  @throws IllegalStateException when not in-game. */
+    void damage(float amount, String source);
+
+    /** Heals through the real {@code HealthComponent.heal} (clamped to max, no-op if dead).
+     *  @throws IllegalStateException when not in-game. */
+    void heal(float amount);
+
+    /** Full heal, clears death - the "future respawn" hook this milestone is asked to leave a
+     *  clear place for. @throws IllegalStateException when not in-game. */
+    void respawn();
+
+    /** {@code level} is a {@code Difficulty} enum name (case-insensitive); also updates the
+     *  world's own settings so a later save persists it. @throws IllegalArgumentException for an
+     *  unknown level; @throws IllegalStateException when not in-game. */
+    void setDifficulty(String level);
+
+    /** Directly sets hunger state (food/saturation/exhaustion), clamped the same way eating or
+     *  exhaustion normally would - for setting up starvation/regen/sprint-disable scenarios
+     *  without waiting out real exhaustion accumulation. @throws IllegalStateException when not
+     *  in-game. */
+    void setHunger(float foodLevel, float saturation, float exhaustion);
 
     /** Structured plain-text dump of player/biome/color/weather/time/streaming state. */
     String stateSnapshot();

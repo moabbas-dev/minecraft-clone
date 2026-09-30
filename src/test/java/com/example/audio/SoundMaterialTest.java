@@ -1,6 +1,7 @@
 package com.example.audio;
 
 import com.example.world.BlockType;
+import com.example.world.FoodRegistry;
 import com.example.world.ToolEffectiveness;
 import org.junit.jupiter.api.Test;
 
@@ -10,12 +11,12 @@ class SoundMaterialTest {
 
     @Test
     void everyRealBlockTypeExceptAirAndWaterHasAMaterial() {
-        // Tools/STICK are never a world block at all (never placed, never mined) - the same
-        // "never solid-collision-walkable or player-breakable" null case materialFor()'s own
-        // docs already carve out for AIR/WATER, just reached a different way.
+        // Tools/STICK/food are never a world block at all (never placed, never mined) - the
+        // same "never solid-collision-walkable or player-breakable" null case materialFor()'s
+        // own docs already carve out for AIR/WATER, just reached a different way.
         for (BlockType type : BlockType.values()) {
-            if (type == BlockType.AIR || type == BlockType.WATER
-                    || type == BlockType.STICK || ToolEffectiveness.isTool(type)) continue;
+            if (type == BlockType.AIR || type == BlockType.WATER || type == BlockType.STICK
+                    || ToolEffectiveness.isTool(type) || FoodRegistry.isFood(type)) continue;
             assertNotNull(SoundMaterial.materialFor(type), type + " must have a sound material");
         }
     }

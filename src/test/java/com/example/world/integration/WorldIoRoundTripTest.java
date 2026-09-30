@@ -28,6 +28,37 @@ class WorldIoRoundTripTest {
         assertEquals(new Vector3f(1.5f, 64.25f, -3.75f), loaded.playerPos());
         assertEquals(0.42f, loaded.dayTime(), 0.0001f);
         assertEquals(3, loaded.selectedIndex());
+        assertEquals(Difficulty.NORMAL, loaded.settings().difficulty(), "default when nothing overrides it");
+        assertNull(loaded.survival(), "no survival section was ever written");
+    }
+
+    @Test
+    void survivalStateAndDifficultyRoundTripThroughWorldDat(@TempDir File tempDir) {
+        WorldSettings settings = new WorldSettings("Hardcore", WorldSettings.WorldType.SURVIVAL, Difficulty.HARD);
+        WorldIO.SurvivalSnapshot snapshot = new WorldIO.SurvivalSnapshot(13.5f, 8f, 2f, 1.25f);
+        WorldIO.saveMeta(tempDir, settings, 1L, 0f, 64f, 0f, 0f, 0, new com.example.inventory.Inventory(), snapshot);
+
+        WorldIO.LoadedMeta loaded = WorldIO.loadMeta(tempDir);
+        assertNotNull(loaded);
+        assertEquals(Difficulty.HARD, loaded.settings().difficulty());
+        assertNotNull(loaded.survival());
+        assertEquals(13.5f, loaded.survival().health());
+        assertEquals(8f, loaded.survival().foodLevel());
+        assertEquals(2f, loaded.survival().saturation());
+        assertEquals(1.25f, loaded.survival().exhaustion());
+    }
+
+    @Test
+    void savesWrittenBeforeHealthHungerExistedStillLoadWithNoSurvivalSnapshot(@TempDir File tempDir) {
+        // The pre-survival 9-argument saveMeta (with an inventory but no snapshot) writes
+        // exactly the on-disk format from before this milestone.
+        WorldIO.saveMeta(tempDir, new WorldSettings("PreHealth", WorldSettings.WorldType.SURVIVAL), 5L,
+                0f, 64f, 0f, 0f, 0, new com.example.inventory.Inventory());
+        WorldIO.LoadedMeta loaded = WorldIO.loadMeta(tempDir);
+        assertNotNull(loaded, "a save with no survival section must not be treated as corrupt");
+        assertNull(loaded.survival());
+        assertEquals(Difficulty.NORMAL, loaded.settings().difficulty(), "falls back to the default");
+        assertNotNull(loaded.inventory(), "the inventory section it does have must still load");
     }
 
     @Test

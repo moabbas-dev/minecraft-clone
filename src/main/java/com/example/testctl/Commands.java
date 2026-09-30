@@ -33,6 +33,7 @@ public final class Commands {
             case "setTime" -> setTime(params);
             case "setWeather" -> setWeather(params);
             case "newTestWorld" -> newTestWorld(params);
+            case "loadTestWorld" -> loadTestWorld(params);
             case "spawnTree" -> spawnTree(params);
             case "setBlock" -> setBlock(params);
             case "selectSlot" -> selectSlot(params);
@@ -44,6 +45,11 @@ public final class Commands {
             case "closeInventory" -> closeInventory();
             case "lookAt" -> lookAt(params);
             case "screenshot" -> screenshot(params);
+            case "damage" -> damage(params);
+            case "heal" -> heal(params);
+            case "respawn" -> respawn();
+            case "setDifficulty" -> setDifficulty(params);
+            case "setHunger" -> setHunger(params);
             case "state" -> state();
             case "shutdown" -> shutdown();
             default -> Result.badRequest("Unknown command: " + command);
@@ -93,6 +99,17 @@ public final class Commands {
         long resolved = seed != null ? seed : System.currentTimeMillis();
         game.newTestWorld(resolved);
         return Result.ok("new test world created with seed " + resolved);
+    }
+
+    private Result loadTestWorld(Map<String, String> p) {
+        String folder = p.get("folder");
+        if (folder == null || folder.isBlank()) return Result.badRequest("loadTestWorld requires a 'folder' name");
+        try {
+            game.loadTestWorld(folder);
+        } catch (IllegalStateException e) {
+            return Result.badRequest(e.getMessage());
+        }
+        return Result.ok("loaded world from folder " + folder);
     }
 
     private Result spawnTree(Map<String, String> p) {
@@ -149,6 +166,66 @@ public final class Commands {
         } catch (IllegalArgumentException e) {
             return Result.badRequest("cannot give " + type + " x" + count + ": " + e.getMessage());
         }
+    }
+
+    private Result damage(Map<String, String> p) {
+        Float amount = parseFloat(p, "amount");
+        String source = p.get("source");
+        if (amount == null || source == null || source.isBlank()) {
+            return Result.badRequest("damage requires a numeric 'amount' and a 'source' (DamageSource name)");
+        }
+        try {
+            game.damage(amount, source);
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return Result.badRequest(e.getMessage());
+        }
+        return Result.ok("applied " + amount + " " + source.toUpperCase(Locale.ROOT) + " damage");
+    }
+
+    private Result heal(Map<String, String> p) {
+        Float amount = parseFloat(p, "amount");
+        if (amount == null) return Result.badRequest("heal requires a numeric 'amount'");
+        try {
+            game.heal(amount);
+        } catch (IllegalStateException e) {
+            return Result.badRequest(e.getMessage());
+        }
+        return Result.ok("healed " + amount);
+    }
+
+    private Result respawn() {
+        try {
+            game.respawn();
+        } catch (IllegalStateException e) {
+            return Result.badRequest(e.getMessage());
+        }
+        return Result.ok("respawned");
+    }
+
+    private Result setDifficulty(Map<String, String> p) {
+        String level = p.get("level");
+        if (level == null || level.isBlank()) return Result.badRequest("setDifficulty requires a 'level' (Difficulty name)");
+        try {
+            game.setDifficulty(level);
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return Result.badRequest(e.getMessage());
+        }
+        return Result.ok("difficulty set to " + level.toUpperCase(Locale.ROOT));
+    }
+
+    private Result setHunger(Map<String, String> p) {
+        Float food = parseFloat(p, "food");
+        Float saturation = parseFloat(p, "saturation");
+        Float exhaustion = parseFloat(p, "exhaustion");
+        if (food == null || saturation == null || exhaustion == null) {
+            return Result.badRequest("setHunger requires numeric 'food', 'saturation', and 'exhaustion'");
+        }
+        try {
+            game.setHunger(food, saturation, exhaustion);
+        } catch (IllegalStateException e) {
+            return Result.badRequest(e.getMessage());
+        }
+        return Result.ok("hunger set to food=" + food + " saturation=" + saturation + " exhaustion=" + exhaustion);
     }
 
     private Result holdAttack(Map<String, String> p) {

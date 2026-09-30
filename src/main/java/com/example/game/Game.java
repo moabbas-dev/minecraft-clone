@@ -9,6 +9,8 @@ import com.example.inventory.InventoryMenu;
 import com.example.inventory.ItemStack;
 import com.example.engine.*;
 import com.example.physics.Player;
+import com.example.survival.DamageSource;
+import com.example.survival.PlayerSurvival;
 import com.example.testctl.GameAccess;
 import com.example.testctl.GameCommandQueue;
 import com.example.testctl.TestController;
@@ -116,6 +118,8 @@ public class Game implements GameAccess {
     private Inventory inventory = new Inventory();
     /** Non-null only while the inventory/crafting screen is open (state == INVENTORY). */
     private InventoryMenu menu;
+    /** Health/hunger/damage state - see resetGameplayState for when a fresh one replaces this. */
+    private PlayerSurvival survival = new PlayerSurvival(Difficulty.NORMAL);
     private final Random gameplayRandom = new Random();
     private final MiningController mining = new MiningController(gameplayRandom);
     private final ItemEntityManager itemEntities = new ItemEntityManager(Inventory.DEFAULT_MAX_STACK);
@@ -345,7 +349,7 @@ public class Game implements GameAccess {
         }
         player = new Player(new Vector3f(spawnLocalX + 0.5f, spawnY, spawnLocalZ + 0.5f));
 
-        resetGameplayState(new Inventory());
+        resetGameplayState(new Inventory(), settings.difficulty());
         weather = new Weather(seed);
         initRainParticles();
 
@@ -386,7 +390,11 @@ public class Game implements GameAccess {
         saplingGrowth.registerChunk(spawnChunk); // rescans for any saplings that were saved mid-growth
 
         player = new Player(new Vector3f(meta.playerPos()));
-        resetGameplayState(meta.inventory() != null ? meta.inventory() : new Inventory());
+        resetGameplayState(meta.inventory() != null ? meta.inventory() : new Inventory(), meta.settings().difficulty());
+        if (meta.survival() != null) {
+            WorldIO.SurvivalSnapshot s = meta.survival();
+            survival.loadState(s.health(), s.foodLevel(), s.saturation(), s.exhaustion());
+        }
         weather = new Weather(meta.seed());
         initRainParticles();
 
@@ -410,7 +418,11 @@ public class Game implements GameAccess {
     private void saveWorld() {
         if (world == null || currentWorldFolder == null) return;
         File dir = WorldIO.worldDir(currentWorldFolder);
-        WorldIO.saveMeta(dir, currentSettings, world.seed, player.position.x, player.position.y, player.position.z, dayTime, inventory.getSelectedSlot(), inventory);
+        WorldIO.SurvivalSnapshot survivalSnapshot = new WorldIO.SurvivalSnapshot(
+                survival.getHealth().getCurrentHealth(), survival.getHunger().getFoodLevel(),
+                survival.getHunger().getSaturation(), survival.getHunger().getExhaustion());
+        WorldIO.saveMeta(dir, currentSettings, world.seed, player.position.x, player.position.y, player.position.z,
+                dayTime, inventory.getSelectedSlot(), inventory, survivalSnapshot);
         for (Chunk c : world.chunkMap().values()) {
             if (c.isGenerated()) WorldIO.saveChunk(dir, c);
         }
@@ -429,12 +441,16 @@ public class Game implements GameAccess {
     }
 
     /** Fresh per-world gameplay state: the given inventory, no in-progress break, no dropped
-     *  items or particles carried over from the previous world. */
-    private void resetGameplayState(Inventory startingInventory) {
+     *  items or particles carried over from the previous world, and fresh health/hunger at the
+     *  given world's difficulty. {@code player} may be null (quitting to the title screen, where
+     *  there's nothing to anchor the survival system's position tracking to yet). */
+    private void resetGameplayState(Inventory startingInventory, Difficulty difficulty) {
         inventory = startingInventory;
         mining.reset();
         itemEntities.clear();
         particles.clear();
+        survival = new PlayerSurvival(difficulty);
+        if (player != null) survival.reset(player.position);
     }
 
     private void quitToTitle() {
@@ -445,7 +461,7 @@ public class Game implements GameAccess {
         player = null;
         weather = null;
         saplingGrowth = null;
-        resetGameplayState(new Inventory());
+        resetGameplayState(new Inventory(), Difficulty.NORMAL);
         forcedAttackHeld = false;
         forcedUseRequests = 0;
         currentWorldFolder = null;
@@ -513,7 +529,8 @@ public class Game implements GameAccess {
         }
 
         player.look(input.getMouseDeltaX(), input.getMouseDeltaY());
-        player.update(dt, input, world, now);
+        player.update(dt, input, world, now, survival.getHunger().canSprint());
+        survival.update(dt, player);
 
         float targetFov = FOV_DEGREES + (player.isSprinting() ? SPRINT_FOV_BOOST : 0f);
         currentFov += (targetFov - currentFov) * Math.min(1f, FOV_LERP_RATE * dt);
@@ -666,6 +683,12 @@ public class Game implements GameAccess {
     }
 
     private void handleInteraction(float dt) {
+        // Dead: no mining, placing, or eating - "prevent additional normal actions" until a
+        // future respawn (see testctl's respawn command). Movement/camera/pause still work -
+        // this project has no death screen to explain a full input freeze, so freezing only the
+        // world-interacting actions is the smallest honest stop-gap (documented limitation).
+        if (survival.getHealth().isDead()) return;
+
         if (input.consumeMousePressed(GLFW_MOUSE_BUTTON_LEFT)) {
             swingTimer = SWING_DURATION; // swings even on a whiff, matching vanilla's air-punch
         }
@@ -687,18 +710,35 @@ public class Game implements GameAccess {
             forcedUseRequests--;
             use = true;
         }
-        if (use && hit != null) {
-            // Using a crafting table opens the 3x3 crafting screen instead of placing a block
-            // (sneaking still places, like vanilla).
-            if (hit.type() == BlockType.CRAFTING_TABLE && !player.isSneaking()) {
-                openInventory(3);
-                return;
+        if (use) {
+            ItemStack held = inventory.selected();
+            FoodProperties food = held.isEmpty() ? null : FoodRegistry.propertiesFor(held.type());
+            if (food != null) {
+                tryEat(held.type());
+            } else if (hit != null) {
+                // Using a crafting table opens the 3x3 crafting screen instead of placing a block
+                // (sneaking still places, like vanilla).
+                if (hit.type() == BlockType.CRAFTING_TABLE && !player.isSneaking()) {
+                    openInventory(3);
+                    return;
+                }
+                BlockPlacer.Result placed = BlockPlacer.tryPlace(world, inventory, hit, this::blockIntersectsPlayer, saplingGrowth);
+                if (placed.placed()) {
+                    swingTimer = SWING_DURATION;
+                    gameAudio.playPlace(placed.type(), new Vector3f(placed.x() + 0.5f, placed.y() + 0.5f, placed.z() + 0.5f));
+                }
             }
-            BlockPlacer.Result placed = BlockPlacer.tryPlace(world, inventory, hit, this::blockIntersectsPlayer, saplingGrowth);
-            if (placed.placed()) {
-                swingTimer = SWING_DURATION;
-                gameAudio.playPlace(placed.type(), new Vector3f(placed.x() + 0.5f, placed.y() + 0.5f, placed.z() + 0.5f));
-            }
+        }
+    }
+
+    /** Eats one unit of the given food type from the selected hotbar slot - instant (no
+     *  eating-duration animation/timer exists in this project yet, so a single right-click
+     *  consumes it immediately; the existing consumeMousePressed edge-trigger already prevents
+     *  eating every frame while the button is merely held). Removes the item only if
+     *  {@link PlayerSurvival#eat} actually applied it (blocked at max food for non-overeat food). */
+    private void tryEat(BlockType foodType) {
+        if (survival.eat(foodType)) {
+            inventory.removeFromSlot(inventory.getSelectedSlot(), 1);
         }
     }
 
@@ -809,6 +849,7 @@ public class Game implements GameAccess {
      *  world change and drop roll already happened there, so nothing below can duplicate or
      *  lose them - and the purely cosmetic burst is isolated so a failure there can't affect the rest. */
     private void onBlockBroken(MiningController.Result r) {
+        survival.onBlockBroken();
         Vector3f center = new Vector3f(r.x() + 0.5f, r.y() + 0.5f, r.z() + 0.5f);
         gameAudio.playDig(r.brokenType(), center);
         for (BlockDrops.Resolved drop : r.drops()) {
@@ -1384,6 +1425,8 @@ public class Game implements GameAccess {
         float startX = (window.getWidth() - totalWidth) / 2f;
         float y = window.getHeight() - slotSize - 12f;
 
+        drawSurvivalHud(startX, startX + totalWidth, y);
+
         float selectedSlotX = startX;
         for (int i = 0; i < visibleSlots; i++) {
             float x = startX + i * (slotSize + margin);
@@ -1408,6 +1451,44 @@ public class Game implements GameAccess {
         }
 
         renderDebugOverlay();
+    }
+
+    /**
+     * Health hearts (left, above the hotbar's left edge) and hunger icons (right, mirrored) -
+     * 10 icons each, 2 points per icon, a proportional partial fill for an odd (half-heart-style)
+     * value. No heart/drumstick texture exists in this project (only block textures were ever
+     * copied in - see TextureAtlas's own docs), so these are plain colored squares over a dark
+     * backing, the same "colored quad primitive" convention every other HUD element here
+     * already uses (the hotbar slots/selection highlight/crosshair) - not a redesign of the HUD,
+     * the smallest layer that actually shows the two new survival stats.
+     */
+    private void drawSurvivalHud(float hotbarLeftX, float hotbarRightX, float hotbarY) {
+        float iconSize = 14f, gap = 2f;
+        float rowY = hotbarY - iconSize - 6f;
+
+        float health = survival.getHealth().getCurrentHealth();
+        for (int i = 0; i < 10; i++) {
+            float x = hotbarLeftX + i * (iconSize + gap);
+            float value = Math.max(0f, Math.min(2f, health - i * 2f));
+            drawSurvivalIcon(x, rowY, iconSize, value, 0.82f, 0.14f, 0.14f, 0.28f, 0.06f, 0.06f);
+        }
+        float food = survival.getHunger().getFoodLevel();
+        for (int i = 0; i < 10; i++) {
+            float x = hotbarRightX - iconSize - i * (iconSize + gap);
+            float value = Math.max(0f, Math.min(2f, food - i * 2f));
+            drawSurvivalIcon(x, rowY, iconSize, value, 0.62f, 0.42f, 0.20f, 0.22f, 0.16f, 0.09f);
+        }
+    }
+
+    /** One heart/hunger icon: a dark empty backing, then a fill whose width is proportional to
+     *  {@code value} (0..2 - 0 empty, 1 half, 2 full), so a half point of health/food reads as a
+     *  half-filled icon rather than rounding away. */
+    private void drawSurvivalIcon(float x, float y, float size, float value, float fr, float fg, float fb,
+                                  float er, float eg, float eb) {
+        uiRenderer.drawColorQuad(x, y, size, size, er, eg, eb, 0.92f);
+        if (value <= 0f) return;
+        float fillWidth = size * (value / 2f);
+        uiRenderer.drawColorQuad(x, y, fillWidth, size, fr, fg, fb, 1f);
     }
 
     /** Quantity in the slot's bottom-right corner, with a dark drop shadow so it reads over any icon. */
@@ -1644,6 +1725,15 @@ public class Game implements GameAccess {
     }
 
     @Override
+    public void loadTestWorld(String folderName) {
+        File dir = WorldIO.worldDir(folderName);
+        if (!dir.isDirectory()) throw new IllegalStateException("no saved world folder named " + folderName);
+        // loadWorld only ever reads saved.folderName() - the rest of SavedWorld exists for the
+        // world-select screen's own display, which this controller path never renders.
+        loadWorld(new WorldIO.SavedWorld(folderName, folderName, WorldSettings.WorldType.SURVIVAL, 0));
+    }
+
+    @Override
     public void spawnTree(String speciesName, int x, int y, int z, long seed) {
         if (world == null) throw new IllegalStateException("no active world");
         TreeSpecies species = TreeSpecies.valueOf(speciesName.toUpperCase(java.util.Locale.ROOT));
@@ -1746,6 +1836,50 @@ public class Game implements GameAccess {
     }
 
     @Override
+    public void damage(float amount, String source) {
+        if (world == null) throw new IllegalStateException("no active world");
+        if (amount <= 0f) throw new IllegalArgumentException("damage amount must be positive: " + amount);
+        DamageSource parsed;
+        try {
+            parsed = DamageSource.valueOf(source.toUpperCase(java.util.Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("unknown damage source: " + source);
+        }
+        survival.damage(amount, parsed);
+    }
+
+    @Override
+    public void heal(float amount) {
+        if (world == null) throw new IllegalStateException("no active world");
+        survival.getHealth().heal(amount);
+    }
+
+    @Override
+    public void respawn() {
+        if (world == null) throw new IllegalStateException("no active world");
+        survival.getHealth().reset();
+    }
+
+    @Override
+    public void setDifficulty(String level) {
+        if (world == null) throw new IllegalStateException("no active world");
+        Difficulty parsed;
+        try {
+            parsed = Difficulty.valueOf(level.toUpperCase(java.util.Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("unknown difficulty: " + level);
+        }
+        survival.setDifficulty(parsed);
+        currentSettings = new WorldSettings(currentSettings.name(), currentSettings.type(), parsed);
+    }
+
+    @Override
+    public void setHunger(float foodLevel, float saturation, float exhaustion) {
+        if (world == null) throw new IllegalStateException("no active world");
+        survival.getHunger().forceState(foodLevel, saturation, exhaustion);
+    }
+
+    @Override
     public String stateSnapshot() {
         if (player == null || world == null || weather == null) {
             return "state=no active world\n";
@@ -1791,6 +1925,18 @@ public class Game implements GameAccess {
         sb.append("weather.stormIntensity=").append(String.format("%.2f", weather.getStormIntensity())).append('\n');
         sb.append("time.dayTime=").append(String.format("%.4f", dayTime)).append('\n');
 
+        sb.append("survival.difficulty=").append(survival.getDifficulty()).append('\n');
+        sb.append("survival.health=").append(String.format("%.2f", survival.getHealth().getCurrentHealth()))
+                .append('/').append(String.format("%.2f", survival.getHealth().getMaxHealth())).append('\n');
+        sb.append("survival.dead=").append(survival.getHealth().isDead()).append('\n');
+        sb.append("survival.hurtCooldown=").append(String.format("%.2f", survival.getHealth().hurtCooldownRemaining())).append('\n');
+        sb.append("survival.food=").append(String.format("%.2f", survival.getHunger().getFoodLevel())).append('\n');
+        sb.append("survival.saturation=").append(String.format("%.2f", survival.getHunger().getSaturation())).append('\n');
+        sb.append("survival.exhaustion=").append(String.format("%.2f", survival.getHunger().getExhaustion())).append('\n');
+        sb.append("survival.canSprint=").append(survival.getHunger().canSprint()).append('\n');
+        sb.append("survival.regenAllowed=").append(survival.getHunger().regenerationAllowed()).append('\n');
+
+        sb.append("world.folder=").append(currentWorldFolder).append('\n');
         long dirtyChunks = world.chunkMap().values().stream().filter(Chunk::isMeshDirty).count();
         StringBuilder slots = new StringBuilder();
         for (int i = 0; i < inventory.slotCount(); i++) {

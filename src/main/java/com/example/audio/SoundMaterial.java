@@ -66,7 +66,7 @@ public enum SoundMaterial {
         }
 
         BY_BLOCK.put(BlockType.GLASS, GLASS);
-        // AIR, WATER, and every tool/STICK (see ToolEffectiveness): never targeted for
+        // AIR, WATER, and every tool/STICK/food item (see ToolEffectiveness/FoodRegistry): never targeted for
         // break/place, and never solid-collision ground for footsteps either - deliberately
         // left unmapped, materialFor() returns null for all of them.
     }

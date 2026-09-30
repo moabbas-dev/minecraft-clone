@@ -257,7 +257,7 @@ public class ChunkMeshBuilder {
      *  Deliberately a separate flag from {@link #isCrossShapedPlant}: that one also gates this
      *  class's own real world-mesh pass, which a tool should never reach in normal play. */
     public static boolean isFlatIconItem(BlockType type) {
-        return isCrossShapedPlant(type) || ToolEffectiveness.isTool(type);
+        return isCrossShapedPlant(type) || ToolEffectiveness.isTool(type) || FoodRegistry.isFood(type);
     }
 
     /**

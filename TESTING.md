@@ -38,6 +38,10 @@ or downgrades a failing assertion.
 | `com.example.world.unit` (`ToolEffectivenessTest`) | Tool kind/tier lookup, correct-tool speed multipliers vs. the wrong tool/no tool, and harvest-level gating for the 4 tool-gated ores | No |
 | `com.example.engine` (`CrackOverlayTest`) | Procedural crack stage images only (cumulative, deterministic); the overlay's GL parts are manual-only | No |
 | `com.example.audio` | Material mapping, manifest validation, registry metadata, trigger predicates (never touches OpenAL) | No |
+| `com.example.survival` (`HealthComponentTest`, `HungerComponentTest`) | Reusable health/damage/hurt-cooldown/death state and food/saturation/exhaustion state, entirely dt-driven (a cooldown check runs the same real-time span at 30fps and 144fps and gets the same result) | No |
+| `com.example.physics.gameplay` (`PlayerSurvivalTest`) | `PlayerSurvival` driving a real `Player` + real gravity: sprint/swim/jump/flying exhaustion, block-break/damage exhaustion, regen (gated on food, costs exhaustion), starvation (ticks, stops at each `Difficulty`'s floor), real fall damage from an actual drop, eating a real food item, death freezing further hunger/regen/starvation, reset/loadState. Also `PlayerMovementGameplayTest`'s `canSprint=false` override test | No |
+| `com.example.world.unit` (`FoodRegistryTest`) | The 3 requested foods' exact nutrition/saturation values, and that none are placeable | No |
+| `com.example.world.integration` (`WorldIoRoundTripTest` additions) | Health/hunger/saturation/exhaustion and difficulty round-trip through `world.dat`, and an old save with no survival section still loads (falls back to full health/NORMAL) | No |
 
 None of the above needs LWJGL/GLFW/OpenGL. That's not an accident of test design - `Player`,
 `World`/`Chunk`, `Raycast`, `Weather`, `TerrainGenerator`/`Biome`/`BiomeColors`, `SimplexNoise`,

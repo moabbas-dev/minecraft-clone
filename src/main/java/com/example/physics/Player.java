@@ -86,6 +86,14 @@ public class Player {
     private float verticalVelocity = 0f;
     @Getter
     private boolean onGround = false;
+    /** True only during the single update() call in which a jump was actually triggered (space
+     *  held while on ground, not flying/swimming) - false every other tick, including the rest
+     *  of the time spent airborne. Follows the same "recomputed every tick, exposed via Getter"
+     *  convention as onGround/sneaking/swimming, so external systems (see
+     *  com.example.survival.PlayerSurvival's jump-exhaustion hook) can query it right after
+     *  update() without Player needing to know anything about hunger/exhaustion itself. */
+    @Getter
+    private boolean justJumped = false;
     @Getter
     private boolean flying = false;
     /** Mirrors the local `sneaking` condition update() already computes each tick (held shift,
@@ -182,7 +190,23 @@ public class Player {
         return base;
     }
 
+    /** Equivalent to {@link #update(float, InputState, World, double, boolean)} with sprinting
+     *  always allowed - every caller that doesn't care about hunger (every test in this project
+     *  today) keeps its exact previous behavior. */
     public void update(float dt, InputState input, World world, double now) {
+        update(dt, input, world, now, true);
+    }
+
+    /**
+     * @param canSprint false forcibly keeps {@link #isSprinting()} false this tick regardless of
+     *                  input (double-tap-W/ctrl are still consumed normally, so releasing and
+     *                  re-pressing isn't required the instant it becomes true again) - the
+     *                  "movement system consults a hunger capability check" this project's
+     *                  survival system needs, without Player knowing anything about hunger
+     *                  itself (see {@code com.example.survival.HungerComponent#canSprint}).
+     */
+    public void update(float dt, InputState input, World world, double now, boolean canSprint) {
+        justJumped = false;
         if (input.consumeKeyPressed(GLFW_KEY_SPACE)) {
             if (now - lastSpacePressTime < DOUBLE_TAP_WINDOW) {
                 flying = !flying;
@@ -219,7 +243,7 @@ public class Player {
         // matches vanilla (double-tap W to start, release W or sneak to stop). Ctrl still works
         // as a direct hold-to-sprint alternative alongside the double-tap toggle.
         if (!wDown || sneaking) sprintToggled = false;
-        sprinting = !sneaking && (sprintToggled || input.isKeyDown(GLFW_KEY_LEFT_CONTROL));
+        sprinting = canSprint && !sneaking && (sprintToggled || input.isKeyDown(GLFW_KEY_LEFT_CONTROL));
 
         updateWaterState(world);
         // Flying overrides water physics entirely (matches the pre-existing precedent of
@@ -322,6 +346,7 @@ public class Player {
             if (input.isKeyDown(GLFW_KEY_SPACE) && onGround) {
                 verticalVelocity = JUMP_VELOCITY;
                 onGround = false;
+                justJumped = true;
             }
             dy = verticalVelocity * dt;
         }

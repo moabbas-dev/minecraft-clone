@@ -84,6 +84,9 @@ public class BlockTextureMap {
         uniform(BlockType.WOODEN_SHOVEL, Tile.WOODEN_SHOVEL);
         uniform(BlockType.STONE_SHOVEL, Tile.STONE_SHOVEL);
         uniform(BlockType.IRON_SHOVEL, Tile.IRON_SHOVEL);
+        uniform(BlockType.APPLE, Tile.APPLE);
+        uniform(BlockType.BREAD, Tile.BREAD);
+        uniform(BlockType.COOKED_BEEF, Tile.COOKED_BEEF);
     }
 
     private void uniform(BlockType type, Tile tile) {

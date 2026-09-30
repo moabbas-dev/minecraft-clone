@@ -78,6 +78,15 @@ class CommandsTest {
             flatWorld = true;
         }
 
+        String loadedFolder;
+        boolean throwOnLoad;
+
+        @Override
+        public void loadTestWorld(String folderName) {
+            if (throwOnLoad) throw new IllegalStateException("no saved world folder named " + folderName);
+            loadedFolder = folderName;
+        }
+
         @Override
         public void spawnTree(String species, int x, int y, int z, long seed) {
             if (species.equals("NOPE")) throw new IllegalArgumentException("No enum constant");
@@ -150,6 +159,51 @@ class CommandsTest {
             if (throwOnScreenshot) throw new IOException("disk full");
             screenshotName = name;
             return "test-output/screenshots/" + name + ".png";
+        }
+
+        Float damagedAmount;
+        String damagedSource;
+        boolean throwOnDamage;
+        Float healedAmount;
+        boolean throwOnHeal;
+        int respawnCalls;
+        boolean throwOnRespawn;
+        String difficultyLevel;
+        boolean throwOnDifficulty;
+        Float hungerFood, hungerSaturation, hungerExhaustion;
+        boolean throwOnHunger;
+
+        @Override
+        public void damage(float amount, String source) {
+            if (throwOnDamage) throw new IllegalArgumentException("unknown damage source: " + source);
+            damagedAmount = amount;
+            damagedSource = source;
+        }
+
+        @Override
+        public void heal(float amount) {
+            if (throwOnHeal) throw new IllegalStateException("no active world");
+            healedAmount = amount;
+        }
+
+        @Override
+        public void respawn() {
+            if (throwOnRespawn) throw new IllegalStateException("no active world");
+            respawnCalls++;
+        }
+
+        @Override
+        public void setDifficulty(String level) {
+            if (throwOnDifficulty) throw new IllegalArgumentException("unknown difficulty: " + level);
+            difficultyLevel = level;
+        }
+
+        @Override
+        public void setHunger(float foodLevel, float saturation, float exhaustion) {
+            if (throwOnHunger) throw new IllegalStateException("no active world");
+            hungerFood = foodLevel;
+            hungerSaturation = saturation;
+            hungerExhaustion = exhaustion;
         }
 
         @Override
@@ -462,5 +516,62 @@ class CommandsTest {
         Commands.Result r = commands.execute("shutdown", params());
         assertEquals(200, r.status());
         assertTrue(fake.shutdownCalled);
+    }
+
+    @Test
+    void damageDispatchesAndValidates() {
+        assertEquals(200, commands.execute("damage", params("amount", "5", "source", "FALL")).status());
+        assertEquals(5f, fake.damagedAmount);
+        assertEquals("FALL", fake.damagedSource);
+        assertEquals(400, commands.execute("damage", params("source", "FALL")).status(), "missing amount");
+        assertEquals(400, commands.execute("damage", params("amount", "5")).status(), "missing source");
+        fake.throwOnDamage = true;
+        assertEquals(400, commands.execute("damage", params("amount", "5", "source", "NOPE")).status());
+    }
+
+    @Test
+    void healDispatchesAndValidates() {
+        assertEquals(200, commands.execute("heal", params("amount", "3")).status());
+        assertEquals(3f, fake.healedAmount);
+        assertEquals(400, commands.execute("heal", params()).status());
+        fake.throwOnHeal = true;
+        assertEquals(400, commands.execute("heal", params("amount", "1")).status());
+    }
+
+    @Test
+    void respawnDispatches() {
+        assertEquals(200, commands.execute("respawn", params()).status());
+        assertEquals(1, fake.respawnCalls);
+        fake.throwOnRespawn = true;
+        assertEquals(400, commands.execute("respawn", params()).status());
+    }
+
+    @Test
+    void setDifficultyDispatchesAndValidates() {
+        assertEquals(200, commands.execute("setDifficulty", params("level", "HARD")).status());
+        assertEquals("HARD", fake.difficultyLevel);
+        assertEquals(400, commands.execute("setDifficulty", params()).status());
+        fake.throwOnDifficulty = true;
+        assertEquals(400, commands.execute("setDifficulty", params("level", "NOPE")).status());
+    }
+
+    @Test
+    void loadTestWorldDispatchesAndValidates() {
+        assertEquals(200, commands.execute("loadTestWorld", params("folder", "My World")).status());
+        assertEquals("My World", fake.loadedFolder);
+        assertEquals(400, commands.execute("loadTestWorld", params()).status());
+        fake.throwOnLoad = true;
+        assertEquals(400, commands.execute("loadTestWorld", params("folder", "Nope")).status());
+    }
+
+    @Test
+    void setHungerDispatchesAndValidates() {
+        assertEquals(200, commands.execute("setHunger", params("food", "0", "saturation", "0", "exhaustion", "3.9")).status());
+        assertEquals(0f, fake.hungerFood);
+        assertEquals(0f, fake.hungerSaturation);
+        assertEquals(3.9f, fake.hungerExhaustion);
+        assertEquals(400, commands.execute("setHunger", params("food", "0", "saturation", "0")).status(), "missing exhaustion");
+        fake.throwOnHunger = true;
+        assertEquals(400, commands.execute("setHunger", params("food", "0", "saturation", "0", "exhaustion", "0")).status());
     }
 }

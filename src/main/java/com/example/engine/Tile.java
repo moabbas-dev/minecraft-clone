@@ -21,5 +21,6 @@ public enum Tile {
     /** Plain skin tone for the first-person hand shown when nothing is held. */
     SKIN,
     STICK, WOODEN_PICKAXE, STONE_PICKAXE, IRON_PICKAXE,
-    WOODEN_AXE, STONE_AXE, IRON_AXE, WOODEN_SHOVEL, STONE_SHOVEL, IRON_SHOVEL
+    WOODEN_AXE, STONE_AXE, IRON_AXE, WOODEN_SHOVEL, STONE_SHOVEL, IRON_SHOVEL,
+    APPLE, BREAD, COOKED_BEEF
 }

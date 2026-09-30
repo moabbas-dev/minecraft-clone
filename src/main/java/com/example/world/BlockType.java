@@ -94,7 +94,14 @@ public enum BlockType {
     IRON_AXE(118, "Iron Axe", false, true, -1f, 0f),
     WOODEN_SHOVEL(119, "Wooden Shovel", false, true, -1f, 0f),
     STONE_SHOVEL(120, "Stone Shovel", false, true, -1f, 0f),
-    IRON_SHOVEL(121, "Iron Shovel", false, true, -1f, 0f);
+    IRON_SHOVEL(121, "Iron Shovel", false, true, -1f, 0f),
+    // Food items (see FoodRegistry) - same non-placeable-item convention as
+    // the tools above. No farming or cooking exists yet, so none of these have a crafting
+    // recipe; obtainable only via the test controller for now, the same "the real item exists,
+    // nothing legitimately produces it yet" situation already accepted for IRON_PICKAXE.
+    APPLE(122, "Apple", false, true, -1f, 0f),
+    BREAD(123, "Bread", false, true, -1f, 0f),
+    COOKED_BEEF(124, "Cooked Beef", false, true, -1f, 0f);
 
     public final int id;
     public final String displayName;
