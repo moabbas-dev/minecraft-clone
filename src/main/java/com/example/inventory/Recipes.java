@@ -54,13 +54,35 @@ public final class Recipes {
         return t -> t == b;
     }
 
+    /** Wood-handled tools take planks for the head; stone tools take cobblestone. Iron tools
+     *  (see BlockType/ToolEffectiveness) have no recipe here at all: an iron tool needs an iron
+     *  ingot, and this project has no furnace smelting yet to turn iron ore into one - the same
+     *  "the real item exists, but nothing legitimately crafts it yet" situation already accepted
+     *  for IRON_BLOCK/DIAMOND_BLOCK. Axe recipes are mirrored (both a left- and right-leaning
+     *  head) since Recipe.matches is exact-shape, not mirror-aware, and real vanilla accepts
+     *  both; pickaxe and shovel are already symmetric so need only one shape each.
+     */
+    private static Recipe tool(String[] rows, BlockType headMaterial, ItemStack result) {
+        return new Recipe(rows, Map.of('H', only(headMaterial), 'S', only(BlockType.STICK)), result);
+    }
+
     private static final List<Recipe> ALL = List.of(
             // Any log species -> oak planks (the only planks block that exists yet).
             new Recipe(new String[]{"L"}, Map.of('L', Recipes::isLog), new ItemStack(BlockType.OAK_PLANKS, 4)),
             new Recipe(new String[]{"PP", "PP"}, Map.of('P', only(BlockType.OAK_PLANKS)), new ItemStack(BlockType.CRAFTING_TABLE, 1)),
             new Recipe(new String[]{"SS", "SS"}, Map.of('S', only(BlockType.SAND)), new ItemStack(BlockType.SANDSTONE, 1)),
             new Recipe(new String[]{"CCC", "C.C", "CCC"}, Map.of('C', only(BlockType.COBBLESTONE)), new ItemStack(BlockType.FURNACE, 1)),
-            new Recipe(new String[]{"PPP", "P.P", "PPP"}, Map.of('P', only(BlockType.OAK_PLANKS)), new ItemStack(BlockType.CHEST, 1))
+            new Recipe(new String[]{"PPP", "P.P", "PPP"}, Map.of('P', only(BlockType.OAK_PLANKS)), new ItemStack(BlockType.CHEST, 1)),
+            new Recipe(new String[]{"P", "P"}, Map.of('P', only(BlockType.OAK_PLANKS)), new ItemStack(BlockType.STICK, 4)),
+
+            tool(new String[]{"HHH", ".S.", ".S."}, BlockType.OAK_PLANKS, new ItemStack(BlockType.WOODEN_PICKAXE, 1)),
+            tool(new String[]{"HHH", ".S.", ".S."}, BlockType.COBBLESTONE, new ItemStack(BlockType.STONE_PICKAXE, 1)),
+            tool(new String[]{"HH", "HS", ".S"}, BlockType.OAK_PLANKS, new ItemStack(BlockType.WOODEN_AXE, 1)),
+            tool(new String[]{"HH", "SH", "S."}, BlockType.OAK_PLANKS, new ItemStack(BlockType.WOODEN_AXE, 1)),
+            tool(new String[]{"HH", "HS", ".S"}, BlockType.COBBLESTONE, new ItemStack(BlockType.STONE_AXE, 1)),
+            tool(new String[]{"HH", "SH", "S."}, BlockType.COBBLESTONE, new ItemStack(BlockType.STONE_AXE, 1)),
+            tool(new String[]{"H", "S", "S"}, BlockType.OAK_PLANKS, new ItemStack(BlockType.WOODEN_SHOVEL, 1)),
+            tool(new String[]{"H", "S", "S"}, BlockType.COBBLESTONE, new ItemStack(BlockType.STONE_SHOVEL, 1))
     );
 
     /** Number of registered recipes (for tests / debug output). */

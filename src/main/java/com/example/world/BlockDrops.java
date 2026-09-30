@@ -77,8 +77,20 @@ public final class BlockDrops {
     /**
      * Rolls the actual quantities for one break. Call exactly once per successful break - this
      * consumes randomness, so calling it twice would both duplicate and desync the result.
+     * Equivalent to {@code resolve(broken, random, null)} - a bare hand.
      */
     public static List<Resolved> resolve(BlockType broken, Random random) {
+        return resolve(broken, random, null);
+    }
+
+    /**
+     * Same as {@link #resolve(BlockType, Random)}, but {@code heldTool} (the BlockType of
+     * whatever's in the player's selected hotbar slot, or null for an empty hand) can withhold
+     * the drop entirely - see {@link ToolEffectiveness#canHarvest}. Nothing about the roll
+     * itself (counts, randomness) changes; a disallowed harvest simply never rolls at all.
+     */
+    public static List<Resolved> resolve(BlockType broken, Random random, BlockType heldTool) {
+        if (!ToolEffectiveness.canHarvest(heldTool, broken)) return List.of();
         List<Drop> drops = dropsFor(broken);
         if (drops.isEmpty()) return List.of();
         List<Resolved> result = new java.util.ArrayList<>(drops.size());

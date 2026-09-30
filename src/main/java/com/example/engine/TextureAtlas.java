@@ -336,6 +336,20 @@ public class TextureAtlas {
             case MANGROVE_ROOTS_SIDE, MANGROVE_ROOTS_TOP -> noisyFill(img, rnd, new Color(78, 52, 40), 14);
             case SKIN -> noisyFill(img, rnd, new Color(208, 158, 124), 6);
             case OAK_SAPLING -> speckledNoise(img, rnd, new Color(60, 120, 40), new Color[]{new Color(50, 100, 32), new Color(75, 140, 50)}, 65);
+            // Tools/stick: no real texture exists for these (no item-texture dump has been
+            // copied into textures/, unlike every block above), so they're always procedural -
+            // a diagonal wood handle (real vanilla's handles are wood at every tier) plus a head
+            // shape distinguishing pickaxe/axe/shovel, tinted by tier (wood/stone/iron).
+            case STICK -> stick(img, rnd);
+            case WOODEN_PICKAXE -> pickaxeIcon(img, rnd, TOOL_HEAD_WOOD);
+            case STONE_PICKAXE -> pickaxeIcon(img, rnd, TOOL_HEAD_STONE);
+            case IRON_PICKAXE -> pickaxeIcon(img, rnd, TOOL_HEAD_IRON);
+            case WOODEN_AXE -> axeIcon(img, rnd, TOOL_HEAD_WOOD);
+            case STONE_AXE -> axeIcon(img, rnd, TOOL_HEAD_STONE);
+            case IRON_AXE -> axeIcon(img, rnd, TOOL_HEAD_IRON);
+            case WOODEN_SHOVEL -> shovelIcon(img, rnd, TOOL_HEAD_WOOD);
+            case STONE_SHOVEL -> shovelIcon(img, rnd, TOOL_HEAD_STONE);
+            case IRON_SHOVEL -> shovelIcon(img, rnd, TOOL_HEAD_IRON);
         }
         g.dispose();
         return img;
@@ -594,6 +608,49 @@ public class TextureAtlas {
                 int alpha = (int) (140 * Math.max(0, 1 - distFromCenter * distFromCenter));
                 img.setRGB(x, y, new Color(170, 195, 220, alpha).getRGB());
             }
+        }
+    }
+
+    private static final Color TOOL_HANDLE = new Color(121, 85, 58);
+    private static final Color TOOL_HEAD_WOOD = new Color(163, 122, 80);
+    private static final Color TOOL_HEAD_STONE = new Color(132, 132, 132);
+    private static final Color TOOL_HEAD_IRON = new Color(216, 216, 216);
+
+    /** A lone diagonal handle, no head - the crafting ingredient/half-finished-looking stick. */
+    private void stick(BufferedImage img, Random rnd) {
+        for (int i = 0; i < 12; i++) {
+            setPixel(img, 2 + i, 13 - i, jitter(TOOL_HANDLE, rnd, 10));
+        }
+    }
+
+    /** The shared diagonal wood handle every tool icon is built on top of. */
+    private void toolHandle(BufferedImage img, Random rnd) {
+        for (int i = 0; i < 9; i++) {
+            int x = 2 + i, y = 13 - i;
+            setPixel(img, x, y, jitter(TOOL_HANDLE, rnd, 8));
+            setPixel(img, x, y + 1, jitter(TOOL_HANDLE, rnd, 8));
+        }
+    }
+
+    private void pickaxeIcon(BufferedImage img, Random rnd, Color head) {
+        toolHandle(img, rnd);
+        for (int[] c : new int[][]{{8, 3}, {9, 2}, {10, 1}, {11, 1}, {12, 2}, {13, 3}, {9, 4}, {12, 4}}) {
+            setPixel(img, c[0], c[1], jitter(head, rnd, 10));
+        }
+    }
+
+    private void axeIcon(BufferedImage img, Random rnd, Color head) {
+        toolHandle(img, rnd);
+        for (int[] c : new int[][]{{9, 1}, {10, 1}, {11, 1}, {9, 2}, {10, 2}, {11, 2}, {12, 2},
+                {10, 3}, {11, 3}, {12, 3}, {13, 3}, {11, 4}, {12, 4}}) {
+            setPixel(img, c[0], c[1], jitter(head, rnd, 10));
+        }
+    }
+
+    private void shovelIcon(BufferedImage img, Random rnd, Color head) {
+        toolHandle(img, rnd);
+        for (int x = 9; x <= 12; x++) {
+            for (int y = 1; y <= 4; y++) setPixel(img, x, y, jitter(head, rnd, 10));
         }
     }
 

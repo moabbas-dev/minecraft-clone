@@ -675,7 +675,7 @@ public class Game implements GameAccess {
         Raycast.Hit hit = Raycast.cast(world, eye, dir, REACH_DISTANCE);
 
         boolean attackHeld = input.isMouseDown(GLFW_MOUSE_BUTTON_LEFT) || forcedAttackHeld;
-        MiningController.Result mined = mining.tick(world, hit, attackHeld, dt);
+        MiningController.Result mined = mining.tick(world, hit, attackHeld, dt, inventory.selected().type());
         if (mined.mining() && swingTimer <= 0f) {
             swingTimer = SWING_DURATION; // repeat the punch while actively mining
             gameAudio.playDig(hit.type(), new Vector3f(hit.x() + 0.5f, hit.y() + 0.5f, hit.z() + 0.5f)); // one hit-tick per swing
@@ -839,7 +839,7 @@ public class Game implements GameAccess {
             float[] topTint = leafTint != null ? leafTint : t == BlockType.GRASS_BLOCK ? ChunkMeshBuilder.grassIconTint() : NEUTRAL_ICON_TINT;
             float[] sideTint = leafTint != null ? leafTint : NEUTRAL_ICON_TINT;
             return new ItemModelBuilder.Model(atlas.getUv(faces.top()), atlas.getUv(faces.bottom()), atlas.getUv(faces.side()),
-                    topTint, sideTint, ChunkMeshBuilder.isCrossShapedPlant(t),
+                    topTint, sideTint, ChunkMeshBuilder.isFlatIconItem(t),
                     faces.sideOverlay() != null ? atlas.getUv(faces.sideOverlay()) : null,
                     faces.sideOverlay() != null ? topTint : null);
         });
@@ -1094,7 +1094,7 @@ public class Game implements GameAccess {
             // Saplings (and any future cross/plant block) are a thin flat cross in-world, never a
             // cube (see ChunkMeshBuilder.emitCrossPlant) - held in hand, they were rendering as the
             // same solid cube every other block gets.
-            verts = ChunkMeshBuilder.isCrossShapedPlant(held) ? buildCrossPlantHeldVerts(held) : buildHeldItemVerts(held);
+            verts = ChunkMeshBuilder.isFlatIconItem(held) ? buildCrossPlantHeldVerts(held) : buildHeldItemVerts(held);
             model = new Matrix4f()
                     .translate(0.62f + bobX, -0.52f - bobY - swingArc * 0.12f, -1.1f - swingArc * 0.25f)
                     .rotateY((float) Math.toRadians(28f - swingArc * 35f))
@@ -1541,13 +1541,12 @@ public class Game implements GameAccess {
      * per-biome one from.
      */
     private void drawBlockIcon(BlockType block, float slotX, float slotY, float slotSize) {
-        if (ChunkMeshBuilder.isCrossShapedPlant(block)) {
-            // Saplings (and any future cross/plant block) render in-world as a thin flat cross,
-            // never a cube (see ChunkMeshBuilder.emitCrossPlant) - the icon was drawing the same
-            // 3-face isometric cube every other block gets, which looked like solid plank rather
-            // than the correct thin plant sprite. A single front-facing flat quad matches real
-            // vanilla's own flat 2D item-icon convention for plants far better than an isometric
-            // cube would anyway.
+        if (ChunkMeshBuilder.isFlatIconItem(block)) {
+            // Saplings/tools render as a single flat icon, never the isometric cube every other
+            // block gets - saplings because their real in-world model is a thin flat cross (see
+            // ChunkMeshBuilder.emitCrossPlant), tools because they're never a world block at all
+            // and a 2D flat icon matches real vanilla's own item-icon convention far better than
+            // an isometric cube would.
             drawFlatPlantIcon(block, slotX, slotY, slotSize);
             return;
         }
@@ -1763,22 +1762,30 @@ public class Game implements GameAccess {
         // These are the biome-side tint values from ClimateSample, i.e. before the time-of-day/
         // storm blending renderWorld applies - not the exact final on-screen pixel color.
         ClimateSample climate = world.climateAt((int) Math.floor(player.position.x), (int) Math.floor(player.position.z));
-        sb.append("biome.dominant=").append(climate.dominant()).append('\n');
-        StringBuilder weights = new StringBuilder();
-        Biome[] biomes = Biome.values();
-        float[] w = climate.weights();
-        for (int i = 0; i < biomes.length; i++) {
-            if (w[i] < 0.01f) continue;
-            if (weights.length() > 0) weights.append(',');
-            weights.append(biomes[i].name()).append(':').append(String.format("%.2f", w[i]));
+        // A flat world's generator has no climate model at all (see FlatWorldGenerator/the F3
+        // overlay's own "no climate model (flat world)" message) - climateAt returns null there,
+        // same as every other climate consumer in this class (renderWorld's sky/fog/underwater-
+        // fog blends) already has to handle; this just hadn't been made to handle it too.
+        if (climate == null) {
+            sb.append("biome.dominant=none (flat world)\n");
+        } else {
+            sb.append("biome.dominant=").append(climate.dominant()).append('\n');
+            StringBuilder weights = new StringBuilder();
+            Biome[] biomes = Biome.values();
+            float[] w = climate.weights();
+            for (int i = 0; i < biomes.length; i++) {
+                if (w[i] < 0.01f) continue;
+                if (weights.length() > 0) weights.append(',');
+                weights.append(biomes[i].name()).append(':').append(String.format("%.2f", w[i]));
+            }
+            sb.append("biome.weights=").append(weights).append('\n');
+            sb.append("biome.grassColor=").append(toHex(climate.grassColor())).append('\n');
+            sb.append("biome.foliageColor=").append(toHex(climate.foliageColor())).append('\n');
+            sb.append("biome.waterColor=").append(toHex(climate.waterColor())).append('\n');
+            sb.append("biome.fogColor=").append(toHex(climate.fogColor())).append('\n');
+            sb.append("biome.underwaterFogColor=").append(toHex(climate.underwaterFogColor())).append('\n');
+            sb.append("biome.skyTint=").append(toHex(climate.skyTint())).append('\n');
         }
-        sb.append("biome.weights=").append(weights).append('\n');
-        sb.append("biome.grassColor=").append(toHex(climate.grassColor())).append('\n');
-        sb.append("biome.foliageColor=").append(toHex(climate.foliageColor())).append('\n');
-        sb.append("biome.waterColor=").append(toHex(climate.waterColor())).append('\n');
-        sb.append("biome.fogColor=").append(toHex(climate.fogColor())).append('\n');
-        sb.append("biome.underwaterFogColor=").append(toHex(climate.underwaterFogColor())).append('\n');
-        sb.append("biome.skyTint=").append(toHex(climate.skyTint())).append('\n');
 
         sb.append("weather.state=").append(weather.getState()).append('\n');
         sb.append("weather.stormIntensity=").append(String.format("%.2f", weather.getStormIntensity())).append('\n');

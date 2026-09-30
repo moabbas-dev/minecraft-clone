@@ -19,5 +19,7 @@ public enum Tile {
     /** Tintable grayscale grass fringe split off GRASS_SIDE at atlas build time - see GrassSideSplit. */
     GRASS_SIDE_OVERLAY,
     /** Plain skin tone for the first-person hand shown when nothing is held. */
-    SKIN
+    SKIN,
+    STICK, WOODEN_PICKAXE, STONE_PICKAXE, IRON_PICKAXE,
+    WOODEN_AXE, STONE_AXE, IRON_AXE, WOODEN_SHOVEL, STONE_SHOVEL, IRON_SHOVEL
 }

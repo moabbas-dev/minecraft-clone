@@ -3,6 +3,9 @@ package com.example.world.unit;
 import com.example.world.BlockType;
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class BlockTypeTest {
@@ -59,6 +62,17 @@ class BlockTypeTest {
     void placeableBlocksAreAllRealNonAirBlocks() {
         for (BlockType b : BlockType.PLACEABLE) {
             assertNotEquals(BlockType.AIR, b);
+        }
+    }
+
+    @Test
+    void toolsAndStickAreNeverPlaceableAndReportUnbreakable() {
+        List<BlockType> placeable = Arrays.asList(BlockType.PLACEABLE);
+        for (BlockType tool : new BlockType[]{BlockType.STICK, BlockType.WOODEN_PICKAXE, BlockType.STONE_PICKAXE,
+                BlockType.IRON_PICKAXE, BlockType.WOODEN_AXE, BlockType.STONE_AXE, BlockType.IRON_AXE,
+                BlockType.WOODEN_SHOVEL, BlockType.STONE_SHOVEL, BlockType.IRON_SHOVEL}) {
+            assertFalse(placeable.contains(tool), tool + " is a tool/ingredient, never a placeable block");
+            assertEquals(-1f, tool.handBreakSeconds(), tool + " is never a world block, so it's never breakable");
         }
     }
 }

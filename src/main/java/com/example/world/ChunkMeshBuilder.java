@@ -249,6 +249,17 @@ public class ChunkMeshBuilder {
                 || type == BlockType.OAK_SAPLING_STAGE_2 || type == BlockType.OAK_SAPLING_STAGE_3;
     }
 
+    /** Every block that should render as a single flat icon/cross rather than a solid cube, for
+     *  the hotbar/inventory icon, the held-item view model, and a dropped item-entity's mesh (see
+     *  Game's drawBlockIcon/buildHeldItemVerts/itemModelFor) - real in-world cross-shaped plants
+     *  (see {@link #isCrossShapedPlant}) plus every tool (see {@link ToolEffectiveness}), which
+     *  is never placed in the world at all so has no in-world model of its own to speak of.
+     *  Deliberately a separate flag from {@link #isCrossShapedPlant}: that one also gates this
+     *  class's own real world-mesh pass, which a tool should never reach in normal play. */
+    public static boolean isFlatIconItem(BlockType type) {
+        return isCrossShapedPlant(type) || ToolEffectiveness.isTool(type);
+    }
+
     /**
      * Real vanilla's actual sapling/flower/grass model: two quads set diagonally across the
      * block's footprint, crossing in an X when viewed from above, instead of 6 axis-aligned cube

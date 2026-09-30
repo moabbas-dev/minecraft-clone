@@ -76,4 +76,61 @@ class RecipesTest {
     void aMismatchedGridArrayIsRejected() {
         assertThrows(IllegalArgumentException.class, () -> Recipes.craft(new BlockType[3], 2, 2));
     }
+
+    private static final BlockType S = BlockType.STICK;
+
+    @Test
+    void twoStackedPlanksMakeFourSticksInAnyGridSize() {
+        assertEquals(new ItemStack(BlockType.STICK, 4), Recipes.craft(grid(2, 2, 0, P, 2, P), 2, 2));
+        assertEquals(new ItemStack(BlockType.STICK, 4), Recipes.craft(grid(3, 3, 1, P, 4, P), 3, 3));
+    }
+
+    @Test
+    void aWoodenPickaxeNeedsThreePlanksAndTwoSticksAndOnlyFitsTheThreeByThreeGrid() {
+        BlockType[] shape = grid(3, 3, 0, P, 1, P, 2, P, 4, S, 7, S);
+        assertEquals(new ItemStack(BlockType.WOODEN_PICKAXE, 1), Recipes.craft(shape, 3, 3));
+    }
+
+    @Test
+    void aStonePickaxeUsesCobblestoneInTheSameShape() {
+        BlockType[] shape = grid(3, 3, 0, C, 1, C, 2, C, 4, S, 7, S);
+        assertEquals(new ItemStack(BlockType.STONE_PICKAXE, 1), Recipes.craft(shape, 3, 3));
+    }
+
+    @Test
+    void aWoodenAxeMatchesEitherMirroredHeadShape() {
+        BlockType[] rightHanded = grid(3, 3, 0, P, 1, P, 3, P, 4, S, 7, S);
+        BlockType[] leftHanded = grid(3, 3, 0, P, 1, P, 3, S, 4, P, 6, S);
+        assertEquals(new ItemStack(BlockType.WOODEN_AXE, 1), Recipes.craft(rightHanded, 3, 3));
+        assertEquals(new ItemStack(BlockType.WOODEN_AXE, 1), Recipes.craft(leftHanded, 3, 3));
+    }
+
+    @Test
+    void aStoneAxeMatchesEitherMirroredHeadShape() {
+        BlockType[] rightHanded = grid(3, 3, 0, C, 1, C, 3, C, 4, S, 7, S);
+        BlockType[] leftHanded = grid(3, 3, 0, C, 1, C, 3, S, 4, C, 6, S);
+        assertEquals(new ItemStack(BlockType.STONE_AXE, 1), Recipes.craft(rightHanded, 3, 3));
+        assertEquals(new ItemStack(BlockType.STONE_AXE, 1), Recipes.craft(leftHanded, 3, 3));
+    }
+
+    @Test
+    void shovelsAreOnePlankOverTwoSticksInEitherMaterial() {
+        assertEquals(new ItemStack(BlockType.WOODEN_SHOVEL, 1), Recipes.craft(grid(3, 3, 0, P, 3, S, 6, S), 3, 3));
+        assertEquals(new ItemStack(BlockType.STONE_SHOVEL, 1), Recipes.craft(grid(3, 3, 0, C, 3, S, 6, S), 3, 3));
+    }
+
+    @Test
+    void toolsDoNotFitTheTwoByTwoInventoryGridOnlyTheCraftingTable() {
+        // The same wooden-pickaxe shape, attempted in a 2x2 grid: it can never fit (3 tall),
+        // matching real vanilla's own "some tools need the crafting table" rule for free.
+        assertTrue(Recipes.craft(grid(2, 2, 0, P, 1, P), 2, 2).isEmpty());
+    }
+
+    @Test
+    void ironToolsHaveNoRecipeYetNoSmeltingExistsToProduceAnIronIngot() {
+        // Using IRON_BLOCK (the closest "iron" material this project can place in a grid) in the
+        // pickaxe shape must not accidentally craft an iron pickaxe - no such recipe is registered.
+        BlockType[] shape = grid(3, 3, 0, BlockType.IRON_BLOCK, 1, BlockType.IRON_BLOCK, 2, BlockType.IRON_BLOCK, 4, S, 7, S);
+        assertTrue(Recipes.craft(shape, 3, 3).isEmpty());
+    }
 }

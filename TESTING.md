@@ -29,12 +29,13 @@ or downgrades a failing assertion.
 | `com.example.entity` | `ItemEntityManager`: drop physics (never tunnels/sinks), pickup delay, full/partial/duplicate pickup, merging, lifetime, entity cap, freezing in unloaded chunks | No |
 | `com.example.fx` | `ParticleSystem`: burst size, expiry, pool cap, vertex output | No |
 | `com.example.game` (`MiningControllerTest`, `BlockPlacerTest`, `ItemModelBuilderTest`) | The break transaction (one drop per break, cancel/target-change/invalidation, crack stage progression) and transactional placement (consume only after success) | No |
-| `com.example.inventory` (`RecipesTest`, `InventoryMenuTest`) | Block-only crafting recipes (2x2 / 3x3 shaped matching), cursor pick/place/merge/swap/split, taking crafted results, item conservation, close-returns-everything with overflow | No |
+| `com.example.inventory` (`RecipesTest`, `InventoryMenuTest`) | Crafting recipes (2x2 / 3x3 shaped matching, including mirrored axe heads), cursor pick/place/merge/swap/split, taking crafted results, item conservation, close-returns-everything with overflow. Now covers wood/stone tools + sticks too (see `com.example.world.unit`'s `ToolEffectivenessTest` for their mining behavior); iron tools have no recipe yet (no furnace smelting) | No |
 | `com.example.ui` (`InventoryLayoutTest`) | Inventory screen geometry: slot hit-testing, no overlaps, everything inside the panel | No |
 | `com.example.engine` (`GrassSideSplitTest`) | Splitting grass_block_side into a dirt base and a biome-tintable grayscale fringe overlay | No |
 | `com.example.engine` (`LeafEdgeDilateTest`) | Filling every leaf/sapling tile's fully-transparent pixels with the nearest opaque pixel's color before mipmapping, so a distant leaf edge fades out instead of picking up a dark/blue halo (never touches alpha) | No |
 | `com.example.world.unit` (`TreeShapeTest`) | Per-species canopy silhouettes (birch narrow/tall, spruce tiered cone, jungle branch clusters, acacia broad/shallow/offset, dark oak heavy, cherry lobes + hanging, mangrove branch sprawl, swamp oak low), every tree face-connected to its trunk, no solid block overwritten, canopy inside its declared margin, per-seed variation, and oak's exact block layout pinned | No |
-| `com.example.world.unit` (`BlockDropsTest`) | Drop table rules | No |
+| `com.example.world.unit` (`BlockDropsTest`) | Drop table rules, and (this round) the tool-aware `resolve` overload: a gated ore drops nothing without the required tier, drops normally with it, and the 2-arg overload is exactly a bare hand | No |
+| `com.example.world.unit` (`ToolEffectivenessTest`) | Tool kind/tier lookup, correct-tool speed multipliers vs. the wrong tool/no tool, and harvest-level gating for the 4 tool-gated ores | No |
 | `com.example.engine` (`CrackOverlayTest`) | Procedural crack stage images only (cumulative, deterministic); the overlay's GL parts are manual-only | No |
 | `com.example.audio` | Material mapping, manifest validation, registry metadata, trigger predicates (never touches OpenAL) | No |
 

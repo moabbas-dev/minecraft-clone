@@ -77,7 +77,24 @@ public enum BlockType {
     OAK_SAPLING_STAGE_0(108, "Oak Sapling", false, true, 0f, 0f),
     OAK_SAPLING_STAGE_1(109, "Oak Sapling", false, true, 0f, 0f),
     OAK_SAPLING_STAGE_2(110, "Oak Sapling", false, true, 0f, 0f),
-    OAK_SAPLING_STAGE_3(111, "Oak Sapling", false, true, 0f, 0f);
+    OAK_SAPLING_STAGE_3(111, "Oak Sapling", false, true, 0f, 0f),
+    // Tools and their crafting ingredient (STICK). None of these are ever placed in the world -
+    // solidCollision/transparentRender=(false,true) matches the sapling convention (never an
+    // opaque cube), and hardness=-1 (matches BEDROCK/WATER's "not something you break normally")
+    // means a tool is treated as unbreakable/no-drop by BlockDrops.dropsFor if one is ever
+    // targeted anyway (only reachable through the test controller's setBlock, never real play -
+    // see ToolEffectiveness's class docs). Not listed in PLACEABLE, so BlockPlacer already
+    // refuses to place any of them without needing its own special case.
+    STICK(112, "Stick", false, true, -1f, 0f),
+    WOODEN_PICKAXE(113, "Wooden Pickaxe", false, true, -1f, 0f),
+    STONE_PICKAXE(114, "Stone Pickaxe", false, true, -1f, 0f),
+    IRON_PICKAXE(115, "Iron Pickaxe", false, true, -1f, 0f),
+    WOODEN_AXE(116, "Wooden Axe", false, true, -1f, 0f),
+    STONE_AXE(117, "Stone Axe", false, true, -1f, 0f),
+    IRON_AXE(118, "Iron Axe", false, true, -1f, 0f),
+    WOODEN_SHOVEL(119, "Wooden Shovel", false, true, -1f, 0f),
+    STONE_SHOVEL(120, "Stone Shovel", false, true, -1f, 0f),
+    IRON_SHOVEL(121, "Iron Shovel", false, true, -1f, 0f);
 
     public final int id;
     public final String displayName;

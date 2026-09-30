@@ -177,4 +177,67 @@ class MiningControllerTest {
         assertDoesNotThrow(() -> mining.tick(world, far, true, DT));
         assertFalse(mining.isMining());
     }
+
+    @Test
+    void theCorrectToolBreaksStrictlyFasterThanABareHand() {
+        world.setBlock(5, 10, 5, BlockType.STONE);
+        world.setBlock(6, 10, 5, BlockType.STONE);
+        int handTicks = 0;
+        while (!mining.tick(world, hit(5, 10, 5), true, DT).broken()) handTicks++;
+        MiningController pickaxeMining = new MiningController(new Random(1));
+        int pickaxeTicks = 0;
+        while (!pickaxeMining.tick(world, hit(6, 10, 5), true, DT, BlockType.STONE_PICKAXE).broken()) pickaxeTicks++;
+        assertTrue(pickaxeTicks < handTicks, "a stone pickaxe must break stone faster than a bare hand");
+    }
+
+    @Test
+    void theWrongToolBreaksAtTheSameSpeedAsABareHand() {
+        world.setBlock(5, 10, 5, BlockType.STONE);
+        world.setBlock(6, 10, 5, BlockType.STONE);
+        int handTicks = 0;
+        while (!mining.tick(world, hit(5, 10, 5), true, DT).broken()) handTicks++;
+        MiningController axeMining = new MiningController(new Random(1));
+        int axeTicks = 0;
+        while (!axeMining.tick(world, hit(6, 10, 5), true, DT, BlockType.WOODEN_AXE).broken()) axeTicks++;
+        assertEquals(handTicks, axeTicks, "an axe is the wrong tool for stone, so it's no faster than a bare hand");
+    }
+
+    @Test
+    void aGatedOreProducesNoDropWithoutTheRightTierEvenThoughItStillBreaks() {
+        world.setBlock(5, 10, 5, BlockType.DIAMOND_ORE);
+        MiningController.Result r = null;
+        for (int i = 0; i < 2000 && r == null; i++) {
+            MiningController.Result tick = mining.tick(world, hit(5, 10, 5), true, DT, BlockType.STONE_PICKAXE);
+            if (tick.broken()) r = tick;
+        }
+        assertNotNull(r, "a stone pickaxe can still break diamond ore (just not obtain it)");
+        assertEquals(BlockType.AIR, world.getBlock(5, 10, 5));
+        assertTrue(r.drops().isEmpty(), "stone tier is below diamond ore's minimum harvest level");
+    }
+
+    @Test
+    void aGatedOreDropsNormallyWithTheRequiredTier() {
+        world.setBlock(5, 10, 5, BlockType.DIAMOND_ORE);
+        MiningController.Result r = null;
+        for (int i = 0; i < 2000 && r == null; i++) {
+            MiningController.Result tick = mining.tick(world, hit(5, 10, 5), true, DT, BlockType.IRON_PICKAXE);
+            if (tick.broken()) r = tick;
+        }
+        assertNotNull(r);
+        assertEquals(1, r.drops().size());
+        assertEquals(BlockType.DIAMOND_ORE, r.drops().get(0).item());
+    }
+
+    @Test
+    void theFourArgOverloadIsExactlyAnEmptyHand() {
+        world.setBlock(5, 10, 5, BlockType.STONE);
+        world.setBlock(6, 10, 5, BlockType.STONE);
+        MiningController a = new MiningController(new Random(7));
+        MiningController b = new MiningController(new Random(7));
+        for (int i = 0; i < 5; i++) {
+            MiningController.Result ra = a.tick(world, hit(5, 10, 5), true, DT);
+            MiningController.Result rb = b.tick(world, hit(6, 10, 5), true, DT, null);
+            assertEquals(ra.broken(), rb.broken());
+        }
+    }
 }

@@ -3,6 +3,7 @@ package com.example.game;
 import com.example.world.BlockDrops;
 import com.example.world.BlockType;
 import com.example.world.Raycast;
+import com.example.world.ToolEffectiveness;
 import com.example.world.World;
 
 import java.util.List;
@@ -44,13 +45,26 @@ public class MiningController {
         this.random = random;
     }
 
+    /** Equivalent to {@link #tick(World, Raycast.Hit, boolean, float, BlockType)} with an empty
+     *  hand (no tool speed-up, no harvest-level gating). */
+    public Result tick(World world, Raycast.Hit hit, boolean attackHeld, float dt) {
+        return tick(world, hit, attackHeld, dt, null);
+    }
+
     /**
      * Advances breaking by {@code dt}. {@code hit} is the caller's existing raycast result (this
      * class never raycasts). Any change of target - different block position, or the same
      * position now holding a different block - restarts progress from zero, so a block swapped
      * by another system mid-break is never broken on the old block's timer.
+     *
+     * @param heldTool the BlockType of whatever's in the player's selected hotbar slot, or null
+     *                 for an empty hand (or anything that isn't a tool) - see
+     *                 {@link ToolEffectiveness}. A change of held tool mid-break is NOT itself a
+     *                 target change (matching real vanilla: switching tools while mining the same
+     *                 block keeps your progress), so it takes effect on the very next tick's
+     *                 speed calculation rather than resetting {@code progress}.
      */
-    public Result tick(World world, Raycast.Hit hit, boolean attackHeld, float dt) {
+    public Result tick(World world, Raycast.Hit hit, boolean attackHeld, float dt, BlockType heldTool) {
         if (cooldown > 0f) cooldown = Math.max(0f, cooldown - dt);
 
         if (hit == null || !attackHeld) {
@@ -63,8 +77,8 @@ public class MiningController {
             cancel();
             return Result.IDLE;
         }
-        float breakTime = current.handBreakSeconds();
-        if (breakTime < 0f) { // unbreakable
+        float handBreakTime = current.handBreakSeconds();
+        if (handBreakTime < 0f) { // unbreakable
             cancel();
             return Result.IDLE;
         }
@@ -81,12 +95,12 @@ public class MiningController {
             targetType = current;
             progress = 0f;
         }
-        required = breakTime;
+        required = handBreakTime / ToolEffectiveness.speedMultiplier(heldTool, current);
         progress += dt;
 
         if (progress < required) return Result.MINING;
 
-        List<BlockDrops.Resolved> drops = BlockDrops.resolve(current, random);
+        List<BlockDrops.Resolved> drops = BlockDrops.resolve(current, random, heldTool);
         world.setBlock(tx, ty, tz, BlockType.AIR);
         Result done = new Result(false, true, current, tx, ty, tz, drops);
         cancel();

@@ -78,4 +78,27 @@ class BlockDropsTest {
         assertEquals(roll(BlockType.STONE), roll(BlockType.STONE));
         assertEquals(1, BlockDrops.dropsFor(BlockType.STONE).size());
     }
+
+    @Test
+    void theTwoArgOverloadIsExactlyABareHand() {
+        // Coal is gated behind "any pickaxe" (see ToolEffectivenessTest) - the bare 2-arg
+        // resolve() must apply that gating exactly like passing heldTool=null explicitly.
+        assertTrue(BlockDrops.resolve(BlockType.COAL_ORE, new Random(1)).isEmpty());
+        assertEquals(BlockDrops.resolve(BlockType.COAL_ORE, new Random(1)),
+                BlockDrops.resolve(BlockType.COAL_ORE, new Random(1), null));
+    }
+
+    @Test
+    void aGatedOreDropsNothingWithoutTheRightToolButDropsNormallyWithIt() {
+        assertTrue(BlockDrops.resolve(BlockType.DIAMOND_ORE, new Random(1), BlockType.STONE_PICKAXE).isEmpty(),
+                "stone is below diamond's minimum tier");
+        assertEquals(List.of(new BlockDrops.Resolved(BlockType.DIAMOND_ORE, 1)),
+                BlockDrops.resolve(BlockType.DIAMOND_ORE, new Random(1), BlockType.IRON_PICKAXE));
+    }
+
+    @Test
+    void anUngatedBlockDropsTheSameWayRegardlessOfTheHeldTool() {
+        assertEquals(BlockDrops.resolve(BlockType.STONE, new Random(1), null),
+                BlockDrops.resolve(BlockType.STONE, new Random(1), BlockType.WOODEN_PICKAXE));
+    }
 }

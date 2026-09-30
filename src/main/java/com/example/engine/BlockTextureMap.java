@@ -74,6 +74,16 @@ public class BlockTextureMap {
         uniform(BlockType.OAK_SAPLING_STAGE_1, Tile.OAK_SAPLING);
         uniform(BlockType.OAK_SAPLING_STAGE_2, Tile.OAK_SAPLING);
         uniform(BlockType.OAK_SAPLING_STAGE_3, Tile.OAK_SAPLING);
+        uniform(BlockType.STICK, Tile.STICK);
+        uniform(BlockType.WOODEN_PICKAXE, Tile.WOODEN_PICKAXE);
+        uniform(BlockType.STONE_PICKAXE, Tile.STONE_PICKAXE);
+        uniform(BlockType.IRON_PICKAXE, Tile.IRON_PICKAXE);
+        uniform(BlockType.WOODEN_AXE, Tile.WOODEN_AXE);
+        uniform(BlockType.STONE_AXE, Tile.STONE_AXE);
+        uniform(BlockType.IRON_AXE, Tile.IRON_AXE);
+        uniform(BlockType.WOODEN_SHOVEL, Tile.WOODEN_SHOVEL);
+        uniform(BlockType.STONE_SHOVEL, Tile.STONE_SHOVEL);
+        uniform(BlockType.IRON_SHOVEL, Tile.IRON_SHOVEL);
     }
 
     private void uniform(BlockType type, Tile tile) {
