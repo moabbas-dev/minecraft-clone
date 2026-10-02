@@ -29,7 +29,7 @@ public final class ToolEffectiveness {
     private ToolEffectiveness() {
     }
 
-    public enum Kind {PICKAXE, AXE, SHOVEL}
+    public enum Kind {PICKAXE, AXE, SHOVEL, SWORD}
 
     /** speedMultiplier applies only when a tool's Kind matches {@link #correctKindFor}; harvestLevel
      *  is compared against {@link #requiredHarvestLevel} for the 4 gated ores. */
@@ -60,6 +60,11 @@ public final class ToolEffectiveness {
         TOOLS.put(BlockType.WOODEN_SHOVEL, new ToolInfo(Kind.SHOVEL, Tier.WOOD));
         TOOLS.put(BlockType.STONE_SHOVEL, new ToolInfo(Kind.SHOVEL, Tier.STONE));
         TOOLS.put(BlockType.IRON_SHOVEL, new ToolInfo(Kind.SHOVEL, Tier.IRON));
+        // Swords: real items with their own combat stats (see com.example.combat); correctKindFor
+        // never returns SWORD, so they mine at bare-hand speed - a sword is not a mining tool here.
+        TOOLS.put(BlockType.WOODEN_SWORD, new ToolInfo(Kind.SWORD, Tier.WOOD));
+        TOOLS.put(BlockType.STONE_SWORD, new ToolInfo(Kind.SWORD, Tier.STONE));
+        TOOLS.put(BlockType.IRON_SWORD, new ToolInfo(Kind.SWORD, Tier.IRON));
     }
 
     /** Blocks a pickaxe speeds up. Ore/stone/stone-derived blocks - real vanilla's own pickaxe list,

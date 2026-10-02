@@ -112,9 +112,19 @@ public interface GameAccess {
      *  in-game. */
     void setHunger(float foodLevel, float saturation, float exhaustion);
 
+    /** One player attack click (swing at the mob in the crosshair, or the air) through the real attack path. */
+    void attack();
+
     /** Spawns a zombie standing at (x, y, z) through the real spawn path (cap applies).
      *  @throws IllegalStateException when not in-game or the mob cap is reached. */
     void spawnZombie(float x, float y, float z);
+
+    /** Spawns a mob by type id (zombie, pig, cow, chicken) at (x, y, z).
+     *  @throws IllegalStateException when not in-game, the type is unknown, or the cap is reached. */
+    default void spawnMob(String type, float x, float y, float z) {
+        if (!"zombie".equals(type)) throw new IllegalStateException("unsupported mob type: " + type);
+        spawnZombie(x, y, z);
+    }
 
     /** Turns the natural mob spawner on/off (tests want deterministic, manually placed mobs). */
     void setMobSpawning(boolean enabled);

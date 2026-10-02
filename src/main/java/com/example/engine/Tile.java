@@ -42,5 +42,10 @@ public enum Tile {
     /** Sickly green mob "skin" tile - no real Mojang mob textures exist in this project (see
      *  the tools/food tiles above for the same situation), so every zombie body box is this one
      *  flat procedural color. */
-    ZOMBIE_SKIN
+    ZOMBIE_SKIN,
+
+    // Combat milestone item icons.
+    WOODEN_SWORD, STONE_SWORD, IRON_SWORD, LEATHER, FEATHER, EGG, LEATHER_HELMET, LEATHER_CHESTPLATE, LEATHER_LEGGINGS, LEATHER_BOOTS, IRON_HELMET, IRON_CHESTPLATE, IRON_LEGGINGS, IRON_BOOTS, GOLD_HELMET, GOLD_CHESTPLATE, GOLD_LEGGINGS, GOLD_BOOTS,
+    /** Procedural flat mob skins (no real mob textures are bundled). */
+    PIG_SKIN, COW_SKIN, CHICKEN_SKIN, CHICKEN_BEAK
 }

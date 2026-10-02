@@ -64,6 +64,10 @@ public final class Recipes {
         return new Recipe(rows, Map.of('H', only(headMaterial), 'S', only(BlockType.STICK)), result);
     }
 
+    private static Recipe armorRecipe(String[] rows, BlockType material, BlockType result) {
+        return new Recipe(rows, Map.of('H', only(material)), new ItemStack(result, 1));
+    }
+
     private static final List<Recipe> ALL = List.of(
             // Any log species -> oak planks (the only planks block that exists yet).
             new Recipe(new String[]{"L"}, Map.of('L', Recipes::isLog), new ItemStack(BlockType.OAK_PLANKS, 4)),
@@ -85,6 +89,25 @@ public final class Recipes {
             tool(new String[]{"HH", "HS", ".S"}, BlockType.IRON_INGOT, new ItemStack(BlockType.IRON_AXE, 1)),
             tool(new String[]{"HH", "SH", "S."}, BlockType.IRON_INGOT, new ItemStack(BlockType.IRON_AXE, 1)),
             tool(new String[]{"H", "S", "S"}, BlockType.IRON_INGOT, new ItemStack(BlockType.IRON_SHOVEL, 1)),
+
+            // Swords: two material items above one stick (research: melee-combat.md).
+            tool(new String[]{"H", "H", "S"}, BlockType.OAK_PLANKS, new ItemStack(BlockType.WOODEN_SWORD, 1)),
+            tool(new String[]{"H", "H", "S"}, BlockType.COBBLESTONE, new ItemStack(BlockType.STONE_SWORD, 1)),
+            tool(new String[]{"H", "H", "S"}, BlockType.IRON_INGOT, new ItemStack(BlockType.IRON_SWORD, 1)),
+
+            // Armor: 5 / 8 / 7 / 4 units of one material (leather, iron ingot, gold ingot).
+            armorRecipe(new String[]{"HHH", "H.H"}, BlockType.LEATHER, BlockType.LEATHER_HELMET),
+            armorRecipe(new String[]{"H.H", "HHH", "HHH"}, BlockType.LEATHER, BlockType.LEATHER_CHESTPLATE),
+            armorRecipe(new String[]{"HHH", "H.H", "H.H"}, BlockType.LEATHER, BlockType.LEATHER_LEGGINGS),
+            armorRecipe(new String[]{"H.H", "H.H"}, BlockType.LEATHER, BlockType.LEATHER_BOOTS),
+            armorRecipe(new String[]{"HHH", "H.H"}, BlockType.IRON_INGOT, BlockType.IRON_HELMET),
+            armorRecipe(new String[]{"H.H", "HHH", "HHH"}, BlockType.IRON_INGOT, BlockType.IRON_CHESTPLATE),
+            armorRecipe(new String[]{"HHH", "H.H", "H.H"}, BlockType.IRON_INGOT, BlockType.IRON_LEGGINGS),
+            armorRecipe(new String[]{"H.H", "H.H"}, BlockType.IRON_INGOT, BlockType.IRON_BOOTS),
+            armorRecipe(new String[]{"HHH", "H.H"}, BlockType.GOLD_INGOT, BlockType.GOLD_HELMET),
+            armorRecipe(new String[]{"H.H", "HHH", "HHH"}, BlockType.GOLD_INGOT, BlockType.GOLD_CHESTPLATE),
+            armorRecipe(new String[]{"HHH", "H.H", "H.H"}, BlockType.GOLD_INGOT, BlockType.GOLD_LEGGINGS),
+            armorRecipe(new String[]{"H.H", "H.H"}, BlockType.GOLD_INGOT, BlockType.GOLD_BOOTS),
 
             // Blast Furnace: 3 iron ingots on top, iron-furnace-iron in the middle, 3 smooth
             // stone on the bottom - the request's own exact vanilla shape.

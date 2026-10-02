@@ -22,15 +22,23 @@ public class ItemEntity {
     /** Seconds after spawn before the item can be picked up. */
     @Getter
     final float pickupDelay;
+    /** Spent durability carried by a dropped tool/armor piece. */
+    @Getter
+    final int damage;
     @Getter
     boolean alive = true;
     @Getter
     boolean onGround = false;
 
     ItemEntity(BlockType type, int count, float pickupDelay) {
+        this(type, count, pickupDelay, 0);
+    }
+
+    ItemEntity(BlockType type, int count, float pickupDelay, int damage) {
         this.type = type;
         this.count = count;
         this.pickupDelay = pickupDelay;
+        this.damage = damage;
     }
 
     void addCount(int amount) {

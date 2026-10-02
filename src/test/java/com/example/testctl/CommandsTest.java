@@ -154,6 +154,13 @@ class CommandsTest {
             closeCalls++;
         }
 
+        int attacks;
+
+        @Override
+        public void attack() {
+            attacks++;
+        }
+
         int[] clicked;
 
         @Override
@@ -560,6 +567,12 @@ class CommandsTest {
         assertEquals(400, commands.execute("advanceSimulationTicks", params()).status());
         fake.throwOnAdvanceTicks = true;
         assertEquals(400, commands.execute("advanceSimulationTicks", params("ticks", "1")).status());
+    }
+
+    @Test
+    void attackCommandDispatches() {
+        assertEquals(200, commands.execute("attack", params()).status());
+        assertEquals(1, fake.attacks);
     }
 
     @Test

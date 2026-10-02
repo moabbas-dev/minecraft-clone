@@ -44,7 +44,7 @@ public class MobSpawner {
         timer -= dt;
         if (timer > 0f) return;
         timer = ATTEMPT_INTERVAL_SECONDS;
-        if (mobs.countAlive() >= MAX_ZOMBIES) return;
+        if (mobs.countAliveHostile() >= MAX_ZOMBIES) return;
 
         double angle = random.nextDouble() * Math.PI * 2;
         float dist = MIN_DISTANCE + random.nextFloat() * (MAX_DISTANCE - MIN_DISTANCE);
@@ -60,7 +60,12 @@ public class MobSpawner {
 
     /** Standable Y near the player's own height (bounded vertical scan, not the whole column). */
     public static Integer findSpawnY(World world, int x, int z, int nearY) {
-        int lo = Math.max(1, nearY - 8), hi = Math.min(Chunk.SIZE_Y - 3, nearY + 8);
+        return findSpawnY(world, x, z, nearY, 8);
+    }
+
+    /** Same, scanning {@code range} blocks above and below {@code nearY}. */
+    public static Integer findSpawnY(World world, int x, int z, int nearY, int range) {
+        int lo = Math.max(1, nearY - range), hi = Math.min(Chunk.SIZE_Y - 3, nearY + range);
         for (int y = hi; y >= lo; y--) {
             if (world.isSolidCollision(x, y - 1, z) && !world.isSolidCollision(x, y, z) && !world.isSolidCollision(x, y + 1, z)) {
                 return y;

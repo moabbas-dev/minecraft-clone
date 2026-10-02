@@ -24,6 +24,8 @@ public class HealthComponent {
     @Getter
     private boolean dead;
     private float hurtCooldown;
+    /** Damage recorded by the hit that started the current hurt window (vanilla lastHurt). */
+    private float lastDamage;
 
     public HealthComponent() {
         this(DEFAULT_MAX_HEALTH);
@@ -60,9 +62,19 @@ public class HealthComponent {
      *         rule) should gate on this, not assume every call landed.
      */
     public boolean damage(float amount, DamageSource source) {
-        if (dead || amount <= 0f || hurtCooldown > 0f) return false;
-        currentHealth = Math.max(0f, currentHealth - amount);
-        hurtCooldown = HURT_COOLDOWN_SECONDS;
+        if (dead || amount <= 0f) return false;
+        if (hurtCooldown > 0f) {
+            // Vanilla rule: during the 10-tick window a hit no bigger than the one that started it does
+            // nothing; a bigger hit applies only the EXCESS and does not restart the window.
+            if (amount <= lastDamage) return false;
+            float excess = amount - lastDamage;
+            lastDamage = amount;
+            currentHealth = Math.max(0f, currentHealth - excess);
+        } else {
+            currentHealth = Math.max(0f, currentHealth - amount);
+            hurtCooldown = HURT_COOLDOWN_SECONDS;
+            lastDamage = amount;
+        }
         if (currentHealth <= 0f) dead = true;
         return true;
     }
@@ -88,5 +100,6 @@ public class HealthComponent {
         currentHealth = maxHealth;
         dead = false;
         hurtCooldown = 0f;
+        lastDamage = 0f;
     }
 }

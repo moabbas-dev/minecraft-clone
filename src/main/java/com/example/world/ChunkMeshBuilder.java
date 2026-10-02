@@ -260,7 +260,8 @@ public class ChunkMeshBuilder {
      *  food) - see BlockType's own docs on the cooking/smelting milestone. */
     private static final java.util.Set<BlockType> SMELTING_ITEMS = java.util.EnumSet.of(
             BlockType.COAL, BlockType.CHARCOAL, BlockType.IRON_INGOT, BlockType.GOLD_INGOT, BlockType.COPPER_INGOT,
-            BlockType.IRON_NUGGET, BlockType.BRICK, BlockType.RAW_IRON, BlockType.RAW_GOLD, BlockType.RAW_COPPER);
+            BlockType.IRON_NUGGET, BlockType.BRICK, BlockType.RAW_IRON, BlockType.RAW_GOLD, BlockType.RAW_COPPER,
+            BlockType.LEATHER, BlockType.FEATHER, BlockType.EGG, BlockType.LEATHER_HELMET, BlockType.LEATHER_CHESTPLATE, BlockType.LEATHER_LEGGINGS, BlockType.LEATHER_BOOTS, BlockType.IRON_HELMET, BlockType.IRON_CHESTPLATE, BlockType.IRON_LEGGINGS, BlockType.IRON_BOOTS, BlockType.GOLD_HELMET, BlockType.GOLD_CHESTPLATE, BlockType.GOLD_LEGGINGS, BlockType.GOLD_BOOTS);
 
     public static boolean isFlatIconItem(BlockType type) {
         return isCrossShapedPlant(type) || ToolEffectiveness.isTool(type) || FoodRegistry.isFood(type)

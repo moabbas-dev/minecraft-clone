@@ -191,13 +191,17 @@ public class Game implements GameAccess {
     private float swingTimer = 0f;
     private final MobManager mobs = new MobManager();
     private final MobSpawner mobSpawner = new MobSpawner();
+    private final com.example.entity.PassiveSpawner passiveSpawner = new com.example.entity.PassiveSpawner();
     private final PlayerTargetAdapter playerTarget = new PlayerTargetAdapter();
     private final java.util.List<Targetable> mobTargets = java.util.List.of(playerTarget);
     private Mesh mobMesh;
     private final float[] mobScratch = new float[MobManager.MAX_MOBS * MobModelBuilder.FLOATS_PER_MOB];
-    private float playerAttackCooldown = 0f;
-    private static final float PLAYER_ATTACK_DAMAGE = 2f;
-    private static final float PLAYER_ATTACK_COOLDOWN_SECONDS = 0.5f;
+    /** Vanilla survival reach for hitting entities (blocks use REACH_DISTANCE). */
+    private static final float ENTITY_REACH = 3.0f;
+    /** Seconds since the last attack swing or held-item change (drives the 1.9+ attack charge). */
+    private float attackTimer = 10f;
+    private BlockType lastHeldType;
+    private int forcedAttackPresses;
     private boolean debugOverlay = false;
     /** 0=surface fog, 1=fully underwater fog - eased, see renderWorld. */
     private float underwaterBlend = 0f;
@@ -477,6 +481,16 @@ public class Game implements GameAccess {
             WorldIO.SurvivalSnapshot s = meta.survival();
             survival.loadState(s.health(), s.foodLevel(), s.saturation(), s.exhaustion());
         }
+        WorldIO.loadArmor(dir, survival.getArmor());
+        for (WorldIO.MobSnapshot ms : WorldIO.loadMobs(dir)) {
+            Mob m = com.example.entity.mob.MobTypes.create(ms.type(), new Vector3f(ms.x(), ms.y(), ms.z()), ms.yaw(),
+                    () -> survival.getDifficulty());
+            if (m == null) continue;
+            m.getHealth().setHealth(ms.health());
+            m.restoreExtraState(ms.extra());
+            m.velocity.set(ms.vx(), ms.vy(), ms.vz());
+            mobs.spawn(m);
+        }
         weather = new Weather(meta.seed());
         initRainParticles();
 
@@ -509,6 +523,14 @@ public class Game implements GameAccess {
             if (c.isGenerated()) WorldIO.saveChunk(dir, c);
         }
         WorldIO.saveCookingStations(dir, toWorldIoSnapshots(cookingStations.snapshotAll()));
+        List<WorldIO.MobSnapshot> savedMobs = new java.util.ArrayList<>();
+        for (Mob m : mobs.mobs()) {
+            if (!m.isPersistent() || !m.isAlive()) continue;
+            savedMobs.add(new WorldIO.MobSnapshot(m.typeId(), m.position.x, m.position.y, m.position.z, m.getYaw(),
+                    m.getHealth().getCurrentHealth(), m.extraState(), m.velocity.x, m.velocity.y, m.velocity.z));
+        }
+        WorldIO.saveMobs(dir, savedMobs);
+        WorldIO.saveArmor(dir, survival.getArmor());
     }
 
     /** These two conversions exist purely because {@code world.WorldIO} deliberately doesn't
@@ -700,7 +722,12 @@ public class Game implements GameAccess {
         float targetFov = options.fov + (player.isSprinting() ? SPRINT_FOV_BOOST : 0f);
         currentFov += (targetFov - currentFov) * Math.min(1f, FOV_LERP_RATE * dt);
         if (swingTimer > 0f) swingTimer = Math.max(0f, swingTimer - dt);
-        if (playerAttackCooldown > 0f) playerAttackCooldown = Math.max(0f, playerAttackCooldown - dt);
+        attackTimer += dt;
+        BlockType heldNow = inventory.selected().isEmpty() ? null : inventory.selected().type();
+        if (heldNow != lastHeldType) {
+            lastHeldType = heldNow;
+            attackTimer = 0f; // switching items restarts the attack cooldown, as in vanilla
+        }
 
         dayTime += dt / DAY_LENGTH_SECONDS;
         dayTime -= (float) Math.floor(dayTime);
@@ -759,6 +786,9 @@ public class Game implements GameAccess {
                     Chunk c = world.getOrCreateChunk(cx, cz);
                     world.generateChunk(c); // biome climate sampling + height noise + block fill
                     saplingGrowth.registerChunk(c); // picks up any saplings this chunk had saved
+                    if (c.isFreshlyGenerated() && mobSpawner.isEnabled()) {
+                        com.example.entity.PassiveSpawner.spawnForNewChunk(world, mobs, c, gameplayRandom);
+                    }
                     generated++;
                     // Check the deadline only AFTER doing a chunk of work, never before, so a
                     // frame is always guaranteed to make forward progress even if a single
@@ -923,6 +953,10 @@ public class Game implements GameAccess {
         if (survival.getHealth().isDead()) return;
 
         boolean leftPressed = input.consumeMousePressed(GLFW_MOUSE_BUTTON_LEFT);
+        if (forcedAttackPresses > 0) {
+            forcedAttackPresses--;
+            leftPressed = true;
+        }
         if (leftPressed) {
             swingTimer = SWING_DURATION; // swings even on a whiff, matching vanilla's air-punch
         }
@@ -935,19 +969,19 @@ public class Game implements GameAccess {
 
         // Entity targeting: a mob nearer than any block hit is what the click is aimed at -
         // attack it (cooldown-gated, via the shared damage pipeline) instead of mining.
-        float blockDist = hit == null ? Float.MAX_VALUE
-                : eye.distance(hit.x() + 0.5f, hit.y() + 0.5f, hit.z() + 0.5f);
+        float blockDist = hit == null ? Float.MAX_VALUE : MobManager.rayBoxDistance(eye, dir,
+                new float[]{hit.x(), hit.y(), hit.z()}, new float[]{hit.x() + 1f, hit.y() + 1f, hit.z() + 1f});
         float[] mobDist = new float[1];
-        Mob targetedMob = mobs.raycast(eye, dir, REACH_DISTANCE, mobDist);
-        if (targetedMob != null && mobDist[0] <= blockDist) {
+        Mob targetedMob = mobs.raycast(eye, dir, ENTITY_REACH, mobDist);
+        // A strictly nearer entity wins the crosshair; at equal distance the block keeps it.
+        boolean aimingAtMob = targetedMob != null && mobDist[0] < blockDist;
+        if (aimingAtMob) {
             mining.cancel();
-            if ((leftPressed || attackHeld) && playerAttackCooldown <= 0f) {
-                playerAttackCooldown = PLAYER_ATTACK_COOLDOWN_SECONDS;
-                swingTimer = SWING_DURATION;
-                targetedMob.damage(PLAYER_ATTACK_DAMAGE, com.example.survival.DamageSource.PLAYER);
-            }
             attackHeld = false;
         }
+        // A click on a mob or on empty air is an attack swing (and restarts the cooldown); a click on a
+        // block is mining and leaves the cooldown alone.
+        if (leftPressed && (aimingAtMob || hit == null)) performPlayerAttack(aimingAtMob ? targetedMob : null);
         MiningController.Result mined = mining.tick(world, hit, attackHeld, dt, inventory.selected().type());
         if (mined.mining() && swingTimer <= 0f) {
             swingTimer = SWING_DURATION; // repeat the punch while actively mining
@@ -963,7 +997,10 @@ public class Game implements GameAccess {
         if (use) {
             ItemStack held = inventory.selected();
             FoodProperties food = held.isEmpty() ? null : FoodRegistry.propertiesFor(held.type());
-            if (food != null) {
+            if (com.example.inventory.PlayerArmor.canEquip(held)) {
+                // Right-click equips armor from the hotbar, swapping with whatever is worn in that slot.
+                inventory.set(inventory.getSelectedSlot(), survival.getArmor().equip(held));
+            } else if (food != null) {
                 tryEat(held.type());
             } else if (hit != null) {
                 // Using a crafting table opens the 3x3 crafting screen instead of placing a block
@@ -988,6 +1025,42 @@ public class Game implements GameAccess {
         }
     }
 
+    /** One player melee swing: charge, crit/sprint/sweep rules, damage through the shared pipeline,
+     *  knockback along the player's facing, and durability. {@code target} is null for an air swing. */
+    private void performPlayerAttack(Mob target) {
+        ItemStack held = inventory.selected();
+        BlockType heldType = held.isEmpty() ? null : held.type();
+        float charge = com.example.combat.CombatMath.charge(attackTimer * 20f, com.example.combat.WeaponStats.periodTicks(heldType));
+        attackTimer = 0f;
+        swingTimer = SWING_DURATION;
+        if (target == null) return;
+        boolean sprintHit = com.example.combat.CombatMath.isSprintHit(charge, player.isSprinting());
+        boolean crit = com.example.combat.CombatMath.isCritical(charge, player.isOnGround(), player.getVerticalVelocity(),
+                player.isSwimming(), player.isFlying(), sprintHit);
+        float damage = com.example.combat.CombatMath.attackDamage(heldType, charge, crit);
+        Vector3f front = player.frontVector();
+        // Vanilla pushes the victim along the attacker's facing, i.e. away from a point behind the target.
+        Vector3f pushFrom = new Vector3f(target.position.x - front.x, 0f, target.position.z - front.z);
+        boolean applied = target.hurtBy(damage, com.example.survival.DamageSource.PLAYER, pushFrom,
+                com.example.combat.CombatMath.knockbackStrength(sprintHit));
+        if (!applied) return; // a hit swallowed by the hurt window spends no durability
+        damageSelectedItem(com.example.combat.Durability.attackCost(heldType));
+        if (com.example.combat.CombatMath.isSweep(heldType, charge, player.isOnGround(), crit, sprintHit)) {
+            for (Mob other : mobs.sweepTargets(target, player.position)) {
+                other.hurtBy(com.example.combat.CombatMath.SWEEP_DAMAGE, com.example.survival.DamageSource.PLAYER, pushFrom,
+                        com.example.combat.CombatMath.BASE_KNOCKBACK * com.example.combat.CombatMath.SWEEP_KNOCKBACK_FACTOR);
+            }
+        }
+    }
+
+    /** Spends durability on the selected hotbar item; a broken item disappears. */
+    private void damageSelectedItem(int uses) {
+        if (uses <= 0) return;
+        int slot = inventory.getSelectedSlot();
+        ItemStack s = inventory.get(slot);
+        if (!s.isEmpty()) inventory.set(slot, s.damaged(uses));
+    }
+
     /** Eats one unit of the given food type from the selected hotbar slot - instant (no
      *  eating-duration animation/timer exists in this project yet, so a single right-click
      *  consumes it immediately; the existing consumeMousePressed edge-trigger already prevents
@@ -1003,7 +1076,7 @@ public class Game implements GameAccess {
 
     private void openInventory(int gridSize) {
         if (state != GameState.IN_GAME) throw new IllegalStateException("not in game");
-        menu = new InventoryMenu(inventory, gridSize);
+        menu = new InventoryMenu(inventory, survival.getArmor(), gridSize);
         mining.cancel();
         state = GameState.INVENTORY;
         window.releaseMouse();
@@ -1047,7 +1120,7 @@ public class Game implements GameAccess {
     /** Spawns a stack as dropped item entities just in front of the player. */
     private void dropIntoWorld(ItemStack stack) {
         Vector3f at = player.eyePosition().add(player.frontVector().mul(0.8f));
-        itemEntities.spawn(stack.type(), stack.count(), at, gameplayRandom);
+        itemEntities.spawn(stack.type(), stack.count(), stack.damage(), at, gameplayRandom);
     }
 
     private void renderInventoryScreen() {
@@ -1070,6 +1143,7 @@ public class Game implements GameAccess {
         for (int s = 0; s < Inventory.DEFAULT_SLOT_COUNT; s++) drawMenuSlot(layout, s, hovered);
         for (int i = 0; i < menu.getGridSize() * menu.getGridSize(); i++) drawMenuSlot(layout, InventoryMenu.GRID_BASE + i, hovered);
         drawMenuSlot(layout, InventoryMenu.RESULT_SLOT, hovered);
+        for (int i = 0; i < 4; i++) drawMenuSlot(layout, InventoryMenu.ARMOR_BASE + i, hovered);
 
         ItemStack held = menu.getCursor();
         if (!held.isEmpty()) {
@@ -1097,6 +1171,7 @@ public class Game implements GameAccess {
         if (!stack.isEmpty()) {
             drawBlockIcon(stack.type(), r.x(), r.y(), r.w());
             if (stack.count() > 1) drawStackCount(stack.count(), r.x(), r.y(), r.w());
+            drawDurabilityBar(stack, r.x(), r.y(), r.w());
         }
         if (slot == hovered) uiRenderer.drawColorQuad(r.x(), r.y(), r.w(), r.h(), 1f, 1f, 1f, 0.28f);
     }
@@ -1245,6 +1320,8 @@ public class Game implements GameAccess {
      *  lose them - and the purely cosmetic burst is isolated so a failure there can't affect the rest. */
     private void onBlockBroken(MiningController.Result r) {
         survival.onBlockBroken();
+        ItemStack heldTool = inventory.selected();
+        if (!heldTool.isEmpty()) damageSelectedItem(com.example.combat.Durability.blockBreakCost(heldTool.type(), r.brokenType().hardness));
         Vector3f center = new Vector3f(r.x() + 0.5f, r.y() + 0.5f, r.z() + 0.5f);
         gameAudio.playDig(r.brokenType(), center);
         for (BlockDrops.Resolved drop : r.drops()) {
@@ -1256,7 +1333,7 @@ public class Game implements GameAccess {
             CookingStationState broken = cookingStations.remove(r.x(), r.y(), r.z());
             if (broken != null) {
                 for (ItemStack contents : broken.contents()) {
-                    itemEntities.spawn(contents.type(), contents.count(), center, gameplayRandom);
+                    itemEntities.spawn(contents.type(), contents.count(), contents.damage(), center, gameplayRandom);
                 }
             }
         }
@@ -1275,7 +1352,9 @@ public class Game implements GameAccess {
         playerTarget.bind(player, survival);
         mobSpawner.tick(world, mobs, player.position, computeDaylightFactor(sunDirection(dayTime)),
                 () -> survival.getDifficulty(), gameplayRandom, dt);
+        passiveSpawner.tick(world, mobs, player.position, computeDaylightFactor(sunDirection(dayTime)), gameplayRandom, dt);
         mobs.tick(world, mobTargets, player.position, itemEntities, gameplayRandom, dt);
+        survival.addExperience(mobs.drainExperience());
         itemEntities.update(world, dt);
         if (itemEntities.collect(player.position, inventory) > 0) gameAudio.playPickup();
         particles.update(dt);
@@ -1511,16 +1590,28 @@ public class Game implements GameAccess {
     private void renderMobs() {
         java.util.List<Mob> list = mobs.mobs();
         if (list.isEmpty()) return;
-        float[] uv = atlas.getUv(com.example.engine.Tile.ZOMBIE_SKIN);
+        float[] zombieUv = atlas.getUv(com.example.engine.Tile.ZOMBIE_SKIN);
+        float[] pigUv = atlas.getUv(com.example.engine.Tile.PIG_SKIN);
+        float[] cowUv = atlas.getUv(com.example.engine.Tile.COW_SKIN);
+        float[] chickenUv = atlas.getUv(com.example.engine.Tile.CHICKEN_SKIN);
+        float[] beakUv = atlas.getUv(com.example.engine.Tile.CHICKEN_BEAK);
         int n = 0;
         for (Mob m : list) {
+            if (n + MobModelBuilder.FLOATS_PER_MOB > mobScratch.length) break;
             int bx = (int) Math.floor(m.position.x), by = (int) Math.floor(m.position.y + 1f), bz = (int) Math.floor(m.position.z);
             float sky = world.getSkyLight(bx, by, bz) / 15f, blk = world.getBlockLight(bx, by, bz) / 15f;
             float[] tint = m.getHurtTime() > 0f || !m.isAlive() ? new float[]{1.6f, 0.5f, 0.5f} : NEUTRAL_ICON_TINT;
+            float tilt = m.isAlive() ? 0f : (float) (Math.PI / 2) * Math.min(1f, m.getDeathTime());
             float yaw = m.getYaw();
             float px = m.position.x, py = m.position.y, pz = m.position.z;
-            if (!m.isAlive()) py -= 0.0f; // corpse simply tints red until removed
-            n = MobModelBuilder.emitZombie(mobScratch, n, px, py, pz, yaw, m.getWalkPhase(), m.getWalkAmount(), uv, sky, blk, tint);
+            float walk = m.getWalkPhase(), amt = m.getWalkAmount();
+            switch (m.typeId()) {
+                case "pig" -> n = MobModelBuilder.emitPig(mobScratch, n, px, py, pz, yaw, tilt, walk, amt, pigUv, sky, blk, tint);
+                case "cow" -> n = MobModelBuilder.emitCow(mobScratch, n, px, py, pz, yaw, tilt, walk, amt, cowUv, sky, blk, tint);
+                case "chicken" -> n = MobModelBuilder.emitChicken(mobScratch, n, px, py, pz, yaw, tilt, walk, amt,
+                        !m.isOnGround(), chickenUv, beakUv, sky, blk, tint);
+                default -> n = MobModelBuilder.emitZombie(mobScratch, n, px, py, pz, yaw, tilt, walk, amt, zombieUv, sky, blk, tint);
+            }
         }
         mobMesh.upload(mobScratch, n);
         chunkShader.setUniform("uModel", IDENTITY);
@@ -1652,12 +1743,11 @@ public class Game implements GameAccess {
     private float[] buildFlatItemHeldVerts(BlockType block) {
         float[] uv = atlas.getUv(textureMap.facesFor(block).side());
         float[] mirrored = {uv[2], uv[1], uv[0], uv[3]};
-        float[] verts = new float[2 * 6 * 11];
-        int idx = 0;
-        idx = emitCubeFace(verts, idx, new float[]{-0.5f, -0.5f, 0f}, new float[]{0.5f, -0.5f, 0f},
+        float[] verts = new float[6 * 11];
+        // Front face only: a second, back-facing copy showed through the sprite's transparent pixels
+        // as a ghost of the item flipped horizontally.
+        emitCubeFace(verts, 0, new float[]{-0.5f, -0.5f, 0f}, new float[]{0.5f, -0.5f, 0f},
                 new float[]{0.5f, 0.5f, 0f}, new float[]{-0.5f, 0.5f, 0f}, mirrored, 1f, NEUTRAL_ICON_TINT);
-        idx = emitCubeFace(verts, idx, new float[]{0.5f, -0.5f, -0.004f}, new float[]{-0.5f, -0.5f, -0.004f},
-                new float[]{-0.5f, 0.5f, -0.004f}, new float[]{0.5f, 0.5f, -0.004f}, mirrored, 0.8f, NEUTRAL_ICON_TINT); // offset: coplanar faces would z-fight
         return verts;
     }
 
@@ -1959,6 +2049,17 @@ public class Game implements GameAccess {
             else if (fv >= 0.5f) HudTextures.draw(uiRenderer, t.foodHalf, fx, heartsY, s);
         }
 
+        int defense = survival.getArmor().totalDefense();
+        if (defense > 0 && t.armorEmpty != null) {
+            for (int i = 0; i < 10; i++) {
+                float x = hx + i * 8 * s, ay = heartsY - 10 * s;
+                HudTextures.draw(uiRenderer, t.armorEmpty, x, ay, s);
+                int v = defense - i * 2;
+                if (v >= 2) HudTextures.draw(uiRenderer, t.armorFull, x, ay, s);
+                else if (v == 1) HudTextures.draw(uiRenderer, t.armorHalf, x, ay, s);
+            }
+        }
+
         int sel = inventory.getSelectedSlot();
         for (int i = 0; i < 9; i++) {
             ItemStack stack = inventory.get(i);
@@ -1966,6 +2067,7 @@ public class Game implements GameAccess {
             float ix = hx + (3 + 20 * i) * s, iy = hy + 3 * s;
             drawBlockIcon(stack.type(), ix, iy, 16 * s);
             if (stack.count() > 1) drawStackCount(stack.count(), ix, iy, 16 * s);
+            drawDurabilityBar(stack, ix, iy, 16 * s);
         }
         HudTextures.draw(uiRenderer, t.hotbarSelection, hx - s + 20 * sel * s, hy - s, s);
         drawHotbarLabel(hx + (3 + 20 * sel) * s, heartsY - 4 * s, 16 * s);
@@ -1998,6 +2100,18 @@ public class Game implements GameAccess {
         if (value <= 0f) return;
         float fillWidth = size * (value / 2f);
         uiRenderer.drawColorQuad(x, y, fillWidth, size, fr, fg, fb, 1f);
+    }
+
+    /** Vanilla durability bar: 13x2 of a 16-unit icon, green to red, only once the item has been used. */
+    private void drawDurabilityBar(ItemStack stack, float slotX, float slotY, float slotSize) {
+        if (stack.isEmpty() || stack.damage() <= 0) return;
+        int max = com.example.combat.Durability.max(stack.type());
+        if (max <= 0) return;
+        float ratio = Math.max(0f, Math.min(1f, stack.durabilityLeft() / (float) max));
+        float u = slotSize / 16f;
+        float bx = slotX + 2 * u, by = slotY + 13 * u;
+        uiRenderer.drawColorQuad(bx, by, 13 * u, 2 * u, 0f, 0f, 0f, 1f);
+        uiRenderer.drawColorQuad(bx, by, 13 * u * ratio, u, 1f - ratio, ratio, 0.1f, 1f);
     }
 
     /** Quantity in the slot's bottom-right corner, with a dark drop shadow so it reads over any icon. */
@@ -2362,6 +2476,11 @@ public class Game implements GameAccess {
     }
 
     @Override
+    public void attack() {
+        forcedAttackPresses++;
+    }
+
+    @Override
     public void spawnZombie(float x, float y, float z) {
         if (world == null) throw new IllegalStateException("no active world");
         if (!mobs.spawn(new Zombie(new Vector3f(x, y, z), 0f, () -> survival.getDifficulty()))) {
@@ -2370,8 +2489,17 @@ public class Game implements GameAccess {
     }
 
     @Override
+    public void spawnMob(String type, float x, float y, float z) {
+        if (world == null) throw new IllegalStateException("no active world");
+        Mob m = com.example.entity.mob.MobTypes.create(type, new Vector3f(x, y, z), 0f, () -> survival.getDifficulty());
+        if (m == null) throw new IllegalStateException("unknown mob type: " + type);
+        if (!mobs.spawn(m)) throw new IllegalStateException("mob cap reached");
+    }
+
+    @Override
     public void setMobSpawning(boolean enabled) {
         mobSpawner.setEnabled(enabled);
+        passiveSpawner.setEnabled(enabled);
     }
 
     @Override
@@ -2575,6 +2703,17 @@ public class Game implements GameAccess {
             sb.append("cooking.burning=").append(st.isBurning()).append(" burnFraction=").append(st.burnFraction())
                     .append(" cookFraction=").append(st.cookFraction()).append('\n');
         }
+        sb.append("armor.defense=").append(survival.getArmor().totalDefense()).append(" toughness=").append(survival.getArmor().totalToughness());
+        for (com.example.combat.EquipmentSlot es : com.example.combat.EquipmentSlot.values()) {
+            ItemStack worn = survival.getArmor().get(es);
+            sb.append(' ').append(es.name().toLowerCase()).append('=').append(worn.isEmpty() ? "-" : worn.type().name() + "(" + worn.durabilityLeft() + ")");
+        }
+        sb.append("\n");
+        ItemStack selStack = inventory.selected();
+        BlockType selType = selStack.isEmpty() ? null : selStack.type();
+        sb.append("attack.charge=").append(String.format(java.util.Locale.ROOT, "%.2f",
+                com.example.combat.CombatMath.charge(attackTimer * 20f, com.example.combat.WeaponStats.periodTicks(selType))));
+        sb.append(" selected.durabilityLeft=").append(selStack.isEmpty() ? 0 : selStack.durabilityLeft()).append("\n");
         sb.append("survival.experience=").append(survival.getExperience()).append('\n');
         sb.append("mobs.count=").append(mobs.size()).append(" spawning=").append(mobSpawner.isEnabled()).append("\n");
         for (Mob m : mobs.mobs()) {

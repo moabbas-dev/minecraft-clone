@@ -29,6 +29,19 @@ public abstract class Mob extends LivingEntity {
     @Setter
     private Targetable target;
 
+    /** Per-mob random source for AI rolls (strolling, looking around, drops). */
+    @Getter
+    protected final java.util.Random random = new java.util.Random();
+    /** Set by goals each tick (reset to 1 before they run): e.g. panic runs faster. */
+    @Getter
+    @Setter
+    private float speedMultiplier = 1f;
+    private boolean swimUpRequested;
+    /** Duration of the current tick, for frame-rate independent AI rolls (see AiRolls). */
+    @Getter
+    private float lastDt;
+    private static final float TURN_RATE = 12f; // radians per second
+
     private float moveDirX, moveDirZ;
     /** Animation bookkeeping only (renderer reads these): advances while moving. */
     @Getter
@@ -44,6 +57,41 @@ public abstract class Mob extends LivingEntity {
     }
 
     public abstract float getMoveSpeed();
+
+    /** Stable id used in saves ("zombie", "pig", ...). */
+    public abstract String typeId();
+
+    /** Persistent mobs (passive animals) never despawn by distance. */
+    public boolean isPersistent() {
+        return false;
+    }
+
+    /** Per-type save value (e.g. a chicken's egg timer); 0 when the type has none. */
+    public float extraState() {
+        return 0f;
+    }
+
+    public void restoreExtraState(float value) {
+    }
+
+    /** Called every tick while alive, before goals - for per-type timers and physics tweaks. */
+    protected void onTick(World world, float dt) {
+    }
+
+    /** An item this mob produced this tick (a laid egg), consumed by whoever polls it; null if none. */
+    public com.example.world.BlockType takeLaidItem() {
+        return null;
+    }
+
+    /** Asks the physics step to push this mob up out of water this tick (the float goal). */
+    public void requestSwimUp() {
+        swimUpRequested = true;
+    }
+
+    public boolean isInWater(World world) {
+        return world.getBlock((int) Math.floor(position.x), (int) Math.floor(position.y + 0.1f), (int) Math.floor(position.z))
+                == com.example.world.BlockType.WATER;
+    }
 
     /** Drop-handling hook: what this mob yields on death. {@code MobManager} rolls it exactly
      *  once and spawns the result through the existing item-entity system. Default: nothing. */
@@ -90,19 +138,29 @@ public abstract class Mob extends LivingEntity {
         if (!isAlive()) {
             moveDirX = 0f;
             moveDirZ = 0f;
-            return; // dead: no AI, no movement, no attacking - just settle under gravity below
+            moveWithGravity(world, 0f, 0f, dt); // dead: no AI/attacks, but still falls and slides from knockback
+            return;
         }
+        speedMultiplier = 1f;
+        lastDt = dt;
+        onTick(world, dt);
         goals.tick(this, world, candidates, dt);
         applyMovement(world, dt);
     }
 
     private void applyMovement(World world, float dt) {
         if (!Float.isNaN(desiredYaw)) {
-            yaw = desiredYaw;
+            float delta = (float) Math.atan2(Math.sin(desiredYaw - yaw), Math.cos(desiredYaw - yaw));
+            float step = TURN_RATE * dt;
+            yaw += Math.max(-step, Math.min(step, delta));
             desiredYaw = Float.NaN;
         }
-        float dx = moveDirX * getMoveSpeed() * dt;
-        float dz = moveDirZ * getMoveSpeed() * dt;
+        if (swimUpRequested) {
+            velocity.y = Math.max(velocity.y, 2.5f);
+            swimUpRequested = false;
+        }
+        float dx = moveDirX * getMoveSpeed() * speedMultiplier * dt;
+        float dz = moveDirZ * getMoveSpeed() * speedMultiplier * dt;
         if ((dx != 0f || dz != 0f) && isOnGround()
                 && intersectsSolid(world, position.x + dx, position.y, position.z + dz)
                 && canStepUp(world, dx, dz)) {

@@ -67,23 +67,29 @@ public class ItemEntityManager {
      * horizontal spread and upward pop. Merges into a nearby same-type stack when there's room.
      */
     public void spawn(BlockType type, int count, Vector3f center, Random random) {
+        spawn(type, count, 0, center, random);
+    }
+
+    /** Same, for an item carrying {@code damage} spent durability (damageable items never merge). */
+    public void spawn(BlockType type, int count, int damage, Vector3f center, Random random) {
         if (type == null || type == BlockType.AIR || count <= 0) return;
         int remaining = count;
+        int stackMax = com.example.inventory.ItemStack.maxStackFor(type, maxStack);
 
         for (ItemEntity e : entities) {
             if (remaining <= 0) break;
-            if (!e.alive || e.getType() != type || e.getCount() >= maxStack) continue;
+            if (!e.alive || e.getType() != type || e.getDamage() != damage || e.getCount() >= stackMax) continue;
             float dx = e.position.x - center.x, dz = e.position.z - center.z, dy = e.position.y - center.y;
             if (dx * dx + dz * dz > MERGE_RADIUS * MERGE_RADIUS || Math.abs(dy) > 1f) continue;
-            int take = Math.min(remaining, maxStack - e.getCount());
+            int take = Math.min(remaining, stackMax - e.getCount());
             e.addCount(take);
             remaining -= take;
         }
 
         while (remaining > 0) {
-            int stack = Math.min(remaining, maxStack);
+            int stack = Math.min(remaining, stackMax);
             remaining -= stack;
-            ItemEntity e = new ItemEntity(type, stack, PICKUP_DELAY_SECONDS);
+            ItemEntity e = new ItemEntity(type, stack, PICKUP_DELAY_SECONDS, damage);
             e.position.set(center.x, center.y - HEIGHT / 2f, center.z);
             e.velocity.set((random.nextFloat() - 0.5f) * 2.4f, 2.5f + random.nextFloat(), (random.nextFloat() - 0.5f) * 2.4f);
             if (entities.size() >= MAX_ENTITIES) entities.remove(0);
@@ -125,7 +131,7 @@ public class ItemEntityManager {
             if (dx * dx + dz * dz > PICKUP_RADIUS * PICKUP_RADIUS) continue;
             if (dy < -PICKUP_Y_BELOW || dy > PICKUP_Y_ABOVE) continue;
 
-            int added = inventory.add(e.getType(), e.getCount());
+            int added = inventory.add(e.getType(), e.getCount(), e.getDamage());
             if (added > 0) {
                 e.removeCount(added);
                 transfers++;

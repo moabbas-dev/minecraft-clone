@@ -170,3 +170,13 @@ Create New World -> Create (world generated and entered) -> pause -> Options -> 
 from the public `misode/mcmeta` asset mirror into the gitignored `textures/` folder and verified by
 screenshot (hotbar, hearts at partial health, hunger, inventory icons, held items). A missing
 texture falls back to the previous procedural icon / plain HUD, so nothing breaks without them.
+
+**Combat-and-food milestone - live-controller pass performed:** launched with
+`-Dtest.controller=true`; equipped a full iron set by right-click (`armor.defense=15`, armor bar
+on the HUD, a zombie hit for 3 took 1.38 HP); an iron sword did 5.9 damage per fully charged hit
+to a zombie with 2 natural armor and lost 1 durability per swing; `spawnMob` placed a pig, cow
+and chicken (all render with the four-legged / bird models), natural packs appeared on newly
+generated chunks, and killing a cow dropped 2 raw beef and 2 leather and granted 3 XP.
+Unit coverage: `CombatSystemTest` (charge/crit/sweep/knockback/armor math, durability, armor
+slots, recipes) and `PassiveMobTest` (stats, drop ranges, egg timer, mob/armor persistence,
+species weights). Not verified live: save/reload of animals (covered by the `WorldIO` unit test only).

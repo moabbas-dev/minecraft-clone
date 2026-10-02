@@ -26,6 +26,8 @@ public final class HudTextures {
     private static final String DIR = "textures/gui/sprites/hud/";
     private static final float[] FULL_UV = {0f, 0f, 1f, 1f};
 
+    /** Optional: null when the armor sprites are missing (the armor bar is then simply not drawn). */
+    public Sprite armorEmpty, armorHalf, armorFull;
     public final Sprite hotbar, hotbarSelection, heartContainer, heartFull, heartHalf, foodEmpty, foodFull, foodHalf;
 
     private HudTextures(Sprite hotbar, Sprite hotbarSelection, Sprite heartContainer, Sprite heartFull, Sprite heartHalf,
@@ -42,10 +44,18 @@ public final class HudTextures {
 
     public static HudTextures loadOrNull() {
         try {
-            return new HudTextures(
+            HudTextures t = new HudTextures(
                     load("hotbar.png"), load("hotbar_selection.png"),
                     load("heart/container.png"), load("heart/full.png"), load("heart/half.png"),
                     load("food_empty.png"), load("food_full.png"), load("food_half.png"));
+            try {
+                t.armorEmpty = load("armor_empty.png");
+                t.armorHalf = load("armor_half.png");
+                t.armorFull = load("armor_full.png");
+            } catch (IOException | RuntimeException e) {
+                t.armorEmpty = t.armorHalf = t.armorFull = null;
+            }
+            return t;
         } catch (IOException | RuntimeException e) {
             log.info("Real HUD sprites not available ({}) - using the plain HUD", e.getMessage());
             return null;

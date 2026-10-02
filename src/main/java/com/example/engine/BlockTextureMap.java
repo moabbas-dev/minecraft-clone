@@ -123,6 +123,24 @@ public class BlockTextureMap {
 
         // Mob-system milestone.
         uniform(BlockType.ROTTEN_FLESH, Tile.ROTTEN_FLESH);
+        uniform(BlockType.WOODEN_SWORD, Tile.WOODEN_SWORD);
+        uniform(BlockType.STONE_SWORD, Tile.STONE_SWORD);
+        uniform(BlockType.IRON_SWORD, Tile.IRON_SWORD);
+        uniform(BlockType.LEATHER, Tile.LEATHER);
+        uniform(BlockType.FEATHER, Tile.FEATHER);
+        uniform(BlockType.EGG, Tile.EGG);
+        uniform(BlockType.LEATHER_HELMET, Tile.LEATHER_HELMET);
+        uniform(BlockType.LEATHER_CHESTPLATE, Tile.LEATHER_CHESTPLATE);
+        uniform(BlockType.LEATHER_LEGGINGS, Tile.LEATHER_LEGGINGS);
+        uniform(BlockType.LEATHER_BOOTS, Tile.LEATHER_BOOTS);
+        uniform(BlockType.IRON_HELMET, Tile.IRON_HELMET);
+        uniform(BlockType.IRON_CHESTPLATE, Tile.IRON_CHESTPLATE);
+        uniform(BlockType.IRON_LEGGINGS, Tile.IRON_LEGGINGS);
+        uniform(BlockType.IRON_BOOTS, Tile.IRON_BOOTS);
+        uniform(BlockType.GOLD_HELMET, Tile.GOLD_HELMET);
+        uniform(BlockType.GOLD_CHESTPLATE, Tile.GOLD_CHESTPLATE);
+        uniform(BlockType.GOLD_LEGGINGS, Tile.GOLD_LEGGINGS);
+        uniform(BlockType.GOLD_BOOTS, Tile.GOLD_BOOTS);
     }
 
     private void uniform(BlockType type, Tile tile) {

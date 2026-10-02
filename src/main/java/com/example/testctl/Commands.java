@@ -48,6 +48,8 @@ public final class Commands {
             case "resizeWindow" -> resizeWindow(params);
             case "setGuiScale" -> setGuiScale(params);
             case "spawnZombie" -> spawnZombie(params);
+            case "spawnMob" -> spawnMob(params);
+            case "attack" -> attack();
             case "setMobSpawning" -> setMobSpawning(params);
             case "damageMobs" -> damageMobs(params);
             case "openCookingScreen" -> openCookingScreen(params);
@@ -317,6 +319,23 @@ public final class Commands {
         if (s == null || s < 0 || s > 4) return Result.badRequest("setGuiScale requires an integer scale 0 (auto) to 4");
         game.setGuiScale(s);
         return Result.ok("gui scale " + s);
+    }
+
+    private Result attack() {
+        game.attack();
+        return Result.ok("attack queued");
+    }
+
+    private Result spawnMob(Map<String, String> p) {
+        Float x = parseFloat(p, "x"), y = parseFloat(p, "y"), z = parseFloat(p, "z");
+        String type = p.get("type");
+        if (type == null || x == null || y == null || z == null) return Result.badRequest("spawnMob requires type and numeric x, y, z");
+        try {
+            game.spawnMob(type, x, y, z);
+        } catch (IllegalStateException e) {
+            return Result.badRequest(e.getMessage());
+        }
+        return Result.ok(type + " spawned at " + x + "," + y + "," + z);
     }
 
     private Result spawnZombie(Map<String, String> p) {

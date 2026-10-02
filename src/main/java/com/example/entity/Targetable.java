@@ -23,4 +23,10 @@ public interface Targetable {
      *  bespoke damage path. Returns true if the damage actually landed (see those methods' own
      *  docs on invulnerability windows). */
     boolean damage(float amount, DamageSource source);
+
+    /** Damage plus knockback away from {@code from} (strength 0.4 for an ordinary hit); the default is
+     *  plain damage for targets that cannot be pushed. */
+    default boolean hurtBy(float amount, DamageSource source, Vector3f from, float knockbackStrength) {
+        return damage(amount, source);
+    }
 }

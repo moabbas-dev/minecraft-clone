@@ -27,6 +27,8 @@ public class Chunk {
 
     @Getter
     private volatile boolean generated = false;
+    /** True when terrain was freshly generated (not restored from a save): passive animals pack-spawn only then. */
+    private volatile boolean freshlyGenerated = false;
     @Getter
     private volatile boolean meshDirty = true;
     /** True once {@link LightEngine#compute} has run at least once - see {@link World#getSkyLight}. */
@@ -142,6 +144,14 @@ public class Chunk {
             }
         }
         meshDirty = true;
+    }
+
+    public boolean isFreshlyGenerated() {
+        return freshlyGenerated;
+    }
+
+    public void setFreshlyGenerated(boolean v) {
+        freshlyGenerated = v;
     }
 
     public int worldOriginX() {

@@ -21,7 +21,9 @@ import java.util.Random;
  * list for {@link #CORPSE_SECONDS} before removal so death can be observed/processed.
  */
 public class MobManager {
-    public static final int MAX_MOBS = 32;
+    public static final int MAX_MOBS = 160;
+    /** Mobs farther than this from the player are not simulated (they simply wait). */
+    public static final float SIMULATION_DISTANCE = 64f;
     public static final float CORPSE_SECONDS = 1.0f;
     public static final float DESPAWN_DISTANCE = 96f;
 
@@ -29,6 +31,14 @@ public class MobManager {
     private final List<Mob> view = Collections.unmodifiableList(mobs);
     private final List<Mob> deadHandled = new ArrayList<>();
     private final java.util.Map<Mob, Float> corpseTimers = new java.util.IdentityHashMap<>();
+    private int pendingExperience;
+
+    /** XP earned by player kills since the last call (the caller adds it to the player). */
+    public int drainExperience() {
+        int xp = pendingExperience;
+        pendingExperience = 0;
+        return xp;
+    }
 
     public List<Mob> mobs() {
         return view;
@@ -51,6 +61,12 @@ public class MobManager {
         return true;
     }
 
+    public int countAliveHostile() {
+        int n = 0;
+        for (Mob m : mobs) if (m.isAlive() && !m.isPersistent()) n++;
+        return n;
+    }
+
     public int countAlive() {
         int n = 0;
         for (Mob m : mobs) if (m.isAlive()) n++;
@@ -67,10 +83,16 @@ public class MobManager {
         for (int i = 0; i < mobs.size(); i++) {
             Mob m = mobs.get(i);
             if (!chunkLoaded(world, m.position.x, m.position.z)) continue; // frozen
+            if (m.isAlive() && m.position.distanceSquared(playerPos) > SIMULATION_DISTANCE * SIMULATION_DISTANCE) continue;
             m.tick(world, candidates, dt);
+            com.example.world.BlockType laid = m.isAlive() ? m.takeLaidItem() : null;
+            if (laid != null) {
+                items.spawn(laid, 1, new Vector3f(m.position.x, m.position.y + 0.3f, m.position.z), random);
+            }
 
             if (!m.isAlive() && !deadHandled.contains(m)) {
                 deadHandled.add(m);
+                if (m.getLastDamageSource() == com.example.survival.DamageSource.PLAYER) pendingExperience += m.xpReward(random);
                 corpseTimers.put(m, CORPSE_SECONDS);
                 Vector3f at = new Vector3f(m.position.x, m.position.y + m.getHeight() * 0.5f, m.position.z);
                 for (BlockDrops.Resolved d : m.getDrops(random)) {
@@ -86,7 +108,7 @@ public class MobManager {
                 float left = corpseTimers.getOrDefault(m, 0f) - dt;
                 corpseTimers.put(m, left);
                 remove = left <= 0f;
-            } else if (m.position.distance(playerPos) > DESPAWN_DISTANCE) {
+            } else if (!m.isPersistent() && m.position.distance(playerPos) > DESPAWN_DISTANCE) {
                 remove = true;
             }
             if (remove) {
@@ -116,10 +138,25 @@ public class MobManager {
         return best;
     }
 
-    private static float rayAabb(Vector3f o, Vector3f d, Mob m) {
-        float hw = m.getWidth() / 2f;
-        float[] min = {m.position.x - hw, m.position.y, m.position.z - hw};
-        float[] max = {m.position.x + hw, m.position.y + m.getHeight(), m.position.z + hw};
+    /** Mobs the player's sword sweep also hits: alive, not the primary target, hitbox touching the primary's
+     *  box grown by 1 block horizontally / 0.25 vertically, feet within 3 blocks of the attacker's feet. */
+    public List<Mob> sweepTargets(Mob primary, Vector3f attackerFeet) {
+        List<Mob> out = new ArrayList<>();
+        float phw = primary.getWidth() / 2f + 1f;
+        for (Mob m : mobs) {
+            if (m == primary || !m.isAlive()) continue;
+            float mhw = m.getWidth() / 2f;
+            boolean overlapX = Math.abs(m.position.x - primary.position.x) <= phw + mhw;
+            boolean overlapZ = Math.abs(m.position.z - primary.position.z) <= phw + mhw;
+            boolean overlapY = m.position.y <= primary.position.y + primary.getHeight() + 0.25f
+                    && m.position.y + m.getHeight() >= primary.position.y - 0.25f;
+            if (overlapX && overlapZ && overlapY && Math.abs(m.position.y - attackerFeet.y) <= 3f) out.add(m);
+        }
+        return out;
+    }
+
+    /** Distance along a ray to an axis-aligned box, or -1 on a miss (slab method). */
+    public static float rayBoxDistance(Vector3f o, Vector3f d, float[] min, float[] max) {
         float[] origin = {o.x, o.y, o.z};
         float[] dir = {d.x, d.y, d.z};
         float tMin = 0f, tMax = Float.MAX_VALUE;
@@ -135,6 +172,13 @@ public class MobManager {
             }
         }
         return tMin;
+    }
+
+    private static float rayAabb(Vector3f o, Vector3f d, Mob m) {
+        float hw = m.getWidth() / 2f;
+        float[] min = {m.position.x - hw, m.position.y, m.position.z - hw};
+        float[] max = {m.position.x + hw, m.position.y + m.getHeight(), m.position.z + hw};
+        return rayBoxDistance(o, d, min, max);
     }
 
     private static boolean chunkLoaded(World world, float x, float z) {

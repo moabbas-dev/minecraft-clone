@@ -33,6 +33,9 @@ public abstract class Entity {
     private boolean onGround;
     @Getter
     private boolean alive = true;
+    /** Horizontal knockback velocity in blocks per second, decaying with friction (see moveWithGravity). */
+    protected float knockX, knockZ;
+    private float fallDistance;
 
     protected Entity(Vector3f spawnPosition, float yaw) {
         this.position.set(spawnPosition);
@@ -59,6 +62,15 @@ public abstract class Entity {
      * whatever the caller (a mob's navigation) already decided in {@code (dx, dz)}.
      */
     protected void moveWithGravity(World world, float dx, float dz, float dt) {
+        dx += knockX * dt;
+        dz += knockZ * dt;
+        // Vanilla drag per tick: ground 0.6 * 0.91, air 0.91.
+        float friction = (float) Math.pow(onGround ? 0.546 : 0.91, dt * 20.0);
+        knockX *= friction;
+        knockZ *= friction;
+        if (Math.abs(knockX) < 0.02f) knockX = 0f;
+        if (Math.abs(knockZ) < 0.02f) knockZ = 0f;
+        float startY = position.y;
         velocity.y = Math.max(velocity.y - GRAVITY * dt, TERMINAL_VELOCITY);
         float dy = velocity.y * dt;
 
@@ -91,6 +103,37 @@ public abstract class Entity {
             }
         }
         if (position.y < VOID_Y) kill();
+
+        if (world.getBlock((int) Math.floor(position.x), (int) Math.floor(position.y), (int) Math.floor(position.z))
+                == com.example.world.BlockType.WATER) {
+            fallDistance = 0f; // landing in water is safe
+        } else if (position.y < startY) {
+            fallDistance += startY - position.y;
+        }
+        if (onGround) {
+            if (fallDistance > 0f) onLanded(fallDistance);
+            fallDistance = 0f;
+        }
+    }
+
+    /** Called once when this entity touches the ground after falling {@code distance} blocks. */
+    protected void onLanded(float distance) {
+    }
+
+    /**
+     * Vanilla LivingEntity.knockback: pushes away from {@code (fromX, fromZ)} with the given strength
+     * (0.4 for an ordinary hit, +0.5 for a sprinting player attack); the vertical pop only happens
+     * when grounded. Velocities convert between blocks/tick (formula) and blocks/second (here).
+     */
+    public void applyKnockback(float fromX, float fromZ, float strength) {
+        float[] v = com.example.combat.CombatMath.knockback(knockX / 20f, velocity.y / 20f, knockZ / 20f, onGround,
+                fromX - position.x, fromZ - position.z, strength);
+        knockX = v[0] * 20f;
+        knockZ = v[2] * 20f;
+        if (onGround) {
+            velocity.y = v[1] * 20f;
+            onGround = false;
+        }
     }
 
     /** Same "one block up" nudge real voxel-game mobs (and vanilla) get for free that this

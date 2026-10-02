@@ -59,6 +59,21 @@ public class Zombie extends Mob {
     }
 
     @Override
+    protected float armorPoints() {
+        return 2f; // vanilla zombies spawn with 2 natural armor points
+    }
+
+    @Override
+    public int xpReward(Random random) {
+        return 5;
+    }
+
+    @Override
+    public String typeId() {
+        return "zombie";
+    }
+
+    @Override
     public float getMoveSpeed() {
         return MOVE_SPEED;
     }

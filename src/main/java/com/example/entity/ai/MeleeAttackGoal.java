@@ -51,7 +51,7 @@ public final class MeleeAttackGoal implements Goal {
         }
         if (!hasLineOfSight(mob, world, target)) return; // wait for a clear shot; cooldown untouched
         cooldown = attackCooldownSeconds; // the swing happens now, landing or not - a fixed rhythm, not "retry every tick until it lands"
-        target.damage(damageProvider.damageAmount(), DamageSource.MOB);
+        target.hurtBy(damageProvider.damageAmount(), DamageSource.MOB, mob.position, com.example.combat.CombatMath.BASE_KNOCKBACK);
     }
 
     /** Casts from the mob's own "eye" (its position accessor already returns a mid-body point -

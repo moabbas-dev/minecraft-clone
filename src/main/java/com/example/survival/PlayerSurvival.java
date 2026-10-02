@@ -1,5 +1,6 @@
 package com.example.survival;
 
+import com.example.inventory.PlayerArmor;
 import com.example.physics.Player;
 import com.example.world.BlockType;
 import com.example.world.Difficulty;
@@ -43,6 +44,8 @@ public class PlayerSurvival {
     private final HungerComponent hunger = new HungerComponent();
     @Getter
     private Difficulty difficulty;
+    @Getter
+    private final PlayerArmor armor = new PlayerArmor();
     /** Total XP earned so far - see {@link #addExperience}. This project has no leveling curve
      *  or XP-bar HUD (no XP system existed before the cooking milestone); this is the "clean
      *  integration point" that request explicitly asks for in place of building one, so cooking
@@ -187,8 +190,15 @@ public class PlayerSurvival {
      *  exhaustion" rule, which {@link HealthComponent} itself deliberately doesn't know about
      *  (a mob's own health has no hunger to feed). */
     public boolean damage(float amount, DamageSource source) {
-        boolean applied = health.damage(amount, source);
-        if (applied) hunger.addExhaustion(DAMAGE_EXHAUSTION_PER_HIT);
+        boolean reducible = !source.bypassesArmor();
+        float taken = reducible
+                ? com.example.combat.ArmorRules.reduce(amount, armor.totalDefense(), armor.totalToughness())
+                : amount;
+        boolean applied = health.damage(taken, source);
+        if (applied) {
+            hunger.addExhaustion(DAMAGE_EXHAUSTION_PER_HIT);
+            if (reducible && armor.totalDefense() > 0) armor.wear(amount);
+        }
         return applied;
     }
 

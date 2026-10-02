@@ -63,7 +63,8 @@ public class TextureAtlas {
             Tile.RAW_MUTTON, Tile.COOKED_MUTTON, Tile.RAW_RABBIT, Tile.COOKED_RABBIT,
             Tile.COD, Tile.COOKED_COD, Tile.SALMON, Tile.COOKED_SALMON,
             Tile.POTATO, Tile.BAKED_POTATO, Tile.KELP, Tile.DRIED_KELP,
-            Tile.ROTTEN_FLESH);
+            Tile.ROTTEN_FLESH,
+            Tile.WOODEN_SWORD, Tile.STONE_SWORD, Tile.IRON_SWORD, Tile.LEATHER, Tile.FEATHER, Tile.EGG, Tile.LEATHER_HELMET, Tile.LEATHER_CHESTPLATE, Tile.LEATHER_LEGGINGS, Tile.LEATHER_BOOTS, Tile.IRON_HELMET, Tile.IRON_CHESTPLATE, Tile.IRON_LEGGINGS, Tile.IRON_BOOTS, Tile.GOLD_HELMET, Tile.GOLD_CHESTPLATE, Tile.GOLD_LEGGINGS, Tile.GOLD_BOOTS);
 
     static {
         REAL_TEXTURE_PATHS.put(Tile.STONE, "textures/block/stone.png");
@@ -136,6 +137,24 @@ public class TextureAtlas {
         REAL_TEXTURE_PATHS.put(Tile.MANGROVE_ROOTS_TOP, "textures/block/mangrove_roots_top.png");
         REAL_TEXTURE_PATHS.put(Tile.OAK_SAPLING, "textures/block/oak_sapling.png");
         // CHEST, SUN, MOON, RAIN: no real block-texture equivalent, always procedural.
+        REAL_TEXTURE_PATHS.put(Tile.WOODEN_SWORD, "textures/item/wooden_sword.png");
+        REAL_TEXTURE_PATHS.put(Tile.STONE_SWORD, "textures/item/stone_sword.png");
+        REAL_TEXTURE_PATHS.put(Tile.IRON_SWORD, "textures/item/iron_sword.png");
+        REAL_TEXTURE_PATHS.put(Tile.LEATHER, "textures/item/leather.png");
+        REAL_TEXTURE_PATHS.put(Tile.FEATHER, "textures/item/feather.png");
+        REAL_TEXTURE_PATHS.put(Tile.EGG, "textures/item/egg.png");
+        REAL_TEXTURE_PATHS.put(Tile.LEATHER_HELMET, "textures/item/leather_helmet.png");
+        REAL_TEXTURE_PATHS.put(Tile.LEATHER_CHESTPLATE, "textures/item/leather_chestplate.png");
+        REAL_TEXTURE_PATHS.put(Tile.LEATHER_LEGGINGS, "textures/item/leather_leggings.png");
+        REAL_TEXTURE_PATHS.put(Tile.LEATHER_BOOTS, "textures/item/leather_boots.png");
+        REAL_TEXTURE_PATHS.put(Tile.IRON_HELMET, "textures/item/iron_helmet.png");
+        REAL_TEXTURE_PATHS.put(Tile.IRON_CHESTPLATE, "textures/item/iron_chestplate.png");
+        REAL_TEXTURE_PATHS.put(Tile.IRON_LEGGINGS, "textures/item/iron_leggings.png");
+        REAL_TEXTURE_PATHS.put(Tile.IRON_BOOTS, "textures/item/iron_boots.png");
+        REAL_TEXTURE_PATHS.put(Tile.GOLD_HELMET, "textures/item/golden_helmet.png");
+        REAL_TEXTURE_PATHS.put(Tile.GOLD_CHESTPLATE, "textures/item/golden_chestplate.png");
+        REAL_TEXTURE_PATHS.put(Tile.GOLD_LEGGINGS, "textures/item/golden_leggings.png");
+        REAL_TEXTURE_PATHS.put(Tile.GOLD_BOOTS, "textures/item/golden_boots.png");
         // Real item icons (textures/item/<name>.png, gitignored like the block textures);
         // any that is missing falls back to the procedural icon drawn in drawTile().
         REAL_TEXTURE_PATHS.put(Tile.STICK, "textures/item/stick.png");
@@ -464,6 +483,19 @@ public class TextureAtlas {
             // ---- Mob-system milestone ----
             case ROTTEN_FLESH -> meatIcon(img, rnd, new Color(120, 110, 70), new Color(80, 95, 55));
             case ZOMBIE_SKIN -> noisyFill(img, rnd, new Color(94, 135, 76), 12);
+            case WOODEN_SWORD -> swordIcon(img, rnd, TOOL_HEAD_WOOD);
+            case STONE_SWORD -> swordIcon(img, rnd, TOOL_HEAD_STONE);
+            case IRON_SWORD -> swordIcon(img, rnd, TOOL_HEAD_IRON);
+            case LEATHER -> blockyIcon(img, rnd, new Color(150, 90, 50));
+            case FEATHER -> blockyIcon(img, rnd, new Color(235, 235, 235));
+            case EGG -> potatoIcon(img, rnd, new Color(235, 225, 200));
+            case LEATHER_HELMET, LEATHER_CHESTPLATE, LEATHER_LEGGINGS, LEATHER_BOOTS -> blockyIcon(img, rnd, new Color(150, 90, 50));
+            case IRON_HELMET, IRON_CHESTPLATE, IRON_LEGGINGS, IRON_BOOTS -> blockyIcon(img, rnd, new Color(210, 210, 210));
+            case GOLD_HELMET, GOLD_CHESTPLATE, GOLD_LEGGINGS, GOLD_BOOTS -> blockyIcon(img, rnd, new Color(240, 210, 70));
+            case PIG_SKIN -> noisyFill(img, rnd, new Color(236, 160, 160), 10);
+            case COW_SKIN -> speckledNoise(img, rnd, new Color(98, 66, 40), new Color[]{new Color(235, 235, 235), new Color(60, 40, 25)}, 55);
+            case CHICKEN_SKIN -> noisyFill(img, rnd, new Color(240, 240, 240), 8);
+            case CHICKEN_BEAK -> noisyFill(img, rnd, new Color(235, 150, 40), 8);
         }
         g.dispose();
         return img;
@@ -818,6 +850,17 @@ public class TextureAtlas {
     /** A brown rounded steak slab with a couple of darker grill-mark stripes. */
     private void cookedBeefIcon(BufferedImage img, Random rnd) {
         meatIcon(img, rnd, new Color(150, 88, 60), new Color(90, 45, 30));
+    }
+
+    /** A diagonal blade with a short handle (fallback when no real sword texture exists). */
+    private void swordIcon(BufferedImage img, Random rnd, Color blade) {
+        for (int i = 0; i < 9; i++) {
+            setPixel(img, 5 + i, 10 - i, jitter(blade, rnd, 8));
+            setPixel(img, 6 + i, 10 - i, jitter(blade, rnd, 8));
+        }
+        setPixel(img, 4, 11, jitter(TOOL_HANDLE, rnd, 8));
+        setPixel(img, 3, 12, jitter(TOOL_HANDLE, rnd, 8));
+        setPixel(img, 2, 13, jitter(TOOL_HANDLE, rnd, 8));
     }
 
     /** A rounded meat-slab shape, either raw (a plain flesh-tone base with no grill marks) or

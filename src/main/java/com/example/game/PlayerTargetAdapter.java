@@ -32,4 +32,11 @@ final class PlayerTargetAdapter implements Targetable {
     public boolean damage(float amount, DamageSource source) {
         return survival.damage(amount, source);
     }
+
+    @Override
+    public boolean hurtBy(float amount, DamageSource source, Vector3f from, float knockbackStrength) {
+        boolean applied = survival.damage(amount, source);
+        if (applied && knockbackStrength > 0f) player.applyKnockback(from.x, from.z, knockbackStrength);
+        return applied;
+    }
 }

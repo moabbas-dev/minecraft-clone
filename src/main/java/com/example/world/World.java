@@ -63,6 +63,7 @@ public class World {
             chunk.importBlocks(saved);
         } else {
             generator.generate(chunk, this);
+            chunk.setFreshlyGenerated(true);
         }
         generator.computeTint(chunk); // not persisted, so this runs on both the load and generate paths
         chunk.markGenerated();

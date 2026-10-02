@@ -21,7 +21,17 @@ public abstract class LivingEntity extends Entity implements Targetable {
      *  window, which {@link HealthComponent} already owns and enforces on its own). */
     @Getter
     private float hurtTime;
-    private static final float HURT_FLASH_SECONDS = 0.3f;
+    private static final float HURT_FLASH_SECONDS = 0.5f; // vanilla: 10 ticks
+    /** The source of the most recent damage that landed (used to credit XP to a player kill). */
+    @Getter
+    private DamageSource lastDamageSource;
+    /** Seconds since death (drives the 1 s topple animation). */
+    @Getter
+    protected float deathTime;
+    /** Seconds left of the "recently hurt" state that makes passive animals panic (vanilla ~100 ticks). */
+    @Getter
+    protected float recentHurtTimer;
+    public static final float PANIC_SECONDS = 5f;
 
     protected LivingEntity(Vector3f spawnPosition, float yaw, float maxHealth) {
         super(spawnPosition, yaw);
@@ -39,9 +49,49 @@ public abstract class LivingEntity extends Entity implements Targetable {
 
     @Override
     public boolean damage(float amount, DamageSource source) {
-        boolean applied = health.damage(amount, source);
-        if (applied) hurtTime = HURT_FLASH_SECONDS;
+        float taken = source.bypassesArmor()
+                ? amount
+                : com.example.combat.ArmorRules.reduce(amount, armorPoints(), armorToughness());
+        boolean applied = health.damage(taken, source);
+        if (applied) {
+            hurtTime = HURT_FLASH_SECONDS;
+            recentHurtTimer = PANIC_SECONDS;
+            lastDamageSource = source;
+        }
         return applied;
+    }
+
+    /** Damage plus knockback away from the attacker position when the hit landed. */
+    public boolean hurtBy(float amount, DamageSource source, Vector3f attackerPos, float knockbackStrength) {
+        boolean applied = damage(amount, source);
+        if (applied && knockbackStrength > 0f) applyKnockback(attackerPos.x, attackerPos.z, knockbackStrength);
+        return applied;
+    }
+
+    /** Natural armor points (zombie: 2); toughness stays 0 for every mob here. */
+    protected float armorPoints() {
+        return 0f;
+    }
+
+    protected float armorToughness() {
+        return 0f;
+    }
+
+    /** Experience granted to a player who kills this mob. */
+    public int xpReward(java.util.Random random) {
+        return 0;
+    }
+
+    /** Fall damage: 1 HP per block beyond 3 (chickens override to be immune). */
+    @Override
+    protected void onLanded(float distance) {
+        if (fallImmune() || !isAlive()) return;
+        int dmg = (int) Math.ceil(Math.max(0f, distance - 3f));
+        if (dmg > 0) damage(dmg, DamageSource.FALL);
+    }
+
+    protected boolean fallImmune() {
+        return false;
     }
 
     public void heal(float amount) {
@@ -53,6 +103,10 @@ public abstract class LivingEntity extends Entity implements Targetable {
     protected void tickHealth(float dt) {
         health.tick(dt);
         if (hurtTime > 0f) hurtTime = Math.max(0f, hurtTime - dt);
-        if (health.isDead()) kill();
+        if (recentHurtTimer > 0f) recentHurtTimer = Math.max(0f, recentHurtTimer - dt);
+        if (health.isDead()) {
+            kill();
+            deathTime += dt;
+        }
     }
 }

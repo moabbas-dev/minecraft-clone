@@ -74,6 +74,10 @@ public final class InventoryLayout {
 
     /** The rectangle for a menu slot id (player slot, {@link InventoryMenu#GRID_BASE}+i, or the result slot). */
     public Rect slotRect(int slot) {
+        if (slot >= InventoryMenu.ARMOR_BASE && slot < InventoryMenu.ARMOR_BASE + 4) {
+            int i = slot - InventoryMenu.ARMOR_BASE; // head, chest / legs, feet in a 2x2 block
+            return new Rect(panelX + PAD + (i % 2) * PITCH, craftY + (i / 2) * PITCH, SLOT, SLOT);
+        }
         if (slot == InventoryMenu.RESULT_SLOT) {
             return new Rect(resultX, craftY + (gridSize * PITCH - GAP - SLOT) / 2f, SLOT, SLOT);
         }
@@ -97,6 +101,9 @@ public final class InventoryLayout {
             if (slotRect(InventoryMenu.GRID_BASE + i).contains(mx, my)) return InventoryMenu.GRID_BASE + i;
         }
         if (slotRect(InventoryMenu.RESULT_SLOT).contains(mx, my)) return InventoryMenu.RESULT_SLOT;
+        for (int i = 0; i < 4; i++) {
+            if (slotRect(InventoryMenu.ARMOR_BASE + i).contains(mx, my)) return InventoryMenu.ARMOR_BASE + i;
+        }
         return -1;
     }
 }

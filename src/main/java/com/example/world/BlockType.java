@@ -155,7 +155,26 @@ public enum BlockType {
     // Mob-system milestone: the one zombie drop. Real vanilla's rotten flesh also has a chance
     // to inflict Hunger on eating - not modeled here (documented simplification, matching this
     // file's own per-item confidence-level convention).
-    ROTTEN_FLESH(156, "Rotten Flesh", false, true, -1f, 0f);
+    ROTTEN_FLESH(156, "Rotten Flesh", false, true, -1f, 0f),
+    // Combat milestone: swords, passive-mob drops and armor (real items, never placed as blocks).
+    WOODEN_SWORD(157, "Wooden Sword", false, true, -1f, 0f),
+    STONE_SWORD(158, "Stone Sword", false, true, -1f, 0f),
+    IRON_SWORD(159, "Iron Sword", false, true, -1f, 0f),
+    LEATHER(160, "Leather", false, true, -1f, 0f),
+    FEATHER(161, "Feather", false, true, -1f, 0f),
+    EGG(162, "Egg", false, true, -1f, 0f),
+    LEATHER_HELMET(163, "Leather Cap", false, true, -1f, 0f),
+    LEATHER_CHESTPLATE(164, "Leather Tunic", false, true, -1f, 0f),
+    LEATHER_LEGGINGS(165, "Leather Pants", false, true, -1f, 0f),
+    LEATHER_BOOTS(166, "Leather Boots", false, true, -1f, 0f),
+    IRON_HELMET(167, "Iron Helmet", false, true, -1f, 0f),
+    IRON_CHESTPLATE(168, "Iron Chestplate", false, true, -1f, 0f),
+    IRON_LEGGINGS(169, "Iron Leggings", false, true, -1f, 0f),
+    IRON_BOOTS(170, "Iron Boots", false, true, -1f, 0f),
+    GOLD_HELMET(171, "Golden Helmet", false, true, -1f, 0f),
+    GOLD_CHESTPLATE(172, "Golden Chestplate", false, true, -1f, 0f),
+    GOLD_LEGGINGS(173, "Golden Leggings", false, true, -1f, 0f),
+    GOLD_BOOTS(174, "Golden Boots", false, true, -1f, 0f);
 
     public final int id;
     public final String displayName;

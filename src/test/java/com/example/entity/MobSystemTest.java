@@ -156,7 +156,7 @@ class MobSystemTest {
         Random rnd = new Random(1);
         for (int i = 0; i < 20; i++) mm.tick(world, List.of(d), p, items, rnd, DT);
         assertTrue(zom.damage(8f, DamageSource.PLAYER));
-        assertEquals(12f, zom.getHealth().getCurrentHealth());
+        assertEquals(20f - com.example.combat.ArmorRules.reduce(8f, 2f, 0f), zom.getHealth().getCurrentHealth(), 1e-4f, "zombies carry 2 natural armor points");
         assertFalse(zom.damage(8f, DamageSource.PLAYER), "hurt cooldown applies like any living entity");
         zom.getHealth().tick(1f);
         zom.damage(100f, DamageSource.PLAYER);

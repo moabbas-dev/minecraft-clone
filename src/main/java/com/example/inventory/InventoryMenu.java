@@ -19,9 +19,12 @@ import java.util.List;
 public class InventoryMenu {
     public static final int GRID_BASE = 100;
     public static final int RESULT_SLOT = 1000;
+    /** Armor slots: ARMOR_BASE + EquipmentSlot ordinal (head, chest, legs, feet). */
+    public static final int ARMOR_BASE = 2000;
 
     private final Inventory player;
     private final Inventory grid;
+    private final PlayerArmor armor;
     @Getter
     private final int gridSize;
     @Getter
@@ -30,7 +33,12 @@ public class InventoryMenu {
     private ItemStack result = ItemStack.EMPTY;
 
     public InventoryMenu(Inventory player, int gridSize) {
+        this(player, null, gridSize);
+    }
+
+    public InventoryMenu(Inventory player, PlayerArmor armor, int gridSize) {
         this.player = player;
+        this.armor = armor;
         this.gridSize = gridSize;
         int cells = gridSize * gridSize;
         this.grid = new Inventory(cells, cells, player.getMaxStack());
@@ -38,6 +46,7 @@ public class InventoryMenu {
 
     public ItemStack stackAt(int slot) {
         if (slot == RESULT_SLOT) return result;
+        if (slot >= ARMOR_BASE && slot < ARMOR_BASE + 4 && armor != null) return armor.get(com.example.combat.EquipmentSlot.values()[slot - ARMOR_BASE]);
         if (slot >= GRID_BASE && slot < GRID_BASE + grid.slotCount()) return grid.get(slot - GRID_BASE);
         if (slot >= 0 && slot < player.slotCount()) return player.get(slot);
         throw new IllegalArgumentException("no such slot: " + slot);
@@ -47,6 +56,10 @@ public class InventoryMenu {
     public void click(int slot, boolean right) {
         if (slot == RESULT_SLOT) {
             takeResult();
+            return;
+        }
+        if (slot >= ARMOR_BASE && slot < ARMOR_BASE + 4) {
+            if (armor != null) clickArmor(com.example.combat.EquipmentSlot.values()[slot - ARMOR_BASE]);
             return;
         }
         Inventory inv;
@@ -65,6 +78,20 @@ public class InventoryMenu {
         if (inv == grid) recomputeResult();
     }
 
+    /** Armor slot click: pick the worn piece up, or place/swap a matching piece (wrong-slot items are ignored). */
+    private void clickArmor(com.example.combat.EquipmentSlot slot) {
+        ItemStack worn = armor.get(slot);
+        if (cursor.isEmpty()) {
+            if (!worn.isEmpty()) {
+                cursor = worn;
+                armor.set(slot, ItemStack.EMPTY);
+            }
+        } else if (PlayerArmor.canEquip(cursor) && com.example.combat.ArmorStats.of(cursor.type()).slot() == slot) {
+            armor.set(slot, cursor.withCount(1));
+            cursor = worn;
+        }
+    }
+
     private void leftClick(Inventory inv, int idx) {
         cursor = leftClickSlot(inv, idx, cursor);
     }
@@ -81,7 +108,7 @@ public class InventoryMenu {
      */
     public static ItemStack leftClickSlot(Inventory inv, int idx, ItemStack cursor) {
         ItemStack s = inv.get(idx);
-        int max = inv.getMaxStack();
+        int max = ItemStack.maxStackFor(cursor.type(), inv.getMaxStack());
         if (cursor.isEmpty()) {
             if (!s.isEmpty()) {
                 inv.set(idx, ItemStack.EMPTY);
@@ -91,7 +118,7 @@ public class InventoryMenu {
         } else if (s.isEmpty()) {
             inv.set(idx, cursor);
             return ItemStack.EMPTY;
-        } else if (s.type() == cursor.type()) {
+        } else if (s.sameItem(cursor) && max > 1) {
             int move = Math.min(max - s.count(), cursor.count());
             inv.set(idx, s.withCount(s.count() + move));
             return cursor.withCount(cursor.count() - move);
@@ -104,21 +131,21 @@ public class InventoryMenu {
     /** Same as {@link #leftClickSlot}, for a right click (pick up half / place one). */
     public static ItemStack rightClickSlot(Inventory inv, int idx, ItemStack cursor) {
         ItemStack s = inv.get(idx);
-        int max = inv.getMaxStack();
+        int max = ItemStack.maxStackFor(cursor.type(), inv.getMaxStack());
         if (cursor.isEmpty()) {
             if (!s.isEmpty()) {
                 int take = (s.count() + 1) / 2;
                 inv.set(idx, s.withCount(s.count() - take));
-                return new ItemStack(s.type(), take);
+                return s.withCount(take);
             }
             return cursor;
         } else if (s.isEmpty()) {
-            inv.set(idx, new ItemStack(cursor.type(), 1));
+            inv.set(idx, cursor.withCount(1));
             return cursor.withCount(cursor.count() - 1);
-        } else if (s.type() == cursor.type() && s.count() < max) {
+        } else if (s.sameItem(cursor) && s.count() < max) {
             inv.set(idx, s.withCount(s.count() + 1));
             return cursor.withCount(cursor.count() - 1);
-        } else if (s.type() != cursor.type()) {
+        } else if (!s.sameItem(cursor)) {
             inv.set(idx, cursor);
             return s;
         }
@@ -128,8 +155,8 @@ public class InventoryMenu {
     private void takeResult() {
         if (result.isEmpty()) return;
         if (!cursor.isEmpty()) {
-            boolean sameItem = cursor.type() == result.type();
-            if (!sameItem || cursor.count() + result.count() > player.getMaxStack()) return;
+            boolean sameItem = cursor.sameItem(result);
+            if (!sameItem || cursor.count() + result.count() > ItemStack.maxStackFor(result.type(), player.getMaxStack())) return;
         }
         cursor = cursor.isEmpty() ? result : cursor.withCount(cursor.count() + result.count());
         for (int i = 0; i < grid.slotCount(); i++) grid.removeOne(i);
@@ -149,7 +176,7 @@ public class InventoryMenu {
     public ItemStack dropFromCursor(boolean single) {
         if (cursor.isEmpty()) return ItemStack.EMPTY;
         int n = single ? 1 : cursor.count();
-        ItemStack dropped = new ItemStack(cursor.type(), n);
+        ItemStack dropped = cursor.withCount(n);
         cursor = cursor.withCount(cursor.count() - n);
         return dropped;
     }
@@ -169,8 +196,8 @@ public class InventoryMenu {
         }
         for (ItemStack s : inFlight) {
             if (s.isEmpty()) continue;
-            int added = player.add(s.type(), s.count());
-            if (added < s.count()) leftovers.add(new ItemStack(s.type(), s.count() - added));
+            int added = player.add(s.type(), s.count(), s.damage());
+            if (added < s.count()) leftovers.add(s.withCount(s.count() - added));
         }
         cursor = ItemStack.EMPTY;
         result = ItemStack.EMPTY;

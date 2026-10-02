@@ -83,7 +83,10 @@ public class Player {
     private float yaw = (float) Math.toRadians(-90); // facing -Z initially
     @Getter
     private float pitch = 0f;
+    @Getter
     private float verticalVelocity = 0f;
+    /** Horizontal knockback velocity (blocks/second), decays with friction - see applyKnockback. */
+    private float knockX, knockZ;
     @Getter
     private boolean onGround = false;
     /** True only during the single update() call in which a jump was actually triggered (space
@@ -356,7 +359,30 @@ public class Player {
         }
         wasInWater = waterActive;
 
+        dx += knockX * dt;
+        dz += knockZ * dt;
+        float drag = (float) Math.pow(onGround ? 0.546 : 0.91, dt * 20.0);
+        knockX *= drag;
+        knockZ *= drag;
+        if (Math.abs(knockX) < 0.02f) knockX = 0f;
+        if (Math.abs(knockZ) < 0.02f) knockZ = 0f;
         moveWithCollision(world, dx, dy, dz, sneaking);
+    }
+
+    /**
+     * Vanilla knockback (see {@code CombatMath.knockback}): pushed away from (fromX, fromZ) with the given
+     * strength, with the vertical pop only when grounded. Works in blocks/tick internally, stored here in
+     * blocks/second.
+     */
+    public void applyKnockback(float fromX, float fromZ, float strength) {
+        float[] v = com.example.combat.CombatMath.knockback(knockX / 20f, verticalVelocity / 20f, knockZ / 20f, onGround,
+                fromX - position.x, fromZ - position.z, strength);
+        knockX = v[0] * 20f;
+        knockZ = v[2] * 20f;
+        if (onGround && !flying) {
+            verticalVelocity = v[1] * 20f;
+            onGround = false;
+        }
     }
 
     /**

@@ -267,6 +267,68 @@ public class WorldIO {
         return result;
     }
 
+    /** One saved persistent mob (passive animals; hostile mobs are never saved). */
+    public record MobSnapshot(String type, float x, float y, float z, float yaw, float health, float extra,
+                              float vx, float vy, float vz) {
+    }
+
+    public static void saveMobs(File dir, List<MobSnapshot> mobs) {
+        dir.mkdirs();
+        try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(new File(dir, "mobs.dat"))))) {
+            out.writeInt(mobs.size());
+            for (MobSnapshot m : mobs) {
+                out.writeUTF(m.type());
+                out.writeFloat(m.x());
+                out.writeFloat(m.y());
+                out.writeFloat(m.z());
+                out.writeFloat(m.yaw());
+                out.writeFloat(m.health());
+                out.writeFloat(m.extra());
+                out.writeFloat(m.vx());
+                out.writeFloat(m.vy());
+                out.writeFloat(m.vz());
+            }
+        } catch (IOException e) {
+            System.err.println("Failed to save mobs: " + e.getMessage());
+        }
+    }
+
+    /** Empty list if the world has no mobs file (a save from before animals existed) or it is unreadable. */
+    public static List<MobSnapshot> loadMobs(File dir) {
+        File file = new File(dir, "mobs.dat");
+        List<MobSnapshot> result = new ArrayList<>();
+        if (!file.isFile()) return result;
+        try (DataInputStream in = new DataInputStream(new BufferedInputStream(new FileInputStream(file)))) {
+            int count = in.readInt();
+            for (int i = 0; i < count && i < 4096; i++) {
+                result.add(new MobSnapshot(in.readUTF(), in.readFloat(), in.readFloat(), in.readFloat(), in.readFloat(),
+                        in.readFloat(), in.readFloat(), in.readFloat(), in.readFloat(), in.readFloat()));
+            }
+        } catch (IOException e) {
+            System.err.println("Failed to load mobs from " + dir + ": " + e.getMessage());
+        }
+        return result;
+    }
+
+    public static void saveArmor(File dir, com.example.inventory.PlayerArmor armor) {
+        dir.mkdirs();
+        try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(new File(dir, "armor.dat"))))) {
+            armor.write(out);
+        } catch (IOException e) {
+            System.err.println("Failed to save armor: " + e.getMessage());
+        }
+    }
+
+    public static void loadArmor(File dir, com.example.inventory.PlayerArmor into) {
+        File file = new File(dir, "armor.dat");
+        if (!file.isFile()) return;
+        try (DataInputStream in = new DataInputStream(new BufferedInputStream(new FileInputStream(file)))) {
+            into.read(in);
+        } catch (IOException e) {
+            System.err.println("Failed to load armor from " + dir + ": " + e.getMessage());
+        }
+    }
+
     public static void deleteWorld(String folderName) {
         deleteRecursively(worldDir(folderName));
     }

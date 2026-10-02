@@ -26,6 +26,7 @@ public class Inventory {
 
     private final BlockType[] types;
     private final int[] counts;
+    private final int[] damages;
     @Getter
     private final int hotbarSize;
     @Getter
@@ -44,6 +45,7 @@ public class Inventory {
         }
         this.types = new BlockType[slotCount];
         this.counts = new int[slotCount];
+        this.damages = new int[slotCount];
         this.hotbarSize = hotbarSize;
         this.maxStack = maxStack;
     }
@@ -66,7 +68,7 @@ public class Inventory {
 
     public ItemStack get(int slot) {
         requireSlot(slot);
-        return new ItemStack(types[slot], counts[slot]);
+        return new ItemStack(types[slot], counts[slot], damages[slot]);
     }
 
     /** Replaces a slot's contents exactly. Counts above the stack limit are rejected, not clamped. */
@@ -77,6 +79,7 @@ public class Inventory {
         }
         types[slot] = stack.type();
         counts[slot] = stack.count();
+        damages[slot] = stack.damage();
     }
 
     /**
@@ -86,21 +89,30 @@ public class Inventory {
      * silently discarded here.
      */
     public int add(BlockType type, int amount) {
+        return add(type, amount, 0);
+    }
+
+    /** Same as {@link #add(BlockType, int)} for an item carrying {@code damage} spent durability:
+     *  it only merges into stacks with identical wear, and damageable items never stack. */
+    public int add(BlockType type, int amount, int damage) {
         requireItem(type);
         if (amount < 0) throw new IllegalArgumentException("negative amount: " + amount);
+        int max = ItemStack.maxStackFor(type, maxStack);
+        int wear = com.example.combat.Durability.isDamageable(type) ? Math.max(0, damage) : 0;
         int remaining = amount;
         for (int i = 0; i < types.length && remaining > 0; i++) {
-            if (types[i] == type && counts[i] < maxStack) {
-                int take = Math.min(remaining, maxStack - counts[i]);
+            if (types[i] == type && damages[i] == wear && counts[i] < max) {
+                int take = Math.min(remaining, max - counts[i]);
                 counts[i] += take;
                 remaining -= take;
             }
         }
         for (int i = 0; i < types.length && remaining > 0; i++) {
             if (types[i] == null) {
-                int take = Math.min(remaining, maxStack);
+                int take = Math.min(remaining, max);
                 types[i] = type;
                 counts[i] = take;
+                damages[i] = wear;
                 remaining -= take;
             }
         }
@@ -111,9 +123,10 @@ public class Inventory {
     public int spaceFor(BlockType type) {
         requireItem(type);
         long space = 0;
+        int max = ItemStack.maxStackFor(type, maxStack);
         for (int i = 0; i < types.length; i++) {
-            if (types[i] == null) space += maxStack;
-            else if (types[i] == type) space += maxStack - counts[i];
+            if (types[i] == null) space += max;
+            else if (types[i] == type && damages[i] == 0) space += max - counts[i];
         }
         return (int) Math.min(space, Integer.MAX_VALUE);
     }
@@ -141,6 +154,7 @@ public class Inventory {
         if (counts[slot] <= 0) {
             counts[slot] = 0;
             types[slot] = null;
+            damages[slot] = 0;
         }
         return removed;
     }
@@ -179,6 +193,7 @@ public class Inventory {
     public void clear() {
         java.util.Arrays.fill(types, null);
         java.util.Arrays.fill(counts, 0);
+        java.util.Arrays.fill(damages, 0);
         selectedSlot = 0;
     }
 
@@ -189,7 +204,7 @@ public class Inventory {
         out.writeInt(selectedSlot);
         for (int i = 0; i < types.length; i++) {
             out.writeInt(types[i] == null ? 0 : types[i].id);
-            out.writeInt(counts[i]);
+            out.writeInt(counts[i] | (damages[i] << 8)); // count <= 64 fits the low byte; old saves have damage 0
         }
     }
 
@@ -205,11 +220,15 @@ public class Inventory {
         int selected = in.readInt();
         for (int i = 0; i < stored; i++) {
             int id = in.readInt();
-            int count = in.readInt();
+            int packed = in.readInt();
+            int count = packed & 0xFF;
+            int damage = packed >>> 8;
             BlockType type = BlockType.byId(id);
             if (i < inv.types.length && type != BlockType.AIR && count > 0) {
                 inv.types[i] = type;
-                inv.counts[i] = Math.min(count, inv.maxStack);
+                inv.counts[i] = Math.min(count, ItemStack.maxStackFor(type, inv.maxStack));
+                inv.damages[i] = com.example.combat.Durability.isDamageable(type)
+                        ? Math.min(damage, com.example.combat.Durability.max(type) - 1) : 0;
             }
         }
         inv.selectedSlot = selected >= 0 && selected < inv.hotbarSize ? selected : 0;
