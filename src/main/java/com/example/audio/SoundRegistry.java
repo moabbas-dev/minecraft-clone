@@ -45,11 +45,40 @@ public class SoundRegistry {
         register(new SoundGroup("step.snow", files("step", "snow", 4), AudioCategory.PLAYER, 0.5f, 0.9f, 1.1f, true, 16f));
         register(new SoundGroup("step.wood", files("step", "wood", 6), AudioCategory.PLAYER, 0.5f, 0.9f, 1.1f, true, 16f));
 
+        // Mob vocalizations/steps (research: docs/research/mob-skins-and-sounds.md). Cow volume 0.4 and the
+        // chicken's 0.8 come straight from the vanilla sound definitions; steps are the quiet 0.15-ish layer.
+        mobSounds("pig", "mob/pig", "say", 3, "say", 3, "death", 1, "step", 5, 0.9f, 0.2f);
+        mobSounds("cow", "mob/cow", "say", 4, "hurt", 3, "hurt", 3, "step", 4, 0.5f, 0.2f);
+        mobSounds("chicken", "mob/chicken", "say", 3, "hurt", 2, "hurt", 2, "step", 2, 0.8f, 0.1f);
+        mobSounds("zombie", "mob/zombie", "say", 3, "hurt", 2, "death", 1, "step", 5, 0.9f, 0.2f);
+        register(new SoundGroup("mob.chicken.plop", new String[]{"mob/chicken/plop.ogg"}, AudioCategory.MOBS, 0.9f, 0.95f, 1.05f, true, 16f));
+
+        register(new SoundGroup("attack.strong", files("entity/player/attack", "strong", 6), AudioCategory.PLAYER, 0.65f, 1f, 1f, false, 0f));
+        register(new SoundGroup("attack.weak", files("entity/player/attack", "weak", 4), AudioCategory.PLAYER, 0.7f, 1f, 1f, false, 0f));
+        register(new SoundGroup("attack.crit", files("entity/player/attack", "crit", 3), AudioCategory.PLAYER, 0.7f, 1f, 1f, false, 0f));
+        register(new SoundGroup("attack.sweep", files("entity/player/attack", "sweep", 7), AudioCategory.PLAYER, 0.7f, 1f, 1f, false, 0f));
+        register(new SoundGroup("attack.knockback", files("entity/player/attack", "knockback", 4), AudioCategory.PLAYER, 0.7f, 1f, 1f, false, 0f));
+        register(new SoundGroup("player.hurt", files("damage", "hit", 3), AudioCategory.PLAYER, 1f, 1f, 1f, false, 0f));
+        for (String m : new String[]{"generic", "leather", "iron", "gold", "diamond"}) {
+            register(new SoundGroup("armor.equip." + m, files("item/armor", "equip_" + m, 6), AudioCategory.PLAYER, 1f, 1f, 1f, false, 0f));
+        }
+        register(new SoundGroup("item.break", new String[]{"random/break.ogg"}, AudioCategory.PLAYER, 1f, 1f, 1f, false, 0f));
+
         register(new SoundGroup("item.pickup", new String[]{"random/pop.ogg"}, AudioCategory.PLAYER, 0.35f, 0.9f, 1.5f, false, 0f));
 
         register(new SoundGroup("ambient.cave", files("ambient/cave", "cave", 19), AudioCategory.AMBIENT, 0.6f, 0.95f, 1.05f, true, 32f));
         register(new SoundGroup("ambient.rain", files("ambient/weather", "rain", 8), AudioCategory.WEATHER, 0.5f, 1f, 1f, false, 0f));
         register(new SoundGroup("weather.thunder", files("ambient/weather", "thunder", 3), AudioCategory.WEATHER, 0.9f, 0.95f, 1.05f, false, 0f));
+    }
+
+    /** Registers mob.&lt;name&gt;.say/hurt/death/step; the numbers are the file counts for each event. */
+    private void mobSounds(String name, String dir, String sayPrefix, int sayCount, String hurtPrefix, int hurtCount,
+                           String deathPrefix, int deathCount, String stepPrefix, int stepCount, float vocalVolume, float stepVolume) {
+        register(new SoundGroup("mob." + name + ".say", files(dir, sayPrefix, sayCount), AudioCategory.MOBS, vocalVolume, 0.8f, 1.2f, true, 24f));
+        register(new SoundGroup("mob." + name + ".hurt", files(dir, hurtPrefix, hurtCount), AudioCategory.MOBS, vocalVolume, 0.8f, 1.2f, true, 24f));
+        register(new SoundGroup("mob." + name + ".death", deathCount == 1 && deathPrefix.equals("death")
+                ? new String[]{dir + "/death.ogg"} : files(dir, deathPrefix, deathCount), AudioCategory.MOBS, vocalVolume, 0.8f, 1.2f, true, 24f));
+        register(new SoundGroup("mob." + name + ".step", files(dir, stepPrefix, stepCount), AudioCategory.MOBS, stepVolume, 0.95f, 1.05f, true, 16f));
     }
 
     private static String[] files(String dir, String prefix, int count) {

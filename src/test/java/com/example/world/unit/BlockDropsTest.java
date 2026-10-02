@@ -102,7 +102,7 @@ class BlockDropsTest {
     void aGatedOreDropsNothingWithoutTheRightToolButDropsNormallyWithIt() {
         assertTrue(BlockDrops.resolve(BlockType.DIAMOND_ORE, new Random(1), BlockType.STONE_PICKAXE).isEmpty(),
                 "stone is below diamond's minimum tier");
-        assertEquals(List.of(new BlockDrops.Resolved(BlockType.DIAMOND_ORE, 1)),
+        assertEquals(List.of(new BlockDrops.Resolved(BlockType.DIAMOND, 1)),
                 BlockDrops.resolve(BlockType.DIAMOND_ORE, new Random(1), BlockType.IRON_PICKAXE));
     }
 

@@ -42,6 +42,19 @@ public abstract class Mob extends LivingEntity {
     private float lastDt;
     private static final float TURN_RATE = 12f; // radians per second
 
+    /** One sound a mob wants played (resolved to a registry id like {@code mob.pig.say}); drained by MobManager. */
+    public record SoundEvent(String id, float x, float y, float z) {
+    }
+
+    private final List<SoundEvent> pendingSounds = new java.util.ArrayList<>(2);
+    private boolean wasAlive = true;
+    private float lastHurtTime;
+    private float ambientTicks;       // vanilla ambientSoundTime: counts up, a sound resets it to -80
+    private float ambientAccumulator; // fractional game ticks carried between frames
+    private float stepDistance;
+    private static final float STEP_EVERY_BLOCKS = 0.9f;
+    private static final float AMBIENT_INTERVAL_TICKS = 80f;
+
     private float moveDirX, moveDirZ;
     /** Animation bookkeeping only (renderer reads these): advances while moving. */
     @Getter
@@ -116,6 +129,40 @@ public abstract class Mob extends LivingEntity {
         if (dx * dx + dz * dz > 1e-6f) desiredYaw = (float) Math.atan2(dx, -dz);
     }
 
+    /** Queues {@code mob.<typeId>.<suffix>} at this mob's position. */
+    public void emitSound(String suffix) {
+        pendingSounds.add(new SoundEvent("mob." + typeId() + "." + suffix, position.x, position.y, position.z));
+    }
+
+    /** Hands over (and clears) the sounds queued since the last call. */
+    public List<SoundEvent> drainSounds() {
+        if (pendingSounds.isEmpty()) return List.of();
+        List<SoundEvent> out = new java.util.ArrayList<>(pendingSounds);
+        pendingSounds.clear();
+        return out;
+    }
+
+    private void updateSounds(float dt) {
+        boolean aliveNow = isAlive();
+        if (wasAlive && !aliveNow) {
+            emitSound("death");
+        } else if (aliveNow && getHurtTime() > lastHurtTime + 1e-4f) {
+            emitSound("hurt");
+        }
+        wasAlive = aliveNow;
+        lastHurtTime = getHurtTime();
+        if (!aliveNow) return;
+        // Vanilla: every tick, if nextInt(1000) < ambientSoundTime++ the mob speaks and the counter drops to -80.
+        ambientAccumulator += dt * 20f;
+        while (ambientAccumulator >= 1f) {
+            ambientAccumulator -= 1f;
+            if (random.nextInt(1000) < ambientTicks++) {
+                emitSound("say");
+                ambientTicks = -AMBIENT_INTERVAL_TICKS;
+            }
+        }
+    }
+
     public boolean hasTarget() {
         return target != null;
     }
@@ -135,6 +182,7 @@ public abstract class Mob extends LivingEntity {
      */
     public void tick(World world, List<Targetable> candidates, float dt) {
         tickHealth(dt);
+        updateSounds(dt);
         if (!isAlive()) {
             moveDirX = 0f;
             moveDirZ = 0f;
@@ -172,6 +220,13 @@ public abstract class Mob extends LivingEntity {
         float target = moved > 1e-4f ? 1f : 0f;
         walkAmount += (target - walkAmount) * Math.min(1f, 10f * dt);
         walkPhase += moved * 6f;
+        if (isOnGround() && moved > 1e-4f) {
+            stepDistance += moved;
+            if (stepDistance >= STEP_EVERY_BLOCKS) {
+                stepDistance = 0f;
+                emitSound("step");
+            }
+        }
         moveDirX = 0f;
         moveDirZ = 0f;
     }

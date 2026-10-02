@@ -225,7 +225,7 @@ class MiningControllerTest {
         }
         assertNotNull(r);
         assertEquals(1, r.drops().size());
-        assertEquals(BlockType.DIAMOND_ORE, r.drops().get(0).item());
+        assertEquals(BlockType.DIAMOND, r.drops().get(0).item());
     }
 
     @Test

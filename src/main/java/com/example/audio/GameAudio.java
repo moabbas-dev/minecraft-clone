@@ -176,6 +176,12 @@ public class GameAudio {
         engine.playOneShot(registry.definitionOf(id), registry.buffersFor(id), worldPos, PLACEMENT_PITCH_MULTIPLIER, 1f);
     }
 
+    /** Plays a registered sound by id (positional when its group is and a position is given). Unknown ids and
+     *  missing files are silent no-ops, like every other sound here. */
+    public void play(String id, Vector3f worldPos) {
+        engine.playOneShot(registry.definitionOf(id), registry.buffersFor(id), worldPos);
+    }
+
     /** Item collected into the inventory. Non-positional (it happens at the player). The caller
      *  invokes this at most once per update no matter how many stacks transferred, so a pile
      *  being collected in one frame is one sound, not a burst. */

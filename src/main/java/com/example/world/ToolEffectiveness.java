@@ -34,7 +34,7 @@ public final class ToolEffectiveness {
     /** speedMultiplier applies only when a tool's Kind matches {@link #correctKindFor}; harvestLevel
      *  is compared against {@link #requiredHarvestLevel} for the 4 gated ores. */
     public enum Tier {
-        WOOD(2f, 1), STONE(4f, 2), IRON(6f, 3);
+        WOOD(2f, 1), STONE(4f, 2), IRON(6f, 3), DIAMOND(8f, 4);
 
         public final float speedMultiplier;
         public final int harvestLevel;
@@ -65,6 +65,10 @@ public final class ToolEffectiveness {
         TOOLS.put(BlockType.WOODEN_SWORD, new ToolInfo(Kind.SWORD, Tier.WOOD));
         TOOLS.put(BlockType.STONE_SWORD, new ToolInfo(Kind.SWORD, Tier.STONE));
         TOOLS.put(BlockType.IRON_SWORD, new ToolInfo(Kind.SWORD, Tier.IRON));
+        TOOLS.put(BlockType.DIAMOND_PICKAXE, new ToolInfo(Kind.PICKAXE, Tier.DIAMOND));
+        TOOLS.put(BlockType.DIAMOND_AXE, new ToolInfo(Kind.AXE, Tier.DIAMOND));
+        TOOLS.put(BlockType.DIAMOND_SHOVEL, new ToolInfo(Kind.SHOVEL, Tier.DIAMOND));
+        TOOLS.put(BlockType.DIAMOND_SWORD, new ToolInfo(Kind.SWORD, Tier.DIAMOND));
     }
 
     /** Blocks a pickaxe speeds up. Ore/stone/stone-derived blocks - real vanilla's own pickaxe list,

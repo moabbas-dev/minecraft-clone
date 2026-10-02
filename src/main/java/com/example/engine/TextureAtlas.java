@@ -64,7 +64,8 @@ public class TextureAtlas {
             Tile.COD, Tile.COOKED_COD, Tile.SALMON, Tile.COOKED_SALMON,
             Tile.POTATO, Tile.BAKED_POTATO, Tile.KELP, Tile.DRIED_KELP,
             Tile.ROTTEN_FLESH,
-            Tile.WOODEN_SWORD, Tile.STONE_SWORD, Tile.IRON_SWORD, Tile.LEATHER, Tile.FEATHER, Tile.EGG, Tile.LEATHER_HELMET, Tile.LEATHER_CHESTPLATE, Tile.LEATHER_LEGGINGS, Tile.LEATHER_BOOTS, Tile.IRON_HELMET, Tile.IRON_CHESTPLATE, Tile.IRON_LEGGINGS, Tile.IRON_BOOTS, Tile.GOLD_HELMET, Tile.GOLD_CHESTPLATE, Tile.GOLD_LEGGINGS, Tile.GOLD_BOOTS);
+            Tile.WOODEN_SWORD, Tile.STONE_SWORD, Tile.IRON_SWORD, Tile.LEATHER, Tile.FEATHER, Tile.EGG, Tile.LEATHER_HELMET, Tile.LEATHER_CHESTPLATE, Tile.LEATHER_LEGGINGS, Tile.LEATHER_BOOTS, Tile.IRON_HELMET, Tile.IRON_CHESTPLATE, Tile.IRON_LEGGINGS, Tile.IRON_BOOTS, Tile.GOLD_HELMET, Tile.GOLD_CHESTPLATE, Tile.GOLD_LEGGINGS, Tile.GOLD_BOOTS,
+            Tile.DIAMOND, Tile.DIAMOND_SWORD, Tile.DIAMOND_AXE, Tile.DIAMOND_PICKAXE, Tile.DIAMOND_SHOVEL, Tile.DIAMOND_HELMET, Tile.DIAMOND_CHESTPLATE, Tile.DIAMOND_LEGGINGS, Tile.DIAMOND_BOOTS);
 
     static {
         REAL_TEXTURE_PATHS.put(Tile.STONE, "textures/block/stone.png");
@@ -155,6 +156,15 @@ public class TextureAtlas {
         REAL_TEXTURE_PATHS.put(Tile.GOLD_CHESTPLATE, "textures/item/golden_chestplate.png");
         REAL_TEXTURE_PATHS.put(Tile.GOLD_LEGGINGS, "textures/item/golden_leggings.png");
         REAL_TEXTURE_PATHS.put(Tile.GOLD_BOOTS, "textures/item/golden_boots.png");
+        REAL_TEXTURE_PATHS.put(Tile.DIAMOND, "textures/item/diamond.png");
+        REAL_TEXTURE_PATHS.put(Tile.DIAMOND_SWORD, "textures/item/diamond_sword.png");
+        REAL_TEXTURE_PATHS.put(Tile.DIAMOND_AXE, "textures/item/diamond_axe.png");
+        REAL_TEXTURE_PATHS.put(Tile.DIAMOND_PICKAXE, "textures/item/diamond_pickaxe.png");
+        REAL_TEXTURE_PATHS.put(Tile.DIAMOND_SHOVEL, "textures/item/diamond_shovel.png");
+        REAL_TEXTURE_PATHS.put(Tile.DIAMOND_HELMET, "textures/item/diamond_helmet.png");
+        REAL_TEXTURE_PATHS.put(Tile.DIAMOND_CHESTPLATE, "textures/item/diamond_chestplate.png");
+        REAL_TEXTURE_PATHS.put(Tile.DIAMOND_LEGGINGS, "textures/item/diamond_leggings.png");
+        REAL_TEXTURE_PATHS.put(Tile.DIAMOND_BOOTS, "textures/item/diamond_boots.png");
         // Real item icons (textures/item/<name>.png, gitignored like the block textures);
         // any that is missing falls back to the procedural icon drawn in drawTile().
         REAL_TEXTURE_PATHS.put(Tile.STICK, "textures/item/stick.png");
@@ -492,6 +502,12 @@ public class TextureAtlas {
             case LEATHER_HELMET, LEATHER_CHESTPLATE, LEATHER_LEGGINGS, LEATHER_BOOTS -> blockyIcon(img, rnd, new Color(150, 90, 50));
             case IRON_HELMET, IRON_CHESTPLATE, IRON_LEGGINGS, IRON_BOOTS -> blockyIcon(img, rnd, new Color(210, 210, 210));
             case GOLD_HELMET, GOLD_CHESTPLATE, GOLD_LEGGINGS, GOLD_BOOTS -> blockyIcon(img, rnd, new Color(240, 210, 70));
+            case DIAMOND -> blockyIcon(img, rnd, new Color(110, 235, 220));
+            case DIAMOND_SWORD -> swordIcon(img, rnd, new Color(110, 235, 220));
+            case DIAMOND_AXE -> axeIcon(img, rnd, new Color(110, 235, 220));
+            case DIAMOND_PICKAXE -> pickaxeIcon(img, rnd, new Color(110, 235, 220));
+            case DIAMOND_SHOVEL -> shovelIcon(img, rnd, new Color(110, 235, 220));
+            case DIAMOND_HELMET, DIAMOND_CHESTPLATE, DIAMOND_LEGGINGS, DIAMOND_BOOTS -> blockyIcon(img, rnd, new Color(110, 235, 220));
             case PIG_SKIN -> noisyFill(img, rnd, new Color(236, 160, 160), 10);
             case COW_SKIN -> speckledNoise(img, rnd, new Color(98, 66, 40), new Color[]{new Color(235, 235, 235), new Color(60, 40, 25)}, 55);
             case CHICKEN_SKIN -> noisyFill(img, rnd, new Color(240, 240, 240), 8);

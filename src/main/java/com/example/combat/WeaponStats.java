@@ -31,6 +31,10 @@ public final class WeaponStats {
         put(BlockType.WOODEN_SHOVEL, 2.5f, 1.0f);
         put(BlockType.STONE_SHOVEL, 3.5f, 1.0f);
         put(BlockType.IRON_SHOVEL, 4.5f, 1.0f);
+        put(BlockType.DIAMOND_SWORD, 7, 1.6f);
+        put(BlockType.DIAMOND_AXE, 9, 1.0f);
+        put(BlockType.DIAMOND_PICKAXE, 5, 1.2f);
+        put(BlockType.DIAMOND_SHOVEL, 5.5f, 1.0f);
     }
 
     private static void put(BlockType t, float damage, float speed) {
@@ -43,7 +47,8 @@ public final class WeaponStats {
     }
 
     public static boolean isSword(BlockType t) {
-        return t == BlockType.WOODEN_SWORD || t == BlockType.STONE_SWORD || t == BlockType.IRON_SWORD;
+        return t == BlockType.WOODEN_SWORD || t == BlockType.STONE_SWORD || t == BlockType.IRON_SWORD
+                || t == BlockType.DIAMOND_SWORD;
     }
 
     public static float damage(BlockType held) {

@@ -279,6 +279,39 @@ class CombatSystemTest {
         assertTrue(Recipes.craft(grid(3, 3, 0, I, 1, I, 2, I, 3, I, 4, I, 5, I), 3, 3).isEmpty(), "a full block of ingots is not a helmet");
     }
 
+    // ---- diamond tier (docs/research/diamond-tier.md) ----
+
+    @Test
+    void diamondToolsAndArmorMatchTheResearch() {
+        assertEquals(7f, WeaponStats.damage(BlockType.DIAMOND_SWORD));
+        assertEquals(9f, WeaponStats.damage(BlockType.DIAMOND_AXE));
+        assertEquals(1.0f, WeaponStats.attackSpeed(BlockType.DIAMOND_AXE));
+        assertEquals(5f, WeaponStats.damage(BlockType.DIAMOND_PICKAXE));
+        assertEquals(5.5f, WeaponStats.damage(BlockType.DIAMOND_SHOVEL));
+        assertTrue(WeaponStats.isSword(BlockType.DIAMOND_SWORD));
+        assertEquals(1561, Durability.max(BlockType.DIAMOND_PICKAXE));
+        assertEquals(363, Durability.max(BlockType.DIAMOND_HELMET));
+        assertEquals(528, Durability.max(BlockType.DIAMOND_CHESTPLATE));
+        assertEquals(495, Durability.max(BlockType.DIAMOND_LEGGINGS));
+        assertEquals(429, Durability.max(BlockType.DIAMOND_BOOTS));
+        PlayerArmor a = new PlayerArmor();
+        for (BlockType t : new BlockType[]{BlockType.DIAMOND_HELMET, BlockType.DIAMOND_CHESTPLATE, BlockType.DIAMOND_LEGGINGS, BlockType.DIAMOND_BOOTS})
+            a.equip(new ItemStack(t, 1));
+        assertEquals(20, a.totalDefense());
+        assertEquals(8f, a.totalToughness());
+        assertEquals(3f, ArmorRules.reduce(10f, a.totalDefense(), a.totalToughness()), 1e-4f);
+    }
+
+    @Test
+    void diamondRecipesCraftAndTheToolMinesFasterThanIron() {
+        BlockType D = BlockType.DIAMOND, S = BlockType.STICK;
+        assertEquals(BlockType.DIAMOND_SWORD, Recipes.craft(grid(3, 3, 0, D, 3, D, 6, S), 3, 3).type());
+        assertEquals(BlockType.DIAMOND_PICKAXE, Recipes.craft(grid(3, 3, 0, D, 1, D, 2, D, 4, S, 7, S), 3, 3).type());
+        assertEquals(BlockType.DIAMOND_BOOTS, Recipes.craft(grid(3, 3, 3, D, 5, D, 6, D, 8, D), 3, 3).type());
+        assertTrue(com.example.world.ToolEffectiveness.tierOf(BlockType.DIAMOND_PICKAXE).speedMultiplier
+                > com.example.world.ToolEffectiveness.tierOf(BlockType.IRON_PICKAXE).speedMultiplier);
+    }
+
     private static BlockType[] grid(int w, int h, Object... cells) {
         BlockType[] g = new BlockType[w * h];
         for (int i = 0; i < cells.length; i += 2) g[(Integer) cells[i]] = (BlockType) cells[i + 1];

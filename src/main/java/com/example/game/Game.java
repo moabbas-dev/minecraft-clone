@@ -195,6 +195,8 @@ public class Game implements GameAccess {
     private final PlayerTargetAdapter playerTarget = new PlayerTargetAdapter();
     private final java.util.List<Targetable> mobTargets = java.util.List.of(playerTarget);
     private Mesh mobMesh;
+    private float lastHurtCooldown;
+    private final java.util.Map<String, com.example.engine.EntityTexture> mobSkins = new java.util.LinkedHashMap<>();
     private final float[] mobScratch = new float[MobManager.MAX_MOBS * MobModelBuilder.FLOATS_PER_MOB];
     /** Vanilla survival reach for hitting entities (blocks use REACH_DISTANCE). */
     private static final float ENTITY_REACH = 3.0f;
@@ -281,6 +283,11 @@ public class Game implements GameAccess {
         crackOverlay = new CrackOverlay(CHUNK_VERTEX_LAYOUT);
 
         gameAudio = new GameAudio();
+        mobs.setSoundSink(e -> {
+            if (player != null && player.position.distanceSquared(e.x(), e.y(), e.z()) < 32f * 32f) {
+                gameAudio.play(e.id(), new Vector3f(e.x(), e.y(), e.z()));
+            }
+        });
         gameAudio.init(); // never throws - degrades to silent no-ops if no device/OpenAL fails
 
         guiEnv = new GuiEnv(options, atlas.getTextureId(), atlas.getUv(Tile.DIRT));
@@ -1000,6 +1007,7 @@ public class Game implements GameAccess {
             if (com.example.inventory.PlayerArmor.canEquip(held)) {
                 // Right-click equips armor from the hotbar, swapping with whatever is worn in that slot.
                 inventory.set(inventory.getSelectedSlot(), survival.getArmor().equip(held));
+                gameAudio.play("armor.equip." + armorMaterial(held.type()), null);
             } else if (food != null) {
                 tryEat(held.type());
             } else if (hit != null) {
@@ -1045,7 +1053,10 @@ public class Game implements GameAccess {
                 com.example.combat.CombatMath.knockbackStrength(sprintHit));
         if (!applied) return; // a hit swallowed by the hurt window spends no durability
         damageSelectedItem(com.example.combat.Durability.attackCost(heldType));
+        gameAudio.play(crit ? "attack.crit" : charge >= 0.9f ? "attack.strong" : "attack.weak", null);
+        if (sprintHit) gameAudio.play("attack.knockback", null);
         if (com.example.combat.CombatMath.isSweep(heldType, charge, player.isOnGround(), crit, sprintHit)) {
+            gameAudio.play("attack.sweep", null);
             for (Mob other : mobs.sweepTargets(target, player.position)) {
                 other.hurtBy(com.example.combat.CombatMath.SWEEP_DAMAGE, com.example.survival.DamageSource.PLAYER, pushFrom,
                         com.example.combat.CombatMath.BASE_KNOCKBACK * com.example.combat.CombatMath.SWEEP_KNOCKBACK_FACTOR);
@@ -1058,7 +1069,19 @@ public class Game implements GameAccess {
         if (uses <= 0) return;
         int slot = inventory.getSelectedSlot();
         ItemStack s = inventory.get(slot);
-        if (!s.isEmpty()) inventory.set(slot, s.damaged(uses));
+        if (s.isEmpty()) return;
+        ItemStack after = s.damaged(uses);
+        inventory.set(slot, after);
+        if (after.isEmpty()) gameAudio.play("item.break", null);
+    }
+
+    private static String armorMaterial(BlockType t) {
+        String n = t.name();
+        if (n.startsWith("LEATHER")) return "leather";
+        if (n.startsWith("IRON")) return "iron";
+        if (n.startsWith("GOLD")) return "gold";
+        if (n.startsWith("DIAMOND")) return "diamond";
+        return "generic";
     }
 
     /** Eats one unit of the given food type from the selected hotbar slot - instant (no
@@ -1350,6 +1373,9 @@ public class Game implements GameAccess {
 
     private void updateItemsAndEffects(float dt) {
         playerTarget.bind(player, survival);
+        float cooldown = survival.getHealth().hurtCooldownRemaining();
+        if (cooldown > lastHurtCooldown + 1e-4f && survival.getHealth().isAlive()) gameAudio.play("player.hurt", null);
+        lastHurtCooldown = cooldown;
         mobSpawner.tick(world, mobs, player.position, computeDaylightFactor(sunDirection(dayTime)),
                 () -> survival.getDifficulty(), gameplayRandom, dt);
         passiveSpawner.tick(world, mobs, player.position, computeDaylightFactor(sunDirection(dayTime)), gameplayRandom, dt);
@@ -1590,32 +1616,39 @@ public class Game implements GameAccess {
     private void renderMobs() {
         java.util.List<Mob> list = mobs.mobs();
         if (list.isEmpty()) return;
-        float[] zombieUv = atlas.getUv(com.example.engine.Tile.ZOMBIE_SKIN);
-        float[] pigUv = atlas.getUv(com.example.engine.Tile.PIG_SKIN);
-        float[] cowUv = atlas.getUv(com.example.engine.Tile.COW_SKIN);
-        float[] chickenUv = atlas.getUv(com.example.engine.Tile.CHICKEN_SKIN);
-        float[] beakUv = atlas.getUv(com.example.engine.Tile.CHICKEN_BEAK);
-        int n = 0;
-        for (Mob m : list) {
-            if (n + MobModelBuilder.FLOATS_PER_MOB > mobScratch.length) break;
-            int bx = (int) Math.floor(m.position.x), by = (int) Math.floor(m.position.y + 1f), bz = (int) Math.floor(m.position.z);
-            float sky = world.getSkyLight(bx, by, bz) / 15f, blk = world.getBlockLight(bx, by, bz) / 15f;
-            float[] tint = m.getHurtTime() > 0f || !m.isAlive() ? new float[]{1.6f, 0.5f, 0.5f} : NEUTRAL_ICON_TINT;
-            float tilt = m.isAlive() ? 0f : (float) (Math.PI / 2) * Math.min(1f, m.getDeathTime());
-            float yaw = m.getYaw();
-            float px = m.position.x, py = m.position.y, pz = m.position.z;
-            float walk = m.getWalkPhase(), amt = m.getWalkAmount();
-            switch (m.typeId()) {
-                case "pig" -> n = MobModelBuilder.emitPig(mobScratch, n, px, py, pz, yaw, tilt, walk, amt, pigUv, sky, blk, tint);
-                case "cow" -> n = MobModelBuilder.emitCow(mobScratch, n, px, py, pz, yaw, tilt, walk, amt, cowUv, sky, blk, tint);
-                case "chicken" -> n = MobModelBuilder.emitChicken(mobScratch, n, px, py, pz, yaw, tilt, walk, amt,
-                        !m.isOnGround(), chickenUv, beakUv, sky, blk, tint);
-                default -> n = MobModelBuilder.emitZombie(mobScratch, n, px, py, pz, yaw, tilt, walk, amt, zombieUv, sky, blk, tint);
-            }
+        if (mobSkins.isEmpty()) {
+            mobSkins.put("zombie", com.example.engine.EntityTexture.load("textures/entity/zombie/zombie.png", 64, 64, 0x5E874C));
+            mobSkins.put("pig", com.example.engine.EntityTexture.load("textures/entity/pig/pig.png", 64, 32, 0xECA0A0));
+            mobSkins.put("cow", com.example.engine.EntityTexture.load("textures/entity/cow/cow.png", 64, 32, 0x694628));
+            mobSkins.put("chicken", com.example.engine.EntityTexture.load("textures/entity/chicken.png", 64, 32, 0xF0F0F0));
         }
-        mobMesh.upload(mobScratch, n);
         chunkShader.setUniform("uModel", IDENTITY);
-        mobMesh.draw();
+        for (java.util.Map.Entry<String, com.example.engine.EntityTexture> skin : mobSkins.entrySet()) {
+            int n = 0;
+            for (Mob m : list) {
+                if (!skin.getKey().equals(m.typeId())) continue;
+                if (n + MobModelBuilder.FLOATS_PER_MOB > mobScratch.length) break;
+                int bx = (int) Math.floor(m.position.x), by = (int) Math.floor(m.position.y + 1f), bz = (int) Math.floor(m.position.z);
+                float sky = world.getSkyLight(bx, by, bz) / 15f, blk = world.getBlockLight(bx, by, bz) / 15f;
+                float[] tint = m.getHurtTime() > 0f || !m.isAlive() ? new float[]{1.6f, 0.5f, 0.5f} : NEUTRAL_ICON_TINT;
+                float tilt = m.isAlive() ? 0f : (float) (Math.PI / 2) * Math.min(1f, m.getDeathTime());
+                float yaw = m.getYaw();
+                float px = m.position.x, py = m.position.y, pz = m.position.z;
+                float walk = m.getWalkPhase(), amt = m.getWalkAmount();
+                switch (skin.getKey()) {
+                    case "pig" -> n = MobModelBuilder.emitPig(mobScratch, n, px, py, pz, yaw, tilt, walk, amt, sky, blk, tint);
+                    case "cow" -> n = MobModelBuilder.emitCow(mobScratch, n, px, py, pz, yaw, tilt, walk, amt, sky, blk, tint);
+                    case "chicken" -> n = MobModelBuilder.emitChicken(mobScratch, n, px, py, pz, yaw, tilt, walk, amt,
+                            !m.isOnGround(), sky, blk, tint);
+                    default -> n = MobModelBuilder.emitZombie(mobScratch, n, px, py, pz, yaw, tilt, walk, amt, sky, blk, tint);
+                }
+            }
+            if (n == 0) continue;
+            skin.getValue().bind(0);
+            mobMesh.upload(mobScratch, n);
+            mobMesh.draw();
+        }
+        atlas.bind(0); // everything drawn after the mobs expects the block atlas on unit 0
     }
 
     private void renderParticles() {
@@ -2768,6 +2801,7 @@ public class Game implements GameAccess {
         heldItemMesh.destroy();
         itemMesh.destroy();
         mobMesh.destroy();
+        for (com.example.engine.EntityTexture t : mobSkins.values()) t.destroy();
         particleMesh.destroy();
         crackOverlay.destroy();
         chunkShader.destroy();

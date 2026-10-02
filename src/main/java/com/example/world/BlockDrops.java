@@ -70,6 +70,9 @@ public final class BlockDrops {
         // legitimate source for it to be usable as furnace fuel at all (this milestone's own
         // requirement), matching real vanilla's actual behavior exactly.
         OVERRIDES.put(BlockType.COAL_ORE, List.of(Drop.of(BlockType.COAL)));
+        // Diamond ore yields the diamond item (needed for the diamond tier); an iron-or-better pickaxe is
+        // still required by ToolEffectiveness.
+        OVERRIDES.put(BlockType.DIAMOND_ORE, List.of(Drop.of(BlockType.DIAMOND)));
     }
 
     /** The drop definitions for a block (empty = drops nothing). Never null. */

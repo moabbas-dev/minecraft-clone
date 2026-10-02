@@ -180,3 +180,13 @@ generated chunks, and killing a cow dropped 2 raw beef and 2 leather and granted
 Unit coverage: `CombatSystemTest` (charge/crit/sweep/knockback/armor math, durability, armor
 slots, recipes) and `PassiveMobTest` (stats, drop ranges, egg timer, mob/armor persistence,
 species weights). Not verified live: save/reload of animals (covered by the `WorldIO` unit test only).
+
+**Diamond tier / original skins / mob sounds - live pass:** full diamond set equipped by right-click
+(`armor.defense=20 toughness=8.0`, durabilities 363/528/495/429); a diamond sword hit cost 1 of 1561
+durability. Pig, cow, chicken and zombie render with the original 64x32 / 64x64 Mojang skins through the
+vanilla box-UV unwrap (screenshots checked by eye: faces, snout, udder, wattle, zombie shirt/pants).
+Sounds are wired for mob say/hurt/death/step, egg plop, player attack variants, player hurt, armor equip
+and item break; the log showed no missing-file warnings, but I cannot hear the audio from here, so the
+mix (volumes, pitch) is by the research values and not judged by ear. Skins and sounds live in the
+gitignored `textures/entity/` and `sounds/mob|entity|damage|item/` (downloaded from the misode/mcmeta
+`1.21.4-assets` tag); without them the mobs fall back to flat-colour skins and silence.

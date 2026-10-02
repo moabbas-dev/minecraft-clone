@@ -22,6 +22,14 @@ import java.util.Random;
  */
 public class MobManager {
     public static final int MAX_MOBS = 160;
+    private java.util.function.Consumer<Mob.SoundEvent> soundSink = e -> {
+    };
+
+    /** Where mob sound events go each tick (the game wires this to its audio engine). */
+    public void setSoundSink(java.util.function.Consumer<Mob.SoundEvent> sink) {
+        this.soundSink = sink == null ? e -> {
+        } : sink;
+    }
     /** Mobs farther than this from the player are not simulated (they simply wait). */
     public static final float SIMULATION_DISTANCE = 64f;
     public static final float CORPSE_SECONDS = 1.0f;
@@ -89,6 +97,7 @@ public class MobManager {
             if (laid != null) {
                 items.spawn(laid, 1, new Vector3f(m.position.x, m.position.y + 0.3f, m.position.z), random);
             }
+            for (Mob.SoundEvent e : m.drainSounds()) soundSink.accept(e);
 
             if (!m.isAlive() && !deadHandled.contains(m)) {
                 deadHandled.add(m);

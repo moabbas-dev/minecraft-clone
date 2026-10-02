@@ -71,6 +71,7 @@ public class Chicken extends PassiveMob {
     public BlockType takeLaidItem() {
         if (!eggReady) return null;
         eggReady = false;
+        emitSound("plop");
         return BlockType.EGG;
     }
 

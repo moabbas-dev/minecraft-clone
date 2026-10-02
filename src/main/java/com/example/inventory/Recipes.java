@@ -95,6 +95,16 @@ public final class Recipes {
             tool(new String[]{"H", "H", "S"}, BlockType.COBBLESTONE, new ItemStack(BlockType.STONE_SWORD, 1)),
             tool(new String[]{"H", "H", "S"}, BlockType.IRON_INGOT, new ItemStack(BlockType.IRON_SWORD, 1)),
 
+            tool(new String[]{"HHH", ".S.", ".S."}, BlockType.DIAMOND, new ItemStack(BlockType.DIAMOND_PICKAXE, 1)),
+            tool(new String[]{"HH", "HS", ".S"}, BlockType.DIAMOND, new ItemStack(BlockType.DIAMOND_AXE, 1)),
+            tool(new String[]{"HH", "SH", "S."}, BlockType.DIAMOND, new ItemStack(BlockType.DIAMOND_AXE, 1)),
+            tool(new String[]{"H", "S", "S"}, BlockType.DIAMOND, new ItemStack(BlockType.DIAMOND_SHOVEL, 1)),
+            tool(new String[]{"H", "H", "S"}, BlockType.DIAMOND, new ItemStack(BlockType.DIAMOND_SWORD, 1)),
+            armorRecipe(new String[]{"HHH", "H.H"}, BlockType.DIAMOND, BlockType.DIAMOND_HELMET),
+            armorRecipe(new String[]{"H.H", "HHH", "HHH"}, BlockType.DIAMOND, BlockType.DIAMOND_CHESTPLATE),
+            armorRecipe(new String[]{"HHH", "H.H", "H.H"}, BlockType.DIAMOND, BlockType.DIAMOND_LEGGINGS),
+            armorRecipe(new String[]{"H.H", "H.H"}, BlockType.DIAMOND, BlockType.DIAMOND_BOOTS),
+
             // Armor: 5 / 8 / 7 / 4 units of one material (leather, iron ingot, gold ingot).
             armorRecipe(new String[]{"HHH", "H.H"}, BlockType.LEATHER, BlockType.LEATHER_HELMET),
             armorRecipe(new String[]{"H.H", "HHH", "HHH"}, BlockType.LEATHER, BlockType.LEATHER_CHESTPLATE),

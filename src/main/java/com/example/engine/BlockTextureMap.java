@@ -141,6 +141,15 @@ public class BlockTextureMap {
         uniform(BlockType.GOLD_CHESTPLATE, Tile.GOLD_CHESTPLATE);
         uniform(BlockType.GOLD_LEGGINGS, Tile.GOLD_LEGGINGS);
         uniform(BlockType.GOLD_BOOTS, Tile.GOLD_BOOTS);
+        uniform(BlockType.DIAMOND, Tile.DIAMOND);
+        uniform(BlockType.DIAMOND_SWORD, Tile.DIAMOND_SWORD);
+        uniform(BlockType.DIAMOND_AXE, Tile.DIAMOND_AXE);
+        uniform(BlockType.DIAMOND_PICKAXE, Tile.DIAMOND_PICKAXE);
+        uniform(BlockType.DIAMOND_SHOVEL, Tile.DIAMOND_SHOVEL);
+        uniform(BlockType.DIAMOND_HELMET, Tile.DIAMOND_HELMET);
+        uniform(BlockType.DIAMOND_CHESTPLATE, Tile.DIAMOND_CHESTPLATE);
+        uniform(BlockType.DIAMOND_LEGGINGS, Tile.DIAMOND_LEGGINGS);
+        uniform(BlockType.DIAMOND_BOOTS, Tile.DIAMOND_BOOTS);
     }
 
     private void uniform(BlockType type, Tile tile) {
