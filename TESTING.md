@@ -164,3 +164,9 @@ Sounds, Controls/Mouse/Key Binds, Game Menu, Death. Responsiveness was checked b
 A real end-to-end click flow used `click` (same edge flags as a physical click): Singleplayer ->
 Create New World -> Create (world generated and entered) -> pause -> Options -> Difficulty (Normal
 -> Hard confirmed in `state`) -> Done -> Respawn from the death screen -> Save and Quit to Title.
+
+**Real-texture HUD pass:** real Minecraft item icons (`textures/item/*.png`), HUD sprites
+(`textures/gui/sprites/hud/` hearts, hunger icons, hotbar and its selection frame) were downloaded
+from the public `misode/mcmeta` asset mirror into the gitignored `textures/` folder and verified by
+screenshot (hotbar, hearts at partial health, hunger, inventory icons, held items). A missing
+texture falls back to the previous procedural icon / plain HUD, so nothing breaks without them.

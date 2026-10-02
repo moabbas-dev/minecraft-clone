@@ -136,6 +136,49 @@ public class TextureAtlas {
         REAL_TEXTURE_PATHS.put(Tile.MANGROVE_ROOTS_TOP, "textures/block/mangrove_roots_top.png");
         REAL_TEXTURE_PATHS.put(Tile.OAK_SAPLING, "textures/block/oak_sapling.png");
         // CHEST, SUN, MOON, RAIN: no real block-texture equivalent, always procedural.
+        // Real item icons (textures/item/<name>.png, gitignored like the block textures);
+        // any that is missing falls back to the procedural icon drawn in drawTile().
+        REAL_TEXTURE_PATHS.put(Tile.STICK, "textures/item/stick.png");
+        REAL_TEXTURE_PATHS.put(Tile.WOODEN_PICKAXE, "textures/item/wooden_pickaxe.png");
+        REAL_TEXTURE_PATHS.put(Tile.STONE_PICKAXE, "textures/item/stone_pickaxe.png");
+        REAL_TEXTURE_PATHS.put(Tile.IRON_PICKAXE, "textures/item/iron_pickaxe.png");
+        REAL_TEXTURE_PATHS.put(Tile.WOODEN_AXE, "textures/item/wooden_axe.png");
+        REAL_TEXTURE_PATHS.put(Tile.STONE_AXE, "textures/item/stone_axe.png");
+        REAL_TEXTURE_PATHS.put(Tile.IRON_AXE, "textures/item/iron_axe.png");
+        REAL_TEXTURE_PATHS.put(Tile.WOODEN_SHOVEL, "textures/item/wooden_shovel.png");
+        REAL_TEXTURE_PATHS.put(Tile.STONE_SHOVEL, "textures/item/stone_shovel.png");
+        REAL_TEXTURE_PATHS.put(Tile.IRON_SHOVEL, "textures/item/iron_shovel.png");
+        REAL_TEXTURE_PATHS.put(Tile.APPLE, "textures/item/apple.png");
+        REAL_TEXTURE_PATHS.put(Tile.BREAD, "textures/item/bread.png");
+        REAL_TEXTURE_PATHS.put(Tile.COOKED_BEEF, "textures/item/cooked_beef.png");
+        REAL_TEXTURE_PATHS.put(Tile.COAL, "textures/item/coal.png");
+        REAL_TEXTURE_PATHS.put(Tile.CHARCOAL, "textures/item/charcoal.png");
+        REAL_TEXTURE_PATHS.put(Tile.IRON_INGOT, "textures/item/iron_ingot.png");
+        REAL_TEXTURE_PATHS.put(Tile.GOLD_INGOT, "textures/item/gold_ingot.png");
+        REAL_TEXTURE_PATHS.put(Tile.COPPER_INGOT, "textures/item/copper_ingot.png");
+        REAL_TEXTURE_PATHS.put(Tile.IRON_NUGGET, "textures/item/iron_nugget.png");
+        REAL_TEXTURE_PATHS.put(Tile.BRICK, "textures/item/brick.png");
+        REAL_TEXTURE_PATHS.put(Tile.RAW_IRON, "textures/item/raw_iron.png");
+        REAL_TEXTURE_PATHS.put(Tile.RAW_GOLD, "textures/item/raw_gold.png");
+        REAL_TEXTURE_PATHS.put(Tile.RAW_COPPER, "textures/item/raw_copper.png");
+        REAL_TEXTURE_PATHS.put(Tile.RAW_BEEF, "textures/item/beef.png");
+        REAL_TEXTURE_PATHS.put(Tile.RAW_PORKCHOP, "textures/item/porkchop.png");
+        REAL_TEXTURE_PATHS.put(Tile.COOKED_PORKCHOP, "textures/item/cooked_porkchop.png");
+        REAL_TEXTURE_PATHS.put(Tile.RAW_CHICKEN, "textures/item/chicken.png");
+        REAL_TEXTURE_PATHS.put(Tile.COOKED_CHICKEN, "textures/item/cooked_chicken.png");
+        REAL_TEXTURE_PATHS.put(Tile.RAW_MUTTON, "textures/item/mutton.png");
+        REAL_TEXTURE_PATHS.put(Tile.COOKED_MUTTON, "textures/item/cooked_mutton.png");
+        REAL_TEXTURE_PATHS.put(Tile.RAW_RABBIT, "textures/item/rabbit.png");
+        REAL_TEXTURE_PATHS.put(Tile.COOKED_RABBIT, "textures/item/cooked_rabbit.png");
+        REAL_TEXTURE_PATHS.put(Tile.COD, "textures/item/cod.png");
+        REAL_TEXTURE_PATHS.put(Tile.COOKED_COD, "textures/item/cooked_cod.png");
+        REAL_TEXTURE_PATHS.put(Tile.SALMON, "textures/item/salmon.png");
+        REAL_TEXTURE_PATHS.put(Tile.COOKED_SALMON, "textures/item/cooked_salmon.png");
+        REAL_TEXTURE_PATHS.put(Tile.POTATO, "textures/item/potato.png");
+        REAL_TEXTURE_PATHS.put(Tile.BAKED_POTATO, "textures/item/baked_potato.png");
+        REAL_TEXTURE_PATHS.put(Tile.KELP, "textures/item/kelp.png");
+        REAL_TEXTURE_PATHS.put(Tile.DRIED_KELP, "textures/item/dried_kelp.png");
+        REAL_TEXTURE_PATHS.put(Tile.ROTTEN_FLESH, "textures/item/rotten_flesh.png");
     }
 
     @Getter

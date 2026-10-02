@@ -185,6 +185,7 @@ public class Game implements GameAccess {
     private McScreen optionsScreen;
     private GameState optionsParent = GameState.TITLE;
     private DeathScreen deathScreen;
+    private HudTextures hudTextures;
     private final Vector3f spawnPoint = new Vector3f();
     private float currentFov = 70f;
     private float swingTimer = 0f;
@@ -265,6 +266,7 @@ public class Game implements GameAccess {
         chunkShader = new Shader(Shaders.CHUNK_VERTEX, Shaders.CHUNK_FRAGMENT);
         uiRenderer = new UiRenderer();
         font = new Font();
+        hudTextures = HudTextures.loadOrNull();
         sunMoonMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
         rainMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
         moteMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
@@ -1567,8 +1569,19 @@ public class Game implements GameAccess {
             // Saplings (and any future cross/plant block) are a thin flat cross in-world, never a
             // cube (see ChunkMeshBuilder.emitCrossPlant) - held in hand, they were rendering as the
             // same solid cube every other block gets.
-            verts = ChunkMeshBuilder.isFlatIconItem(held) ? buildCrossPlantHeldVerts(held) : buildHeldItemVerts(held);
-            model = new Matrix4f()
+            boolean flatItem = ChunkMeshBuilder.isFlatIconItem(held) && !ChunkMeshBuilder.isCrossShapedPlant(held);
+            verts = flatItem ? buildFlatItemHeldVerts(held)
+                    : ChunkMeshBuilder.isFlatIconItem(held) ? buildCrossPlantHeldVerts(held) : buildHeldItemVerts(held);
+            model = flatItem
+                    // Tools/food/ingots: one mirrored sprite plane held diagonally in the right hand
+                    // (handle toward the hand, head up and away), like vanilla's first-person item.
+                    ? new Matrix4f()
+                    .translate(0.3f + bobX, -0.2f - bobY - swingArc * 0.1f, -0.7f - swingArc * 0.2f)
+                    .rotateY((float) Math.toRadians(-25f + swingArc * 20f))
+                    .rotateX((float) Math.toRadians(5f - swingArc * 55f))
+                    .rotateZ((float) Math.toRadians(-4f))
+                    .scale(0.26f)
+                    : new Matrix4f()
                     .translate(0.62f + bobX, -0.52f - bobY - swingArc * 0.12f, -1.1f - swingArc * 0.25f)
                     .rotateY((float) Math.toRadians(28f - swingArc * 35f))
                     .rotateX((float) Math.toRadians(-12f - swingArc * 25f))
@@ -1635,6 +1648,19 @@ public class Game implements GameAccess {
      *  and reusing emitCubeFace's quad-emission (its p0..p3 corner-to-UV convention already
      *  matches emitCrossPlant's own corner ordering exactly). Saplings are never tinted (not a
      *  leaf, not the grass block), so this always uses the neutral tint. */
+    /** A single sprite plane (front + back), U mirrored so a tool's head points away from the hand. */
+    private float[] buildFlatItemHeldVerts(BlockType block) {
+        float[] uv = atlas.getUv(textureMap.facesFor(block).side());
+        float[] mirrored = {uv[2], uv[1], uv[0], uv[3]};
+        float[] verts = new float[2 * 6 * 11];
+        int idx = 0;
+        idx = emitCubeFace(verts, idx, new float[]{-0.5f, -0.5f, 0f}, new float[]{0.5f, -0.5f, 0f},
+                new float[]{0.5f, 0.5f, 0f}, new float[]{-0.5f, 0.5f, 0f}, mirrored, 1f, NEUTRAL_ICON_TINT);
+        idx = emitCubeFace(verts, idx, new float[]{0.5f, -0.5f, -0.004f}, new float[]{-0.5f, -0.5f, -0.004f},
+                new float[]{-0.5f, 0.5f, -0.004f}, new float[]{0.5f, 0.5f, -0.004f}, mirrored, 0.8f, NEUTRAL_ICON_TINT); // offset: coplanar faces would z-fight
+        return verts;
+    }
+
     private float[] buildCrossPlantHeldVerts(BlockType block) {
         float[] uv = atlas.getUv(textureMap.facesFor(block).side());
         float[] verts = new float[2 * 6 * 11];
@@ -1852,6 +1878,16 @@ public class Game implements GameAccess {
         uiRenderer.drawColorQuad(cx - 5, cy - 1, 10, 2, 1, 1, 1, 0.9f);
         uiRenderer.drawColorQuad(cx - 1, cy - 5, 2, 10, 1, 1, 1, 0.9f);
 
+        if (hudTextures != null && inventory.getHotbarSize() == 9) {
+            renderRealHud();
+            float flashReal = weather.getLightningFlash();
+            if (flashReal > 0.01f) {
+                uiRenderer.drawColorQuad(0, 0, window.getWidth(), window.getHeight(), 1f, 1f, 1f, flashReal * 0.8f);
+            }
+            renderDebugOverlay();
+            return;
+        }
+
         int visibleSlots = inventory.getHotbarSize();
         float slotSize = 44f;
         float margin = 4f;
@@ -1896,6 +1932,45 @@ public class Game implements GameAccess {
      * already uses (the hotbar slots/selection highlight/crosshair) - not a redesign of the HUD,
      * the smallest layer that actually shows the two new survival stats.
      */
+    /** The HUD drawn from the real Minecraft sprites at the menu's GUI scale: 182x22 hotbar with its
+     *  selection frame, hearts (8px pitch) left of the bar and hunger icons mirrored on the right,
+     *  10 icons each, container + full/half overlay exactly like vanilla. */
+    private void renderRealHud() {
+        int w = window.getWidth(), h = window.getHeight();
+        float s = com.example.ui.GuiScale.compute(w, h, options.guiScale);
+        float hx = (float) Math.floor((w - 182 * s) / 2f), hy = h - 22 * s;
+        HudTextures t = hudTextures;
+        HudTextures.draw(uiRenderer, t.hotbar, hx, hy, s);
+
+        float heartsY = hy - 17 * s;
+        float health = survival.getHealth().getCurrentHealth();
+        float food = survival.getHunger().getFoodLevel();
+        for (int i = 0; i < 10; i++) {
+            float x = hx + i * 8 * s;
+            HudTextures.draw(uiRenderer, t.heartContainer, x, heartsY, s);
+            float v = health - i * 2f;
+            if (v >= 1.5f) HudTextures.draw(uiRenderer, t.heartFull, x, heartsY, s);
+            else if (v >= 0.5f) HudTextures.draw(uiRenderer, t.heartHalf, x, heartsY, s);
+
+            float fx = hx + (182 - 9) * s - i * 8 * s;
+            HudTextures.draw(uiRenderer, t.foodEmpty, fx, heartsY, s);
+            float fv = food - i * 2f;
+            if (fv >= 1.5f) HudTextures.draw(uiRenderer, t.foodFull, fx, heartsY, s);
+            else if (fv >= 0.5f) HudTextures.draw(uiRenderer, t.foodHalf, fx, heartsY, s);
+        }
+
+        int sel = inventory.getSelectedSlot();
+        for (int i = 0; i < 9; i++) {
+            ItemStack stack = inventory.get(i);
+            if (stack.isEmpty()) continue;
+            float ix = hx + (3 + 20 * i) * s, iy = hy + 3 * s;
+            drawBlockIcon(stack.type(), ix, iy, 16 * s);
+            if (stack.count() > 1) drawStackCount(stack.count(), ix, iy, 16 * s);
+        }
+        HudTextures.draw(uiRenderer, t.hotbarSelection, hx - s + 20 * sel * s, hy - s, s);
+        drawHotbarLabel(hx + (3 + 20 * sel) * s, heartsY - 4 * s, 16 * s);
+    }
+
     private void drawSurvivalHud(float hotbarLeftX, float hotbarRightX, float hotbarY) {
         float iconSize = 14f, gap = 2f;
         float rowY = hotbarY - iconSize - 6f;
@@ -1928,12 +2003,10 @@ public class Game implements GameAccess {
     /** Quantity in the slot's bottom-right corner, with a dark drop shadow so it reads over any icon. */
     private void drawStackCount(int count, float slotX, float slotY, float slotSize) {
         String text = Integer.toString(count);
-        float scale = slotSize >= 44f ? 1.1f : 0.85f; // smaller slots (the inventory screen) get smaller digits
-        float w = font.measureText(text, scale);
-        float x = slotX + slotSize - w - 3f;
-        float y = slotY + slotSize - font.lineHeight(scale) - 1f;
-        font.drawText(uiRenderer, text, x + 1.5f, y + 1.5f, scale, 0.1f, 0.1f, 0.1f, 1f);
-        font.drawText(uiRenderer, text, x, y, scale, 1f, 1f, 1f, 1f);
+        float px = Math.max(1f, (float) Math.floor(slotSize / 16f)); // one font pixel per slot "icon pixel"
+        float x = slotX + slotSize - font.width(text, px) - px * 0.5f;
+        float y = slotY + slotSize - 9 * px;
+        font.draw(uiRenderer, text, x, y, px, 0xFFFFFF, true);
     }
 
     /** The selected block's display name, floating just above its hotbar slot for
@@ -2549,6 +2622,7 @@ public class Game implements GameAccess {
         for (ChunkRenderData rd : renderData.values()) rd.destroy();
         uiRenderer.destroy();
         font.destroy();
+        if (hudTextures != null) hudTextures.destroy();
         sunMoonMesh.destroy();
         rainMesh.destroy();
         moteMesh.destroy();
