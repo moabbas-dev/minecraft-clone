@@ -151,7 +151,28 @@ public class TerrainGenerator implements WorldGenerator {
         // class docs for why this can't simply carve neighbor chunks directly.
         CaveCarver.carve(chunk, seed);
 
+        floodSubmergedCaves(chunk, heights);
+
         placeTrees(chunk, heights, dominantBiome, treeProbability, rnd);
+    }
+
+    /**
+     * Caves carved beneath an ocean/lake must be full of water, not air pockets roofed by the
+     * water above (that is physically wrong and looks like a glass ceiling). Every air cell a
+     * carve left at or below sea level in a column whose natural terrain surface is under water
+     * becomes water. Columns whose terrain is above sea level are untouched, so caves under land
+     * stay dry. Pure per-chunk and deterministic - needs no neighbor data, and this project has
+     * no fluid-propagation system to otherwise keep such water consistent.
+     */
+    static void floodSubmergedCaves(Chunk chunk, int[][] heights) {
+        for (int x = 0; x < Chunk.SIZE_X; x++) {
+            for (int z = 0; z < Chunk.SIZE_Z; z++) {
+                if (heights[x][z] >= SEA_LEVEL) continue;
+                for (int y = 1; y <= SEA_LEVEL; y++) {
+                    if (chunk.getLocal(x, y, z) == BlockType.AIR) chunk.setLocal(x, y, z, BlockType.WATER);
+                }
+            }
+        }
     }
 
     /**

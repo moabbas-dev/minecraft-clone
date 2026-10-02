@@ -28,9 +28,13 @@ import static org.lwjgl.system.MemoryUtil.memFree;
 @Slf4j
 public class TextureAtlas {
     public static final int TILE_PX = 16;
-    // Each tile gets a 1px extruded border so mipmap downsampling blends a tile with
-    // itself instead of bleeding in neighboring tiles' colors.
-    public static final int BORDER_PX = 1;
+    // Each tile gets a wrapped (tile-repeating) border so mipmap downsampling blends a tile with
+    // itself instead of bleeding in neighboring tiles' colors. 1px only protected mip level 0-1;
+    // at distance (mip 2+) a 1px gutter let e.g. the water tile next to sand tint far-away sand
+    // blocks with blue grid lines. 8px keeps every mip level up to MAX_MIP_LEVEL clean.
+    public static final int BORDER_PX = 8;
+    /** A 16px tile is a single texel at level 4; deeper levels only blend the whole atlas. */
+    private static final int MAX_MIP_LEVEL = 4;
     public static final int CELL_PX = TILE_PX + BORDER_PX * 2;
     public static final int COLS = 8;
     public static final int ROWS = (Tile.values().length + COLS - 1) / COLS;
@@ -220,8 +224,8 @@ public class TextureAtlas {
             for (int dx = -BORDER_PX; dx < TILE_PX + BORDER_PX; dx++) {
                 boolean border = dx < 0 || dy < 0 || dx >= TILE_PX || dy >= TILE_PX;
                 if (!border) continue;
-                int sx = Math.max(0, Math.min(TILE_PX - 1, dx));
-                int sy = Math.max(0, Math.min(TILE_PX - 1, dy));
+                int sx = Math.floorMod(dx, TILE_PX);
+                int sy = Math.floorMod(dy, TILE_PX);
                 atlas.setRGB(ox + dx, oy + dy, atlas.getRGB(ox + sx, oy + sy));
             }
         }
@@ -271,6 +275,7 @@ public class TextureAtlas {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, MAX_MIP_LEVEL);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
         glGenerateMipmap(GL_TEXTURE_2D);
         memFree(buffer);
@@ -330,6 +335,7 @@ public class TextureAtlas {
             case TERRACOTTA -> bandedHorizontal(img, rnd, new Color(180, 95, 65), new Color(160, 80, 55));
             case RED_SAND -> noisyFill(img, rnd, new Color(191, 108, 57), 14);
             case RAIN -> rainStreak(img, rnd);
+            case NIGHT_MOTE -> nightMote(img);
             // New species fallbacks (only reached if the copied PNG is missing/unreadable -
             // verified present, see REAL_TEXTURE_PATHS): simple tinted variants of the existing
             // oak log/leaf procedural style rather than dedicated bark patterns per species.
@@ -666,8 +672,21 @@ public class TextureAtlas {
         for (int y = 0; y < TILE_PX; y++) {
             for (int x = 0; x < TILE_PX; x++) {
                 double distFromCenter = Math.abs(x + 0.5 - TILE_PX / 2.0) / (TILE_PX / 2.0);
-                int alpha = (int) (140 * Math.max(0, 1 - distFromCenter * distFromCenter));
-                img.setRGB(x, y, new Color(170, 195, 220, alpha).getRGB());
+                int alpha = (int) (200 * Math.max(0, 1 - distFromCenter * distFromCenter));
+                // Vanilla rain reads as a light, slightly saturated blue streak (not gray-white).
+                img.setRGB(x, y, new Color(100, 140, 255, alpha).getRGB());
+            }
+        }
+    }
+
+    /** A soft round pale yellow-green glow (firefly-like), fully transparent at the edge. */
+    private void nightMote(BufferedImage img) {
+        double c = (TILE_PX - 1) / 2.0;
+        for (int y = 0; y < TILE_PX; y++) {
+            for (int x = 0; x < TILE_PX; x++) {
+                double d = Math.hypot(x - c, y - c) / (TILE_PX / 2.0);
+                double a = Math.max(0, 1 - d);
+                img.setRGB(x, y, new Color(230, 255, 150, (int) (255 * a * a)).getRGB());
             }
         }
     }

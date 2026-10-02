@@ -42,7 +42,11 @@ public class AudioEngine {
 
     private final int[] sourcePool = new int[SOURCE_POOL_SIZE];
     private int nextSourceIndex = 0;
-    private int rainSource = 0;
+    /** Several overlapping loop layers (see {@link #startRainLoop}) - one short clip looping on
+     *  its own leaves an audible gap/dip at every seam (encoder padding + the clip's own quiet
+     *  tail), which sounded intermittent. */
+    private static final int RAIN_LAYERS = 3;
+    private final int[] rainSources = new int[RAIN_LAYERS];
     private boolean rainLoopActive = false;
 
     private final Random random = new Random();
@@ -78,9 +82,11 @@ public class AudioEngine {
             AL.createCapabilities(deviceCaps);
 
             for (int i = 0; i < SOURCE_POOL_SIZE; i++) sourcePool[i] = alGenSources();
-            rainSource = alGenSources();
-            alSourcei(rainSource, AL_LOOPING, AL_TRUE);
-            alSourcei(rainSource, AL_SOURCE_RELATIVE, AL_TRUE);
+            for (int i = 0; i < RAIN_LAYERS; i++) {
+                rainSources[i] = alGenSources();
+                alSourcei(rainSources[i], AL_LOOPING, AL_TRUE);
+                alSourcei(rainSources[i], AL_SOURCE_RELATIVE, AL_TRUE);
+            }
 
             available = true;
             log.info("Audio initialized: {} one-shot sources + 1 rain loop source", SOURCE_POOL_SIZE);
@@ -184,24 +190,42 @@ public class AudioEngine {
         return sourcePool[idx];
     }
 
-    public void startRainLoop(SoundBuffer buffer) {
-        if (!available || buffer == null || rainLoopActive) return;
-        alSourcei(rainSource, AL_BUFFER, buffer.getBufferId());
-        alSourcePlay(rainSource);
+    /** Starts one looping layer per entry (up to RAIN_LAYERS), each begun at an evenly spaced
+     *  offset into its clip, so the layers' loop seams never line up and the sum is a steady bed. */
+    public void startRainLoop(SoundBuffer[] buffers) {
+        if (!available || buffers == null || buffers.length == 0 || rainLoopActive) return;
+        for (int i = 0; i < RAIN_LAYERS; i++) {
+            SoundBuffer b = buffers[i % buffers.length];
+            int id = b.getBufferId();
+            alSourcei(rainSources[i], AL_BUFFER, id);
+            float seconds = bufferSeconds(id);
+            alSourcePlay(rainSources[i]);
+            if (seconds > 0.5f) alSourcef(rainSources[i], org.lwjgl.openal.AL11.AL_SEC_OFFSET, seconds * i / RAIN_LAYERS);
+        }
         rainLoopActive = true;
         log.debug("rain loop started");
     }
 
+    private static float bufferSeconds(int bufferId) {
+        int freq = alGetBufferi(bufferId, AL_FREQUENCY);
+        int bytes = alGetBufferi(bufferId, AL_SIZE);
+        int bits = alGetBufferi(bufferId, AL_BITS);
+        int ch = alGetBufferi(bufferId, AL_CHANNELS);
+        if (freq <= 0 || bits <= 0 || ch <= 0) return 0f;
+        return bytes / (float) (freq * ch * (bits / 8));
+    }
+
     public void stopRainLoop() {
         if (!available || !rainLoopActive) return;
-        alSourceStop(rainSource);
+        for (int src : rainSources) alSourceStop(src);
         rainLoopActive = false;
         log.debug("rain loop stopped");
     }
 
     public void setRainVolume(float baseVolume) {
         if (!available) return;
-        alSourcef(rainSource, AL_GAIN, effectiveGain(AudioCategory.WEATHER, baseVolume));
+        float gain = effectiveGain(AudioCategory.WEATHER, baseVolume) * 0.7f; // 3 layers sum louder than one
+        for (int src : rainSources) alSourcef(src, AL_GAIN, gain);
     }
 
     public boolean isRainLoopActive() {
@@ -223,8 +247,10 @@ public class AudioEngine {
             alSourceStop(s);
             alDeleteSources(s);
         }
-        alSourceStop(rainSource);
-        alDeleteSources(rainSource);
+        for (int src : rainSources) {
+            alSourceStop(src);
+            alDeleteSources(src);
+        }
         alcMakeContextCurrent(0);
         alcDestroyContext(context);
         alcCloseDevice(device);

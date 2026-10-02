@@ -206,7 +206,17 @@ public class GameAudio {
         if (weather.isRaining()) {
             if (!engine.isRainLoopActive()) {
                 SoundBuffer[] variations = registry.buffersFor("ambient.rain");
-                if (variations.length > 0) engine.startRainLoop(variations[random.nextInt(variations.length)]);
+                if (variations.length > 0) {
+                    // Three distinct clips in a random order, layered by the engine.
+                    SoundBuffer[] picks = variations.clone();
+                    for (int i = picks.length - 1; i > 0; i--) {
+                        int j = random.nextInt(i + 1);
+                        SoundBuffer t = picks[i];
+                        picks[i] = picks[j];
+                        picks[j] = t;
+                    }
+                    engine.startRainLoop(picks);
+                }
             }
             SoundGroup rainDef = registry.definitionOf("ambient.rain");
             engine.setRainVolume(rainDef.baseVolume() * weather.getStormIntensity());

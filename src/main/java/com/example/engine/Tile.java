@@ -37,6 +37,8 @@ public enum Tile {
 
     // Mob-system milestone.
     ROTTEN_FLESH,
+    /** Soft round glow used for the ambient night motes (see Game.renderNightMotes). */
+    NIGHT_MOTE,
     /** Sickly green mob "skin" tile - no real Mojang mob textures exist in this project (see
      *  the tools/food tiles above for the same situation), so every zombie body box is this one
      *  flat procedural color. */

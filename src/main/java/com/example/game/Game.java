@@ -71,7 +71,9 @@ public class Game implements GameAccess {
     private static final float DAY_LENGTH_SECONDS = 600f;
     private static final float CELESTIAL_DISTANCE = 180f;
     private static final float CELESTIAL_SIZE = 28f;
-    private static final int RAIN_PARTICLE_COUNT = 500;
+    private static final int RAIN_PARTICLE_COUNT = 1000;
+    private static final int NIGHT_MOTE_COUNT = 70;
+    private static final float NIGHT_MOTE_RADIUS = 14f;
     private static final float RAIN_RADIUS = 20f;
     private static final float RAIN_SPAWN_HEIGHT = 15f;
     private static final float RAIN_FALL_SPEED = 12f;
@@ -204,6 +206,13 @@ public class Game implements GameAccess {
     private final float[] rainX = new float[RAIN_PARTICLE_COUNT];
     private final float[] rainY = new float[RAIN_PARTICLE_COUNT];
     private final float[] rainZ = new float[RAIN_PARTICLE_COUNT];
+    private final float[] moteX = new float[NIGHT_MOTE_COUNT];
+    private final float[] moteY = new float[NIGHT_MOTE_COUNT];
+    private final float[] moteZ = new float[NIGHT_MOTE_COUNT];
+    private final float[] motePhase = new float[NIGHT_MOTE_COUNT];
+    private float moteTime = 0f;
+    private boolean motesInitialized = false;
+    private Mesh moteMesh;
 
     // 11 floats/vertex everywhere: position(3), uv(2), skyShade(1), blockLight(1), tint(3),
     // windWeight(1) - one shared layout across every mesh that uses chunkShader (chunk terrain,
@@ -247,6 +256,7 @@ public class Game implements GameAccess {
         font = new Font();
         sunMoonMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
         rainMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
+        moteMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
         heldItemMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
         itemMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
         mobMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
@@ -607,6 +617,7 @@ public class Game implements GameAccess {
         dayTime -= (float) Math.floor(dayTime);
         weather.update(dt);
         updateRainParticles(dt);
+        updateNightMotes(dt);
         saplingGrowth.update(world, dt);
         tickCookingStations(dt);
         windTime += dt;
@@ -735,6 +746,71 @@ public class Game implements GameAccess {
         rainX[i] = player.position.x + (float) (Math.cos(angle) * radius);
         rainZ[i] = player.position.z + (float) (Math.sin(angle) * radius);
         rainY[i] = player.position.y + RAIN_SPAWN_HEIGHT * (randomHeight ? rainRandom.nextFloat() : 1f);
+    }
+
+    /** Night = well past sunset; motes only exist while it is NOT raining. */
+    private boolean nightMotesActive() {
+        return !weather.isRaining() && computeDaylightFactor(sunDirection(dayTime)) < 0.3f;
+    }
+
+    private void updateNightMotes(float dt) {
+        if (!nightMotesActive()) {
+            motesInitialized = false;
+            return;
+        }
+        if (!motesInitialized) {
+            for (int i = 0; i < NIGHT_MOTE_COUNT; i++) respawnMote(i);
+            motesInitialized = true;
+        }
+        moteTime += dt;
+        for (int i = 0; i < NIGHT_MOTE_COUNT; i++) {
+            float t = moteTime * 0.6f + motePhase[i];
+            moteX[i] += (float) Math.sin(t * 1.3f) * 0.35f * dt;
+            moteZ[i] += (float) Math.cos(t * 0.9f) * 0.35f * dt;
+            moteY[i] += (float) Math.sin(t * 0.7f) * 0.25f * dt;
+            float dx = moteX[i] - player.position.x, dz = moteZ[i] - player.position.z;
+            if (dx * dx + dz * dz > NIGHT_MOTE_RADIUS * NIGHT_MOTE_RADIUS) respawnMote(i);
+        }
+    }
+
+    private void respawnMote(int i) {
+        double angle = rainRandom.nextDouble() * Math.PI * 2;
+        double radius = Math.sqrt(rainRandom.nextDouble()) * NIGHT_MOTE_RADIUS;
+        moteX[i] = player.position.x + (float) (Math.cos(angle) * radius);
+        moteZ[i] = player.position.z + (float) (Math.sin(angle) * radius);
+        int ground = world.getColumnHeightAt((int) Math.floor(moteX[i]), (int) Math.floor(moteZ[i]));
+        moteY[i] = Math.max(ground + 1f, player.position.y - 3f) + rainRandom.nextFloat() * 3f;
+        motePhase[i] = rainRandom.nextFloat() * 6.28f;
+    }
+
+    private void renderNightMotes() {
+        if (!nightMotesActive() || !motesInitialized) return;
+        Vector3f front = player.frontVector();
+        Vector3f right = new Vector3f(-front.z, 0, front.x);
+        if (right.lengthSquared() < 1e-6f) right.set(1, 0, 0);
+        right.normalize();
+        Vector3f up = new Vector3f(right).cross(front).normalize();
+        float[] uv = atlas.getUv(Tile.NIGHT_MOTE);
+        float half = 0.07f;
+        float[] verts = new float[NIGHT_MOTE_COUNT * 6 * 11];
+        int idx = 0;
+        for (int i = 0; i < NIGHT_MOTE_COUNT; i++) {
+            float pulse = 0.65f + 0.35f * (float) Math.sin(moteTime * 2.2f + motePhase[i] * 3f);
+            float h = half * pulse;
+            float cx = moteX[i], cy = moteY[i], cz = moteZ[i];
+            float rx = right.x * h, ry = right.y * h, rz = right.z * h;
+            float ux = up.x * h, uy = up.y * h, uz = up.z * h;
+            idx = putVertex(verts, idx, cx - rx - ux, cy - ry - uy, cz - rz - uz, uv[0], uv[3]);
+            idx = putVertex(verts, idx, cx + rx - ux, cy + ry - uy, cz + rz - uz, uv[2], uv[3]);
+            idx = putVertex(verts, idx, cx + rx + ux, cy + ry + uy, cz + rz + uz, uv[2], uv[1]);
+            idx = putVertex(verts, idx, cx - rx - ux, cy - ry - uy, cz - rz - uz, uv[0], uv[3]);
+            idx = putVertex(verts, idx, cx + rx + ux, cy + ry + uy, cz + rz + uz, uv[2], uv[1]);
+            idx = putVertex(verts, idx, cx - rx + ux, cy - ry + uy, cz - rz + uz, uv[0], uv[1]);
+        }
+        chunkShader.setUniform("uModel", IDENTITY);
+        chunkShader.setUniform("uAlpha", 1f);
+        moteMesh.upload(verts);
+        moteMesh.draw();
     }
 
     private void rebuildMesh(Chunk chunk) {
@@ -1287,6 +1363,7 @@ public class Game implements GameAccess {
 
         renderSunAndMoon(eye, sunDir, stormFactor, weather.isThundering());
         renderRain();
+        renderNightMotes();
         renderHeldItem();
 
         chunkShader.unbind();
@@ -1517,7 +1594,7 @@ public class Game implements GameAccess {
 
         float[] uv = atlas.getUv(Tile.RAIN);
         float u0 = uv[0], v0 = uv[1], u1 = uv[2], v1 = uv[3];
-        float halfW = 0.05f, halfH = 0.45f;
+        float halfW = 0.02f, halfH = 0.26f; // thin short streaks; twice as many of them as before
 
         chunkShader.setUniform("uModel", new Matrix4f());
         chunkShader.setUniform("uAlpha", 1f);
@@ -1528,6 +1605,8 @@ public class Game implements GameAccess {
         int idx = 0;
         for (int i = 0; i < RAIN_PARTICLE_COUNT; i++) {
             float cx = rainX[i], cy = rainY[i], cz = rainZ[i];
+            float ddx = cx - player.position.x, ddz = cz - player.position.z;
+            if (ddx * ddx + ddz * ddz < 1.2f * 1.2f) continue; // a streak right at the lens would fill the screen
             float rx = right.x * halfW, ry = right.y * halfW, rz = right.z * halfW;
             float ux = up.x * halfH, uy = up.y * halfH, uz = up.z * halfH;
 
@@ -1543,7 +1622,7 @@ public class Game implements GameAccess {
             idx = putVertex(verts, idx, p2x, p2y, p2z, u1, v0);
             idx = putVertex(verts, idx, p3x, p3y, p3z, u0, v0);
         }
-        rainMesh.upload(verts);
+        rainMesh.upload(verts, idx);
         rainMesh.draw();
     }
 
@@ -2320,6 +2399,7 @@ public class Game implements GameAccess {
         font.destroy();
         sunMoonMesh.destroy();
         rainMesh.destroy();
+        moteMesh.destroy();
         heldItemMesh.destroy();
         itemMesh.destroy();
         mobMesh.destroy();
