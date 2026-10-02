@@ -50,6 +50,8 @@ public enum Tile {
     DIAMOND, DIAMOND_SWORD, DIAMOND_AXE, DIAMOND_PICKAXE, DIAMOND_SHOVEL, DIAMOND_HELMET, DIAMOND_CHESTPLATE, DIAMOND_LEGGINGS, DIAMOND_BOOTS,
     // Block drop items.
     FLINT, CLAY_BALL, SNOWBALL, GLOWSTONE_DUST, BOOK,
+    // Hostile mob drops.
+    GUNPOWDER, BONE, ARROW, STRING, SPIDER_EYE,
     /** Procedural flat mob skins (no real mob textures are bundled). */
     PIG_SKIN, COW_SKIN, CHICKEN_SKIN, CHICKEN_BEAK
 }

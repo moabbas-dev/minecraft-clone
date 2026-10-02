@@ -23,6 +23,14 @@ import java.util.Random;
 public class MobManager {
     public static final int MAX_MOBS = 160;
     private XpOrbManager xpOrbs;
+    private java.util.function.Consumer<Mob.ProjectileRequest> projectileSink = r -> {
+    };
+
+    /** Where mob-launched arrows go (the game wires this to its ArrowManager). */
+    public void setProjectileSink(java.util.function.Consumer<Mob.ProjectileRequest> sink) {
+        this.projectileSink = sink == null ? r -> {
+        } : sink;
+    }
 
     /** When set, a player-killed mob drops real XP orbs instead of queuing XP for direct pickup. */
     public void setXpOrbs(XpOrbManager orbs) {
@@ -40,6 +48,11 @@ public class MobManager {
     /** Peaceful removes every hostile mob at once, like vanilla. */
     public void removeHostile() {
         mobs.removeIf(Mob::isHostile);
+    }
+
+    private int lightAt(World world, Mob m) {
+        int x = (int) Math.floor(m.position.x), y = (int) Math.floor(m.position.y + 0.5f), z = (int) Math.floor(m.position.z);
+        return Math.max(Math.round(world.getSkyLight(x, y, z) * daylightFactor), world.getBlockLight(x, y, z));
     }
 
     private boolean sunReaches(World world, Mob m) {
@@ -119,15 +132,29 @@ public class MobManager {
             if (!chunkLoaded(world, m.position.x, m.position.z)) continue; // frozen
             if (m.isAlive() && m.position.distanceSquared(playerPos) > SIMULATION_DISTANCE * SIMULATION_DISTANCE) continue;
             m.setSunlit(m.isAlive() && sunReaches(world, m));
+            m.setLightLevel(lightAt(world, m));
             m.tick(world, candidates, dt);
             com.example.world.BlockType laid = m.isAlive() ? m.takeLaidItem() : null;
             if (laid != null) {
                 items.spawn(laid, 1, new Vector3f(m.position.x, m.position.y + 0.3f, m.position.z), random);
             }
+            for (Mob.ProjectileRequest r : m.drainProjectiles()) projectileSink.accept(r);
+            float blast = m.takeExplosion();
+            if (blast > 0f) {
+                List<Targetable> victims = new ArrayList<>(candidates);
+                for (Mob other : mobs) if (other != m && other.isAlive()) victims.add(other);
+                Vector3f at = new Vector3f(m.position.x, m.position.y + m.getHeight() * 0.5f, m.position.z);
+                Explosions.detonate(world, at, blast, victims, items, random, m.explosionDifficulty());
+                soundSink.accept(new Mob.SoundEvent("explode", at.x, at.y, at.z));
+            }
             for (Mob.SoundEvent e : m.drainSounds()) soundSink.accept(e);
 
             if (!m.isAlive() && !deadHandled.contains(m)) {
                 deadHandled.add(m);
+                if (m.isSilentRemoval()) {
+                    corpseTimers.put(m, 0f); // exploded: no loot, no XP, no corpse
+                    continue;
+                }
                 corpseTimers.put(m, CORPSE_SECONDS);
                 Vector3f at = new Vector3f(m.position.x, m.position.y + m.getHeight() * 0.5f, m.position.z);
                 if (m.getLastDamageSource() == com.example.survival.DamageSource.PLAYER) {

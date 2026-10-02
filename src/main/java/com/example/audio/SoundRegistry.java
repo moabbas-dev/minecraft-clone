@@ -51,6 +51,17 @@ public class SoundRegistry {
         mobSounds(AudioCategory.NEUTRAL, "cow", "mob/cow", "say", 4, "hurt", 3, "hurt", 3, "step", 4, 0.5f, 0.2f);
         mobSounds(AudioCategory.NEUTRAL, "chicken", "mob/chicken", "say", 3, "hurt", 2, "hurt", 2, "step", 2, 0.8f, 0.1f);
         mobSounds(AudioCategory.HOSTILE, "zombie", "mob/zombie", "say", 3, "hurt", 2, "death", 1, "step", 5, 0.9f, 0.2f);
+        mobSounds(AudioCategory.HOSTILE, "skeleton", "mob/skeleton", "say", 3, "hurt", 4, "death", 1, "step", 4, 0.9f, 0.2f);
+        mobSounds(AudioCategory.HOSTILE, "spider", "mob/spider", "say", 4, "say", 4, "death", 1, "step", 4, 0.9f, 0.2f);
+        // Creepers hiss-hurt with their "say" files and have no footstep sound of their own: borrow the grass steps.
+        register(new SoundGroup("mob.creeper.say", files("mob/creeper", "say", 4), AudioCategory.HOSTILE, 0.9f, 0.8f, 1.2f, true, 24f));
+        register(new SoundGroup("mob.creeper.hurt", files("mob/creeper", "say", 4), AudioCategory.HOSTILE, 0.9f, 0.8f, 1.2f, true, 24f));
+        register(new SoundGroup("mob.creeper.death", new String[]{"mob/creeper/death.ogg"}, AudioCategory.HOSTILE, 0.9f, 0.8f, 1.2f, true, 24f));
+        register(new SoundGroup("mob.creeper.step", files("step", "grass", 6), AudioCategory.HOSTILE, 0.2f, 0.95f, 1.05f, true, 16f));
+        register(new SoundGroup("fuse", new String[]{"random/fuse.ogg"}, AudioCategory.HOSTILE, 1f, 1f, 1f, true, 32f));
+        register(new SoundGroup("explode", files("random", "explode", 4), AudioCategory.HOSTILE, 1f, 0.9f, 1.1f, true, 64f));
+        register(new SoundGroup("arrow.shoot", new String[]{"random/bow.ogg"}, AudioCategory.HOSTILE, 0.8f, 0.9f, 1.1f, true, 32f));
+        register(new SoundGroup("arrow.hit", files("random", "bowhit", 4), AudioCategory.HOSTILE, 0.7f, 0.9f, 1.1f, true, 32f));
         register(new SoundGroup("mob.chicken.plop", new String[]{"mob/chicken/plop.ogg"}, AudioCategory.NEUTRAL, 0.9f, 0.95f, 1.05f, true, 16f));
 
         register(new SoundGroup("attack.strong", files("entity/player/attack", "strong", 6), AudioCategory.PLAYER, 0.65f, 1f, 1f, false, 0f));

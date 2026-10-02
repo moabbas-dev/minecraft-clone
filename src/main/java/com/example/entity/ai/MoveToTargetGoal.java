@@ -33,6 +33,7 @@ public final class MoveToTargetGoal implements Goal {
 
     @Override
     public void tick(Mob mob, World world, List<Targetable> candidates, float dt) {
+        if (!mob.hasTarget()) return; // FindTargetGoal may have dropped it earlier this same tick
         mob.getNavigator().moveToward(mob, world, mob.getTarget().getPosition(), dt);
     }
 }

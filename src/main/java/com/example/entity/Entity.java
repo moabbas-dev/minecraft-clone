@@ -61,7 +61,11 @@ public abstract class Entity {
      * {@code dt} only drives gravity integration here - horizontal movement this tick is
      * whatever the caller (a mob's navigation) already decided in {@code (dx, dz)}.
      */
+    /** True when the last move was stopped by a wall on X or Z (spiders use it to start climbing). */
+    protected boolean horizontalBlocked;
+
     protected void moveWithGravity(World world, float dx, float dz, float dt) {
+        horizontalBlocked = false;
         dx += knockX * dt;
         dz += knockZ * dt;
         // Vanilla drag per tick: ground 0.6 * 0.91, air 0.91.
@@ -83,11 +87,11 @@ public abstract class Entity {
         for (int s = 0; s < steps; s++) {
             if (sx != 0f) {
                 if (!intersectsSolid(world, position.x + sx, position.y, position.z)) position.x += sx;
-                else { velocity.x = 0f; sx = 0f; }
+                else { velocity.x = 0f; sx = 0f; horizontalBlocked = true; }
             }
             if (sz != 0f) {
                 if (!intersectsSolid(world, position.x, position.y, position.z + sz)) position.z += sz;
-                else { velocity.z = 0f; sz = 0f; }
+                else { velocity.z = 0f; sz = 0f; horizontalBlocked = true; }
             }
             if (!yDone && sy != 0f) {
                 if (!intersectsSolid(world, position.x, position.y + sy, position.z)) {

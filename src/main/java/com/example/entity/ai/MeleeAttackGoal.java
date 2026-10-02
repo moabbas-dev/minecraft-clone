@@ -44,6 +44,7 @@ public final class MeleeAttackGoal implements Goal {
     @Override
     public void tick(Mob mob, World world, List<Targetable> candidates, float dt) {
         Targetable target = mob.getTarget();
+        if (target == null) return;
         mob.facePoint(target.getPosition());
         if (cooldown > 0f) {
             cooldown = Math.max(0f, cooldown - dt);

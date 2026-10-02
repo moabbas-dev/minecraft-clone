@@ -66,7 +66,8 @@ public class TextureAtlas {
             Tile.ROTTEN_FLESH,
             Tile.WOODEN_SWORD, Tile.STONE_SWORD, Tile.IRON_SWORD, Tile.LEATHER, Tile.FEATHER, Tile.EGG, Tile.LEATHER_HELMET, Tile.LEATHER_CHESTPLATE, Tile.LEATHER_LEGGINGS, Tile.LEATHER_BOOTS, Tile.IRON_HELMET, Tile.IRON_CHESTPLATE, Tile.IRON_LEGGINGS, Tile.IRON_BOOTS, Tile.GOLD_HELMET, Tile.GOLD_CHESTPLATE, Tile.GOLD_LEGGINGS, Tile.GOLD_BOOTS,
             Tile.DIAMOND, Tile.DIAMOND_SWORD, Tile.DIAMOND_AXE, Tile.DIAMOND_PICKAXE, Tile.DIAMOND_SHOVEL, Tile.DIAMOND_HELMET, Tile.DIAMOND_CHESTPLATE, Tile.DIAMOND_LEGGINGS, Tile.DIAMOND_BOOTS,
-            Tile.FLINT, Tile.CLAY_BALL, Tile.SNOWBALL, Tile.GLOWSTONE_DUST, Tile.BOOK);
+            Tile.FLINT, Tile.CLAY_BALL, Tile.SNOWBALL, Tile.GLOWSTONE_DUST, Tile.BOOK,
+            Tile.GUNPOWDER, Tile.BONE, Tile.ARROW, Tile.STRING, Tile.SPIDER_EYE);
 
     static {
         REAL_TEXTURE_PATHS.put(Tile.STONE, "textures/block/stone.png");
@@ -157,6 +158,11 @@ public class TextureAtlas {
         REAL_TEXTURE_PATHS.put(Tile.GOLD_CHESTPLATE, "textures/item/golden_chestplate.png");
         REAL_TEXTURE_PATHS.put(Tile.GOLD_LEGGINGS, "textures/item/golden_leggings.png");
         REAL_TEXTURE_PATHS.put(Tile.GOLD_BOOTS, "textures/item/golden_boots.png");
+        REAL_TEXTURE_PATHS.put(Tile.GUNPOWDER, "textures/item/gunpowder.png");
+        REAL_TEXTURE_PATHS.put(Tile.BONE, "textures/item/bone.png");
+        REAL_TEXTURE_PATHS.put(Tile.ARROW, "textures/item/arrow.png");
+        REAL_TEXTURE_PATHS.put(Tile.STRING, "textures/item/string.png");
+        REAL_TEXTURE_PATHS.put(Tile.SPIDER_EYE, "textures/item/spider_eye.png");
         REAL_TEXTURE_PATHS.put(Tile.FLINT, "textures/item/flint.png");
         REAL_TEXTURE_PATHS.put(Tile.CLAY_BALL, "textures/item/clay_ball.png");
         REAL_TEXTURE_PATHS.put(Tile.SNOWBALL, "textures/item/snowball.png");
@@ -519,6 +525,11 @@ public class TextureAtlas {
             case SNOWBALL -> potatoIcon(img, rnd, new Color(245, 250, 250));
             case GLOWSTONE_DUST -> blockyIcon(img, rnd, new Color(255, 210, 90));
             case BOOK -> blockyIcon(img, rnd, new Color(140, 85, 45));
+            case GUNPOWDER -> blockyIcon(img, rnd, new Color(110, 110, 110));
+            case BONE -> blockyIcon(img, rnd, new Color(235, 232, 215));
+            case ARROW -> swordIcon(img, rnd, new Color(200, 200, 200));
+            case STRING -> blockyIcon(img, rnd, new Color(235, 235, 235));
+            case SPIDER_EYE -> blockyIcon(img, rnd, new Color(120, 30, 40));
             case PIG_SKIN -> noisyFill(img, rnd, new Color(236, 160, 160), 10);
             case COW_SKIN -> speckledNoise(img, rnd, new Color(98, 66, 40), new Color[]{new Color(235, 235, 235), new Color(60, 40, 25)}, 55);
             case CHICKEN_SKIN -> noisyFill(img, rnd, new Color(240, 240, 240), 8);

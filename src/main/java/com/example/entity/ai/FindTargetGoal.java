@@ -25,8 +25,15 @@ public final class FindTargetGoal implements Goal {
     private final float searchRadius;
     private final float loseRadiusSq;
     private float timer;
+    private final java.util.function.Predicate<Mob> allowed;
 
     public FindTargetGoal(float searchRadius) {
+        this(searchRadius, m -> true);
+    }
+
+    /** {@code allowed} gates targeting (a spider is neutral in bright light unless hurt). */
+    public FindTargetGoal(float searchRadius, java.util.function.Predicate<Mob> allowed) {
+        this.allowed = allowed;
         this.searchRadius = searchRadius;
         float loseRadius = searchRadius * LOSE_RADIUS_FACTOR;
         this.loseRadiusSq = loseRadius * loseRadius;
@@ -39,6 +46,10 @@ public final class FindTargetGoal implements Goal {
 
     @Override
     public void tick(Mob mob, World world, List<Targetable> candidates, float dt) {
+        if (!allowed.test(mob)) {
+            mob.setTarget(null);
+            return;
+        }
         Vector3f mobPos = mob.getPosition();
         Targetable current = mob.getTarget();
         if (current != null) {

@@ -190,3 +190,14 @@ and item break; the log showed no missing-file warnings, but I cannot hear the a
 mix (volumes, pitch) is by the research values and not judged by ear. Skins and sounds live in the
 gitignored `textures/entity/` and `sounds/mob|entity|damage|item/` (downloaded from the misode/mcmeta
 `1.21.4-assets` tag); without them the mobs fall back to flat-colour skins and silence.
+
+**Vanilla-alignment milestone - live pass:** screenshots checked by eye for the vanilla-layout Options hub
+(difficulty + lock), Video Settings (render distance, max framerate, brightness, attack indicator, FOV effects),
+Music & Sounds (hostile / friendly sliders) and the rebinding Key Binds screen; the HUD shows the XP bar filling
+from orbs; creeper, skeleton and spider render with their original skins and a creeper that reached a target
+exploded, hurt the player, dug blocks and spilled orbs. Unit tests cover `options.txt` round trips (vanilla and
+legacy format), key binding conflicts, XP curve, fast regeneration, Peaceful, drowning state, falling blocks, XP
+orbs, thrown-item velocity, zombie sunburn/babies, spawn light rules, leaf/gravel drop chances, harvest tiers,
+explosions (damage formula, craters, bedrock/obsidian), arrows and the three hostile mobs. Not verified live:
+audio playback quality, eating animation timing with real mouse input, drowning HUD, and Q-drop/pick-block by
+real keypress (the controller has no key-injection command).

@@ -68,7 +68,7 @@ class PassiveMobTest {
         for (String id : new String[]{"pig", "cow", "chicken", "zombie"}) {
             assertEquals(id, MobTypes.create(id, new Vector3f(), 0f, () -> null).typeId());
         }
-        assertNull(MobTypes.create("creeper", new Vector3f(), 0f, () -> null));
+        assertNull(MobTypes.create("wither", new Vector3f(), 0f, () -> null));
     }
 
     @Test

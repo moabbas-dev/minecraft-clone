@@ -54,6 +54,7 @@ final class MobModelBuilder {
         final float px, py, pz, cos, sin, tiltCos, tiltSin, sky, blockLight, texW, texH;
         final float[] tint;
         float scale = 1f;
+        float scaleY = -1f; // vertical scale; negative = same as {@link #scale}
 
         Writer(float[] out, int n, float px, float py, float pz, float yaw, float tilt, float sky, float blockLight,
                float[] tint, int texW, int texH) {
@@ -80,10 +81,11 @@ final class MobModelBuilder {
          */
         void box(float mx, float my, float mz, int w, int h, int d, int u, int v, int quarter, boolean mirror) {
             float cx = -mx / 16f, cy = (24f - my) / 16f, cz = mz / 16f;
+            float sv = scaleY < 0f ? scale : scaleY;
             cx *= scale;
-            cy *= scale;
+            cy *= sv;
             cz *= scale;
-            float lhx = w / 32f * scale, lhy = h / 32f * scale, lhz = d / 32f * scale;
+            float lhx = w / 32f * scale, lhy = h / 32f * sv, lhz = d / 32f * scale;
             // World half extents: a quarter turn swaps the local Y and Z extents.
             float hx = lhx, hy = quarter == 0 ? lhy : lhz, hz = quarter == 0 ? lhz : lhy;
             for (int f = 0; f < 6; f++) {
@@ -103,20 +105,58 @@ final class MobModelBuilder {
                     if (mirror) uu = 1f - uu;
                     float tu = (rect[0] + uu * (rect[2] - rect[0])) / texW;
                     float tv = (rect[1] + vv * (rect[3] - rect[1])) / texH;
-                    float lx = cx + c[0] * hx, ly = cy + c[1] * hy, lz = cz + c[2] * hz;
-                    float rx = lx * tiltCos - ly * tiltSin;  // roll about the forward (Z) axis for the death topple
-                    float ry = lx * tiltSin + ly * tiltCos;
-                    out[n++] = px + rx * cos - lz * sin;
-                    out[n++] = py + ry;
-                    out[n++] = pz + rx * sin + lz * cos;
-                    out[n++] = tu;
-                    out[n++] = tv;
-                    out[n++] = sky * FACE_SHADE[f];
-                    out[n++] = blockLight;
-                    out[n++] = tint[0];
-                    out[n++] = tint[1];
-                    out[n++] = tint[2];
-                    out[n++] = 0f;
+                    vertex(cx + c[0] * hx, cy + c[1] * hy, cz + c[2] * hz, tu, tv, f);
+                }
+            }
+        }
+
+        /** Writes one vertex given a position in the mob's local frame (feet origin, front = -Z). */
+        void vertex(float lx, float ly, float lz, float tu, float tv, int face) {
+            float rx = lx * tiltCos - ly * tiltSin;  // roll about the forward (Z) axis for the death topple
+            float ry = lx * tiltSin + ly * tiltCos;
+            out[n++] = px + rx * cos - lz * sin;
+            out[n++] = py + ry;
+            out[n++] = pz + rx * sin + lz * cos;
+            out[n++] = tu;
+            out[n++] = tv;
+            out[n++] = sky * FACE_SHADE[face];
+            out[n++] = blockLight;
+            out[n++] = tint[0];
+            out[n++] = tint[1];
+            out[n++] = tint[2];
+            out[n++] = 0f;
+        }
+
+        /**
+         * A spider leg: a {@code lengthPx} x 2 x 2 box starting at a pivot (mob-local blocks), pointing out along the
+         * side {@code s} (+1 = +X) and rolled down by {@code roll} and swung in the horizontal plane by {@code yaw}
+         * (radians, positive = toward the front for the +X side). Its faces all sample the leg strip of the skin.
+         */
+        void leg(float pivotX, float pivotY, float pivotZ, float s, float roll, float yaw, float lengthPx) {
+            float half = lengthPx / 32f, t = 1f / 16f;
+            float phi = -s * roll, cphi = (float) Math.cos(phi), sphi = (float) Math.sin(phi);
+            float cth = (float) Math.cos(yaw), sth = (float) Math.sin(yaw);
+            float[] side = {20, 2, 36, 4}, top = {20, 0, 36, 2}, cap = {18, 2, 20, 4};
+            for (int f = 0; f < 6; f++) {
+                float[] rect = f < 2 ? top : f < 4 ? side : cap;
+                for (int k : ORDER) {
+                    int[] c = FACES[f][k];
+                    float lx = s * half + c[0] * half, ly = c[1] * t, lz = c[2] * t;
+                    float u01, v01;
+                    if (f < 2) {
+                        u01 = (c[0] * s + 1) / 2f;
+                        v01 = (c[2] + 1) / 2f;
+                    } else if (f < 4) {
+                        u01 = (c[0] * s + 1) / 2f;
+                        v01 = 1f - (c[1] + 1) / 2f;
+                    } else {
+                        u01 = (c[2] + 1) / 2f;
+                        v01 = 1f - (c[1] + 1) / 2f;
+                    }
+                    float rx = lx * cphi - ly * sphi, ry = lx * sphi + ly * cphi, rz = lz; // roll about Z
+                    float yx = rx * cth + rz * sth, yz = -rx * sth + rz * cth;               // swing about Y
+                    vertex((pivotX + yx) * scale, pivotY + ry, (pivotZ + yz) * scale,
+                            (rect[0] + u01 * (rect[2] - rect[0])) / texW, (rect[1] + v01 * (rect[3] - rect[1])) / texH, f);
                 }
             }
         }
@@ -162,6 +202,96 @@ final class MobModelBuilder {
         w.box(-2, 18 - Math.max(0f, lift), 0, 4, 12, 4, 0, 16, 0, false);   // right leg
         w.box(2, 18 - Math.max(0f, -lift), 0, 4, 12, 4, 16, 48, 0, true);    // left leg
         return w.n;
+    }
+
+    /** Creeper with the vanilla swell pulse: horizontal scale (1 + 0.4 q) w, vertical (1 + 0.1 q) / w, q = s^4. */
+    static int emitCreeper(float[] out, int n, float px, float py, float pz, float yaw, float tilt, float walkPhase,
+                           float walkAmount, float swell, float sky, float blockLight, float[] tint) {
+        Writer w = new Writer(out, n, px, py, pz, yaw, tilt, sky, blockLight, tint, ANIMAL_TEX_W, ANIMAL_TEX_H);
+        float wobble = 1f + (float) Math.sin(100f * swell) * swell * 0.01f;
+        float q = swell * swell * swell * swell;
+        w.scale = (1f + 0.4f * q) * wobble;
+        w.scaleY = (1f + 0.1f * q) / wobble;
+        float sw = (float) Math.sin(walkPhase), lift = Math.max(0f, sw) * 1.5f * walkAmount, liftB = Math.max(0f, -sw) * 1.5f * walkAmount;
+        float swing = sw * 3f * walkAmount;
+        w.box(0, 2, 0, 8, 8, 8, 0, 0, 0, false);                       // head
+        w.box(0, 12, 0, 8, 12, 4, 16, 16, 0, false);                   // body
+        w.box(-2, 21 - lift, -4 + swing, 4, 6, 4, 0, 16, 0, false);    // front right
+        w.box(2, 21 - liftB, -4 - swing, 4, 6, 4, 0, 16, 0, true);     // front left
+        w.box(-2, 21 - liftB, 4 - swing, 4, 6, 4, 0, 16, 0, false);    // hind right
+        w.box(2, 21 - lift, 4 + swing, 4, 6, 4, 0, 16, 0, true);       // hind left
+        return w.n;
+    }
+
+    static int emitSkeleton(float[] out, int n, float px, float py, float pz, float yaw, float tilt, float walkPhase,
+                            float walkAmount, float sky, float blockLight, float[] tint) {
+        Writer w = new Writer(out, n, px, py, pz, yaw, tilt, sky, blockLight, tint, ANIMAL_TEX_W, ANIMAL_TEX_H);
+        float lift = (float) Math.sin(walkPhase) * 2f * walkAmount;
+        w.box(0, -4, 0, 8, 8, 8, 0, 0, 0, false);                      // head
+        w.box(0, 6, 0, 8, 12, 4, 16, 16, 0, false);                    // ribcage
+        w.box(-5, 2, -6, 2, 12, 2, 40, 16, 1, false);                  // right arm raised to hold the bow
+        w.box(5, 2, -6, 2, 12, 2, 40, 16, 1, true);                    // left arm
+        w.box(-2, 18 - Math.max(0f, lift), 0, 2, 12, 2, 0, 16, 0, false);
+        w.box(2, 18 - Math.max(0f, -lift), 0, 2, 12, 2, 0, 16, 0, true);
+        return w.n;
+    }
+
+    static int emitSpider(float[] out, int n, float px, float py, float pz, float yaw, float tilt, float walkPhase,
+                          float walkAmount, float sky, float blockLight, float[] tint) {
+        Writer w = new Writer(out, n, px, py, pz, yaw, tilt, sky, blockLight, tint, ANIMAL_TEX_W, ANIMAL_TEX_H);
+        w.box(0, 15, -7, 8, 8, 8, 32, 4, 0, false);                    // head
+        w.box(0, 15, 0, 6, 6, 6, 0, 0, 0, false);                      // neck
+        w.box(0, 15, 9, 10, 8, 12, 0, 12, 0, false);                   // abdomen
+        float[] yawBase = {-45f, -22.5f, 22.5f, 45f};
+        float[] roll = {45f, 33.3f, 33.3f, 45f};
+        for (int i = 0; i < 4; i++) {
+            float z = (2 - i) / 16f;
+            for (int side = -1; side <= 1; side += 2) {
+                float phase = walkPhase * 1.3f + i * 1.6f + (side > 0 ? (float) Math.PI : 0f);
+                float swing = (float) Math.sin(phase) * 0.3f * walkAmount;
+                w.leg(side * 0.25f, 0.5625f, z, side, (float) Math.toRadians(roll[i]),
+                        side * ((float) Math.toRadians(yawBase[i]) + swing), 16f);
+            }
+        }
+        return w.n;
+    }
+
+    /** One arrow as two crossed quads along {@code dir}, sampling the shaft strip of the 32x32 arrow texture. */
+    static int emitArrow(float[] out, int n, float x, float y, float z, float dx, float dy, float dz, float sky, float blockLight) {
+        float len = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (len < 1e-4f) return n;
+        dx /= len;
+        dy /= len;
+        dz /= len;
+        float ux = Math.abs(dy) > 0.95f ? 1f : 0f, uy = Math.abs(dy) > 0.95f ? 0f : 1f;
+        float ax = dy * 0f - dz * uy, ay = dz * ux - dx * 0f, az = dx * uy - dy * ux; // d x up
+        float al = (float) Math.sqrt(ax * ax + ay * ay + az * az);
+        ax /= al;
+        ay /= al;
+        az /= al;
+        float bx = dy * az - dz * ay, by = dz * ax - dx * az, bz = dx * ay - dy * ax; // d x a
+        float half = 0.45f, wd = 0.07f;
+        float[][] planes = {{ax, ay, az}, {bx, by, bz}};
+        float[][] uvc = {{0, 5}, {16, 5}, {16, 0}, {0, 0}};
+        int[] order = {0, 1, 2, 0, 2, 3};
+        float[][] corner = {{-1, -1}, {1, -1}, {1, 1}, {-1, 1}};
+        for (float[] p : planes) {
+            for (int k : order) {
+                float along = corner[k][0] * half, across = corner[k][1] * wd;
+                out[n++] = x + dx * along + p[0] * across;
+                out[n++] = y + dy * along + p[1] * across;
+                out[n++] = z + dz * along + p[2] * across;
+                out[n++] = uvc[k][0] / 32f;
+                out[n++] = uvc[k][1] / 32f;
+                out[n++] = sky;
+                out[n++] = blockLight;
+                out[n++] = 1f;
+                out[n++] = 1f;
+                out[n++] = 1f;
+                out[n++] = 0f;
+            }
+        }
+        return n;
     }
 
     static int emitPig(float[] out, int n, float px, float py, float pz, float yaw, float tilt, float walkPhase,

@@ -198,6 +198,7 @@ public class Game implements GameAccess {
     private float lastHurtCooldown;
     private final com.example.entity.XpOrbManager xpOrbs = new com.example.entity.XpOrbManager();
     private final com.example.entity.FallingBlockManager fallingBlocks = new com.example.entity.FallingBlockManager();
+    private final com.example.entity.ArrowManager arrows = new com.example.entity.ArrowManager();
     private boolean hideHud;
     private boolean difficultyLocked;
     private float eatTimer, eatSoundTimer;
@@ -290,6 +291,7 @@ public class Game implements GameAccess {
 
         gameAudio = new GameAudio();
         mobs.setXpOrbs(xpOrbs);
+        mobs.setProjectileSink(r -> arrows.fire(r.origin(), r.velocity(), r.damage()));
         mobs.setSoundSink(e -> {
             if (player != null && player.position.distanceSquared(e.x(), e.y(), e.z()) < 32f * 32f) {
                 gameAudio.play(e.id(), new Vector3f(e.x(), e.y(), e.z()));
@@ -681,6 +683,7 @@ public class Game implements GameAccess {
         mobs.clear();
         xpOrbs.clear();
         fallingBlocks.clear();
+        arrows.clear();
         difficultyLocked = false;
         eatTimer = 0f;
         survival = new PlayerSurvival(difficulty);
@@ -1474,6 +1477,7 @@ public class Game implements GameAccess {
         mobs.setEnvironment(computeDaylightFactor(sunDirection(dayTime)), weather.isRaining());
         if (survival.getDifficulty() == Difficulty.PEACEFUL) mobs.removeHostile();
         fallingBlocks.update(world, dt, itemEntities, gameplayRandom);
+        arrows.update(world, mobTargets, dt, p -> gameAudio.play("arrow.hit", new Vector3f(p)));
         xpOrbs.update(world, player.position, dt, v -> {
             survival.addExperience((float) v);
             gameAudio.play("xp.pickup", null);
@@ -1665,6 +1669,7 @@ public class Game implements GameAccess {
         renderBlockCrack();
         renderDroppedItems();
         renderMobs();
+        renderArrows();
         renderXpOrbs();
         renderFallingBlocks();
         renderParticles();
@@ -1741,6 +1746,26 @@ public class Game implements GameAccess {
         itemMesh.draw();
     }
 
+    private void renderArrows() {
+        java.util.List<com.example.entity.ArrowManager.Arrow> list = arrows.arrows();
+        if (list.isEmpty()) return;
+        com.example.engine.EntityTexture tex = mobSkins.computeIfAbsent("arrow",
+                k -> com.example.engine.EntityTexture.load("textures/entity/projectiles/arrow.png", 32, 32, 0x8A7048));
+        int n = 0;
+        for (com.example.entity.ArrowManager.Arrow a : list) {
+            if (n + 12 * 11 > mobScratch.length) break;
+            int bx = (int) Math.floor(a.position.x), by = (int) Math.floor(a.position.y), bz = (int) Math.floor(a.position.z);
+            n = MobModelBuilder.emitArrow(mobScratch, n, a.position.x, a.position.y, a.position.z, a.facing.x, a.facing.y, a.facing.z,
+                    world.getSkyLight(bx, by, bz) / 15f, world.getBlockLight(bx, by, bz) / 15f);
+        }
+        if (n == 0) return;
+        chunkShader.setUniform("uModel", IDENTITY);
+        tex.bind(0);
+        mobMesh.upload(mobScratch, n);
+        mobMesh.draw();
+        atlas.bind(0);
+    }
+
     private void renderMobs() {
         java.util.List<Mob> list = mobs.mobs();
         if (list.isEmpty()) return;
@@ -1749,6 +1774,9 @@ public class Game implements GameAccess {
             mobSkins.put("pig", com.example.engine.EntityTexture.load("textures/entity/pig/pig.png", 64, 32, 0xECA0A0));
             mobSkins.put("cow", com.example.engine.EntityTexture.load("textures/entity/cow/cow.png", 64, 32, 0x694628));
             mobSkins.put("chicken", com.example.engine.EntityTexture.load("textures/entity/chicken.png", 64, 32, 0xF0F0F0));
+            mobSkins.put("creeper", com.example.engine.EntityTexture.load("textures/entity/creeper/creeper.png", 64, 32, 0x4FA13A));
+            mobSkins.put("skeleton", com.example.engine.EntityTexture.load("textures/entity/skeleton/skeleton.png", 64, 32, 0xC9C9C9));
+            mobSkins.put("spider", com.example.engine.EntityTexture.load("textures/entity/spider/spider.png", 64, 32, 0x3A2F28));
         }
         chunkShader.setUniform("uModel", IDENTITY);
         for (java.util.Map.Entry<String, com.example.engine.EntityTexture> skin : mobSkins.entrySet()) {
@@ -1766,6 +1794,13 @@ public class Game implements GameAccess {
                 float walk = m.getWalkPhase(), amt = m.getWalkAmount();
                 switch (skin.getKey()) {
                     case "pig" -> n = MobModelBuilder.emitPig(mobScratch, n, px, py, pz, yaw, tilt, walk, amt, sky, blk, tint);
+                    case "creeper" -> {
+                        float swell = ((com.example.entity.mob.Creeper) m).getSwellFraction();
+                        float[] t2 = ((int) Math.floor(swell * 10f) & 1) == 1 && m.isAlive() ? new float[]{2.4f, 2.4f, 2.4f} : tint;
+                        n = MobModelBuilder.emitCreeper(mobScratch, n, px, py, pz, yaw, tilt, walk, amt, swell, sky, blk, t2);
+                    }
+                    case "skeleton" -> n = MobModelBuilder.emitSkeleton(mobScratch, n, px, py, pz, yaw, tilt, walk, amt, sky, blk, tint);
+                    case "spider" -> n = MobModelBuilder.emitSpider(mobScratch, n, px, py, pz, yaw, tilt, walk, amt, sky, blk, tint);
                     case "cow" -> n = MobModelBuilder.emitCow(mobScratch, n, px, py, pz, yaw, tilt, walk, amt, sky, blk, tint);
                     case "chicken" -> n = MobModelBuilder.emitChicken(mobScratch, n, px, py, pz, yaw, tilt, walk, amt,
                             !m.isOnGround(), sky, blk, tint);

@@ -155,6 +155,11 @@ public class BlockTextureMap {
         uniform(BlockType.SNOWBALL, Tile.SNOWBALL);
         uniform(BlockType.GLOWSTONE_DUST, Tile.GLOWSTONE_DUST);
         uniform(BlockType.BOOK, Tile.BOOK);
+        uniform(BlockType.GUNPOWDER, Tile.GUNPOWDER);
+        uniform(BlockType.BONE, Tile.BONE);
+        uniform(BlockType.ARROW, Tile.ARROW);
+        uniform(BlockType.STRING, Tile.STRING);
+        uniform(BlockType.SPIDER_EYE, Tile.SPIDER_EYE);
     }
 
     private void uniform(BlockType type, Tile tile) {

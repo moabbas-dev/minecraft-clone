@@ -27,7 +27,11 @@ public enum DamageSource {
     /** Wired up this round - see {@code PlayerSurvival}'s starvation tick. */
     STARVATION,
     /** Not wired up yet - no void/kill-plane check exists below the world. */
-    VOID;
+    VOID,
+    /** Creeper and TNT blasts: reduced by armor like vanilla. */
+    EXPLOSION,
+    /** A skeleton arrow in flight. */
+    ARROW;
 
     /** Sources ordinary armor does not reduce (research: docs/research/armor.md). GENERIC is the test
      *  controller's exact-amount damage. */

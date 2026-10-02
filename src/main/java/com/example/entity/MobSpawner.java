@@ -55,8 +55,14 @@ public class MobSpawner {
         if (!isValidSpawn(world, x, y, z, playerPos, daylightFactor)) return;
 
         Vector3f at = new Vector3f(x + 0.5f, y, z + 0.5f);
-        boolean baby = random.nextFloat() < 0.05f; // vanilla: 5% of zombies are babies
-        mobs.spawn(new Zombie(at, random.nextFloat() * (float) (Math.PI * 2), difficulty, baby));
+        float yaw = random.nextFloat() * (float) (Math.PI * 2);
+        // Vanilla overworld monster weights: spider, zombie, skeleton and creeper are all about equally likely.
+        switch (random.nextInt(4)) {
+            case 0 -> mobs.spawn(new com.example.entity.mob.Skeleton(at, yaw, difficulty));
+            case 1 -> mobs.spawn(new com.example.entity.mob.Creeper(at, yaw, difficulty));
+            case 2 -> mobs.spawn(new com.example.entity.mob.Spider(at, yaw, difficulty));
+            default -> mobs.spawn(new Zombie(at, yaw, difficulty, random.nextFloat() < 0.05f)); // 5% of zombies are babies
+        }
     }
 
     /** Standable Y near the player's own height (bounded vertical scan, not the whole column). */

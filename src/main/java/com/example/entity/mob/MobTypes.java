@@ -14,6 +14,9 @@ public final class MobTypes {
     public static Mob create(String typeId, Vector3f position, float yaw, Supplier<Difficulty> difficulty) {
         return switch (typeId) {
             case "zombie" -> new Zombie(position, yaw, difficulty);
+            case "creeper" -> new Creeper(position, yaw, difficulty);
+            case "skeleton" -> new Skeleton(position, yaw, difficulty);
+            case "spider" -> new Spider(position, yaw, difficulty);
             case "pig" -> new Pig(position, yaw);
             case "cow" -> new Cow(position, yaw);
             case "chicken" -> new Chicken(position, yaw);

@@ -188,7 +188,12 @@ public enum BlockType {
     CLAY_BALL(185, "Clay Ball", false, true, -1f, 0f),
     SNOWBALL(186, "Snowball", false, true, -1f, 0f),
     GLOWSTONE_DUST(187, "Glowstone Dust", false, true, -1f, 0f),
-    BOOK(188, "Book", false, true, -1f, 0f);
+    BOOK(188, "Book", false, true, -1f, 0f),
+    GUNPOWDER(189, "Gunpowder", false, true, -1f, 0f),
+    BONE(190, "Bone", false, true, -1f, 0f),
+    ARROW(191, "Arrow", false, true, -1f, 0f),
+    STRING(192, "String", false, true, -1f, 0f),
+    SPIDER_EYE(193, "Spider Eye", false, true, -1f, 0f);
 
     public final int id;
     public final String displayName;

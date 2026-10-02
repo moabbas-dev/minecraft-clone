@@ -71,6 +71,60 @@ public abstract class Mob extends LivingEntity {
 
     public abstract float getMoveSpeed();
 
+    /** Combined sky/block light level (0-15) at this mob, set by MobManager (spiders are neutral in bright light). */
+    @Getter
+    @Setter
+    private int lightLevel;
+    /** Set when a mob is removed without loot or a death sound (an exploded creeper). */
+    @Getter
+    private boolean silentRemoval;
+    private float explosionPower;
+
+    /** Whether the mob makes the vanilla random ambient noise (creepers do not). */
+    protected boolean makesAmbientSound() {
+        return true;
+    }
+
+    /** An arrow (or other missile) a mob wants launched, handed to the projectile system by MobManager. */
+    public record ProjectileRequest(Vector3f origin, Vector3f velocity, float damage) {
+    }
+
+    private final List<ProjectileRequest> pendingProjectiles = new java.util.ArrayList<>(1);
+
+    public void launchProjectile(Vector3f origin, Vector3f velocity, float damage) {
+        pendingProjectiles.add(new ProjectileRequest(origin, velocity, damage));
+    }
+
+    public List<ProjectileRequest> drainProjectiles() {
+        if (pendingProjectiles.isEmpty()) return List.of();
+        List<ProjectileRequest> out = new java.util.ArrayList<>(pendingProjectiles);
+        pendingProjectiles.clear();
+        return out;
+    }
+
+    /** Asks MobManager to detonate an explosion of this power at the mob's position, then removes the mob silently. */
+    public void requestExplosion(float power) {
+        explosionPower = power;
+        silentRemoval = true;
+        getHealth().setHealth(0f);
+    }
+
+    public float takeExplosion() {
+        float p = explosionPower;
+        explosionPower = 0f;
+        return p;
+    }
+
+    /** Difficulty used to scale explosion damage; only creepers care. */
+    public com.example.world.Difficulty explosionDifficulty() {
+        return com.example.world.Difficulty.NORMAL;
+    }
+
+    /** Queues a sound by its full registry id (not prefixed with the mob type). */
+    public void emitGlobalSound(String id) {
+        pendingSounds.add(new SoundEvent(id, position.x, position.y, position.z));
+    }
+
     /** Hostile mobs despawn on Peaceful and use the hostile sound category. */
     public boolean isHostile() {
         return false;
@@ -187,7 +241,7 @@ public abstract class Mob extends LivingEntity {
     private void updateSounds(float dt) {
         boolean aliveNow = isAlive();
         if (wasAlive && !aliveNow) {
-            emitSound("death");
+            if (!silentRemoval) emitSound("death");
         } else if (aliveNow && getHurtTime() > lastHurtTime + 1e-4f) {
             emitSound("hurt");
         }
@@ -195,6 +249,7 @@ public abstract class Mob extends LivingEntity {
         lastHurtTime = getHurtTime();
         if (!aliveNow) return;
         // Vanilla: every tick, if nextInt(1000) < ambientSoundTime++ the mob speaks and the counter drops to -80.
+        if (!makesAmbientSound()) return;
         ambientAccumulator += dt * 20f;
         while (ambientAccumulator >= 1f) {
             ambientAccumulator -= 1f;
