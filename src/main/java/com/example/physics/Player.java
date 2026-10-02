@@ -118,6 +118,9 @@ public class Player {
     private float horizontalVelX = 0f, horizontalVelZ = 0f;
     @Getter
     private float bobPhase = 0f;
+    /** Options toggle: false zeroes the camera/held-item bob. */
+    @Setter
+    private boolean viewBobbing = true;
     @Getter
     private float bobAmplitude = 0f;
 
@@ -283,6 +286,7 @@ public class Player {
             bobAmplitude += (0f - bobAmplitude) * Math.min(1f, (BOB_AMPLITUDE_LERP_RATE * 0.6f) * dt);
         }
 
+        if (!viewBobbing) bobAmplitude = 0f;
         float dx, dz;
         if (waterActive) {
             // Water drag: eases horizontal velocity toward the input direction instead of

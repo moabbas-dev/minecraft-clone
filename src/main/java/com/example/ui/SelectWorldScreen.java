@@ -1,16 +1,20 @@
 package com.example.ui;
 
-import com.example.engine.Font;
-import com.example.engine.Input;
-import com.example.engine.UiRenderer;
 import com.example.world.WorldIO;
+import com.example.world.WorldSettings;
 
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT;
-
-public class SelectWorldScreen implements Screen {
+/**
+ * Vanilla "Select World": a scrolling list (36px rows: name, "folder (date)", game mode) between a
+ * 32px header and 64px footer, with Play Selected World / Create New World on the first button row
+ * and Edit / Delete / Re-Create / Cancel on the second. Edit and Delete open child screens.
+ */
+public class SelectWorldScreen extends McScreen {
     public interface Listener {
         void onLoadWorld(WorldIO.SavedWorld world);
 
@@ -19,110 +23,149 @@ public class SelectWorldScreen implements Screen {
         void onBack();
     }
 
+    static final int ROW_H = 36, LIST_W = 220, HEADER_H = 32, FOOTER_H = 64;
+    private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm").withZone(ZoneId.systemDefault());
+
     private final Listener listener;
     private List<WorldIO.SavedWorld> worlds = new ArrayList<>();
-    private final List<Button> rowPlayButtons = new ArrayList<>();
-    private final List<Button> rowDeleteButtons = new ArrayList<>();
-    private Button createButton, backButton;
-    private String pendingDelete = null;
+    private int selected = -1;
+    private float scroll;
+    private long lastClickNanos;
+    private int lastClickIndex = -1;
 
-    public SelectWorldScreen(Listener listener) {
+    public SelectWorldScreen(GuiEnv env, Listener listener) {
+        super(env);
         this.listener = listener;
     }
 
     /** Re-scans saves/ - call whenever this screen is entered. */
     public void refresh() {
         worlds = WorldIO.listSavedWorlds();
-        pendingDelete = null;
+        selected = worlds.isEmpty() ? -1 : Math.min(Math.max(selected, -1), worlds.size() - 1);
+        child = null;
+        invalidate();
     }
 
-    private void layout(int w, int h) {
-        rowPlayButtons.clear();
-        rowDeleteButtons.clear();
-        float rowW = 480, rowH = 44, gap = 8;
-        float startX = w / 2f - rowW / 2f;
-        float startY = h * 0.18f;
-        for (int i = 0; i < worlds.size(); i++) {
-            float y = startY + i * (rowH + gap);
-            rowPlayButtons.add(new Button(startX, y, rowW - 90, rowH, worlds.get(i).displayName()));
-            rowDeleteButtons.add(new Button(startX + rowW - 84, y, 84, rowH, "Delete"));
-        }
-        createButton = new Button(w / 2f - 110, h - 110, 220, 44, "Create New World");
-        backButton = new Button(20, h - 56, 100, 36, "Back");
+    WorldIO.SavedWorld selectedWorld() {
+        return selected >= 0 && selected < worlds.size() ? worlds.get(selected) : null;
     }
 
     @Override
-    public void update(float dt, Input input, int screenWidth, int screenHeight) {
-        layout(screenWidth, screenHeight);
-        double mx = input.getMouseX(), my = input.getMouseY();
-        for (Button b : rowPlayButtons) b.updateHover(mx, my);
-        for (Button b : rowDeleteButtons) b.updateHover(mx, my);
-        createButton.updateHover(mx, my);
-        backButton.updateHover(mx, my);
-
-        if (input.consumeMousePressed(GLFW_MOUSE_BUTTON_LEFT)) {
-            if (createButton.contains(mx, my)) {
-                listener.onCreateNew();
-                return;
-            }
-            if (backButton.contains(mx, my)) {
-                listener.onBack();
-                return;
-            }
-            for (int i = 0; i < rowDeleteButtons.size(); i++) {
-                if (rowDeleteButtons.get(i).contains(mx, my)) {
-                    String folder = worlds.get(i).folderName();
-                    if (folder.equals(pendingDelete)) {
-                        WorldIO.deleteWorld(folder);
-                        refresh();
-                    } else {
-                        pendingDelete = folder; // first click arms it, second click confirms
-                    }
-                    return;
-                }
-            }
-            for (int i = 0; i < rowPlayButtons.size(); i++) {
-                if (rowPlayButtons.get(i).contains(mx, my)) {
-                    listener.onLoadWorld(worlds.get(i));
-                    return;
-                }
-            }
-        }
+    protected void init() {
+        widgets.add(new WorldList());
+        int cx = guiW / 2;
+        int y1 = guiH - 52, y2 = guiH - 28;
+        Button play = new Button(cx - 154, y1, 150, 20, "Play Selected World", () -> {
+            if (selectedWorld() != null) listener.onLoadWorld(selectedWorld());
+        });
+        play.active = selectedWorld() != null;
+        widgets.add(play);
+        widgets.add(new Button(cx + 4, y1, 150, 20, "Create New World", listener::onCreateNew));
+        Button edit = new Button(cx - 154, y2, 72, 20, "Edit", () -> {
+            WorldIO.SavedWorld w = selectedWorld();
+            if (w != null) openChild(new EditWorldScreen(env, w.displayName(), newName -> {
+                WorldIO.renameWorld(w.folderName(), newName);
+                refresh();
+            }));
+        });
+        edit.active = selectedWorld() != null;
+        widgets.add(edit);
+        Button delete = new Button(cx - 76, y2, 72, 20, "Delete", () -> {
+            WorldIO.SavedWorld w = selectedWorld();
+            if (w != null) openChild(new ConfirmScreen(env, "Are you sure you want to delete this world?",
+                    "'" + w.displayName() + "' will be lost forever! (A long time!)", "Delete", () -> {
+                WorldIO.deleteWorld(w.folderName());
+                selected = -1;
+                refresh();
+            }));
+        });
+        delete.active = selectedWorld() != null;
+        widgets.add(delete);
+        Button recreate = new Button(cx + 4, y2, 72, 20, "Re-Create", () -> {
+        });
+        recreate.active = false;
+        widgets.add(recreate);
+        widgets.add(new Button(cx + 82, y2, 72, 20, "Cancel", listener::onBack));
     }
 
     @Override
-    public void render(UiRenderer ui, Font font, int screenWidth, int screenHeight) {
-        layout(screenWidth, screenHeight);
+    protected void onEscape() {
+        listener.onBack();
+    }
 
-        ui.drawColorQuad(0, 0, screenWidth, screenHeight, 0.15f, 0.15f, 0.19f, 1f);
+    @Override
+    protected void onEnter() {
+        if (selectedWorld() != null) listener.onLoadWorld(selectedWorld());
+    }
 
-        String title = "Select World";
-        float titleScale = 2.2f;
-        float tw = font.measureText(title, titleScale);
-        font.drawText(ui, title, screenWidth / 2f - tw / 2f, screenHeight * 0.06f, titleScale, 1f, 1f, 1f, 1f);
+    @Override
+    protected void onScroll(double delta) {
+        scroll = clampScroll(scroll - (float) delta * 18f);
+    }
 
-        if (worlds.isEmpty()) {
-            String msg = "No saved worlds yet - create one below.";
-            float ms = 1.1f;
-            float mw = font.measureText(msg, ms);
-            font.drawText(ui, msg, screenWidth / 2f - mw / 2f, screenHeight * 0.18f, ms, 0.8f, 0.8f, 0.8f, 1f);
+    private float viewH() {
+        return guiH - HEADER_H - FOOTER_H;
+    }
+
+    private float clampScroll(float s) {
+        return Math.max(0f, Math.min(s, Math.max(0f, worlds.size() * ROW_H - viewH())));
+    }
+
+    @Override
+    protected void drawForeground(GuiContext g) {
+        g.textCentered("Select World", g.w / 2f, 12, 0xFFFFFF);
+        if (worlds.isEmpty()) g.textCentered("No saved worlds yet - create one below.", g.w / 2f, HEADER_H + 20, 0xA0A0A0);
+    }
+
+    private final class WorldList extends Widget {
+        WorldList() {
+            super(0, HEADER_H, guiW, guiH - HEADER_H - FOOTER_H);
         }
 
-        for (int i = 0; i < worlds.size(); i++) {
-            WorldIO.SavedWorld w = worlds.get(i);
-            rowPlayButtons.get(i).render(ui, font, false);
-            Button del = rowDeleteButtons.get(i);
-            boolean armed = w.folderName().equals(pendingDelete);
-            ui.drawColorQuad(del.x, del.y, del.width, del.height, armed ? 0.7f : 0.4f, 0.15f, 0.15f, 0.9f);
-            float ds = 1.1f;
-            float dw = font.measureText(armed ? "Confirm?" : "Delete", ds);
-            font.drawText(ui, armed ? "Confirm?" : "Delete", del.x + (del.width - dw) / 2f, del.y + (del.height - font.lineHeight(ds)) / 2f, ds, 1, 1, 1, 1);
-
-            String typeLabel = w.type().name();
-            font.drawText(ui, typeLabel, rowPlayButtons.get(i).x + 12, rowPlayButtons.get(i).y + rowPlayButtons.get(i).height - 16, 0.8f, 0.75f, 0.85f, 1f, 1f);
+        @Override
+        public boolean mouseClicked(float mx, float my) {
+            if (!contains(mx, my) || mx < (guiW - LIST_W) / 2f || mx > (guiW + LIST_W) / 2f) return false;
+            int idx = (int) ((my - HEADER_H + scroll) / ROW_H);
+            if (idx < 0 || idx >= worlds.size()) return false;
+            long now = System.nanoTime();
+            boolean dbl = idx == lastClickIndex && now - lastClickNanos < 400_000_000L;
+            lastClickIndex = idx;
+            lastClickNanos = now;
+            selected = idx;
+            if (dbl) listener.onLoadWorld(worlds.get(idx));
+            else invalidate();
+            return true;
         }
 
-        createButton.render(ui, font, false);
-        backButton.render(ui, font, false);
+        @Override
+        public void render(GuiContext g) {
+            scroll = clampScroll(scroll);
+            float left = (g.w - LIST_W) / 2f;
+            for (int i = 0; i < worlds.size(); i++) {
+                float y = HEADER_H - scroll + i * ROW_H;
+                if (y + ROW_H < HEADER_H || y > g.h - FOOTER_H) continue;
+                if (i == selected) {
+                    g.fill(left - 2, y - 2, LIST_W + 4, ROW_H, 0x808080);
+                    g.fill(left - 1, y - 1, LIST_W + 2, ROW_H - 2, 0x000000);
+                }
+                WorldIO.SavedWorld w = worlds.get(i);
+                g.text(w.displayName(), left + 2, y + 1, 0xFFFFFF);
+                g.text(w.folderName() + " (" + DATE.format(Instant.ofEpochMilli(w.lastPlayed())) + ")", left + 2, y + 12, 0x808080);
+                String mode = w.type() == WorldSettings.WorldType.FLAT ? "Survival Mode - Superflat" : "Survival Mode";
+                g.text(mode, left + 2, y + 23, 0x808080);
+            }
+            // Header/footer strips hide rows scrolled past the list area and frame it like vanilla.
+            g.dirtStrip(0, 0, g.w, HEADER_H);
+            g.dirtStrip(0, g.h - FOOTER_H, g.w, FOOTER_H);
+            g.gradient(0, HEADER_H, g.w, 4, 0x000000, 1f, 0x000000, 0f);
+            g.gradient(0, g.h - FOOTER_H - 4, g.w, 4, 0x000000, 0f, 0x000000, 1f);
+            float total = worlds.size() * ROW_H;
+            if (total > viewH()) {
+                float barH = Math.max(16, viewH() * viewH() / total);
+                float barY = HEADER_H + (viewH() - barH) * (scroll / (total - viewH()));
+                g.fill(g.w - 8, HEADER_H, 6, viewH(), 0x000000);
+                g.fill(g.w - 8, barY, 6, barH, 0x808080);
+            }
+        }
     }
 }

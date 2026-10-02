@@ -24,6 +24,11 @@ import com.example.testctl.GameAccess;
 import com.example.testctl.GameCommandQueue;
 import com.example.testctl.TestController;
 import com.example.ui.CookingLayout;
+import com.example.ui.DeathScreen;
+import com.example.ui.GameOptions;
+import com.example.ui.GuiEnv;
+import com.example.ui.McScreen;
+import com.example.ui.OptionsScreens;
 import com.example.ui.InventoryLayout;
 import com.example.ui.PauseScreen;
 import com.example.ui.SelectWorldScreen;
@@ -53,7 +58,8 @@ import static org.lwjgl.opengl.GL33.*;
 
 @Slf4j
 public class Game implements GameAccess {
-    private static final int RENDER_DISTANCE = 6; // in chunks
+    /** Chunk radius currently in effect (Video Settings > Render Distance). */
+    private int renderDistance = 6;
     // Chunk streaming used to be budgeted by a fixed COUNT of chunks/meshes per frame. That
     // doesn't bound wall-clock time: per-chunk cost varies a lot (an exposed-sky column near
     // a cave mouth lights very differently than solid stone), so a run of expensive chunks
@@ -65,7 +71,6 @@ public class Game implements GameAccess {
     private static final long STREAMING_TIME_BUDGET_NANOS = 4_000_000L; // 4ms/frame cap
     private static final long FRAME_WARN_THRESHOLD_NANOS = 20_000_000L; // flag frames slower than 20ms
     private static final float REACH_DISTANCE = 5.0f;
-    private static final float FOV_DEGREES = 70f;
     private static final float SKY_R = 0.53f, SKY_G = 0.81f, SKY_B = 0.92f;
     /** Full day/night cycle length. Vanilla is 1200s (20 min); shortened a bit here. */
     private static final float DAY_LENGTH_SECONDS = 600f;
@@ -100,7 +105,7 @@ public class Game implements GameAccess {
      *  tuning, not an official Minecraft value. */
     private static final float WIND_STRENGTH = 1f;
 
-    private enum GameState {TITLE, SELECT_WORLD, WORLD_CREATE, IN_GAME, PAUSED, INVENTORY, COOKING}
+    private enum GameState {TITLE, SELECT_WORLD, WORLD_CREATE, IN_GAME, PAUSED, INVENTORY, COOKING, OPTIONS, DEATH}
 
     private Window window;
     private Input input;
@@ -175,7 +180,13 @@ public class Game implements GameAccess {
     private double titleTimer = 0;
     /** 0=midnight, 0.25=sunrise, 0.5=noon, 0.75=sunset. */
     private float dayTime = 0.5f;
-    private float currentFov = FOV_DEGREES;
+    private final GameOptions options = GameOptions.load(GameOptions.DEFAULT_FILE);
+    private GuiEnv guiEnv;
+    private McScreen optionsScreen;
+    private GameState optionsParent = GameState.TITLE;
+    private DeathScreen deathScreen;
+    private final Vector3f spawnPoint = new Vector3f();
+    private float currentFov = 70f;
     private float swingTimer = 0f;
     private final MobManager mobs = new MobManager();
     private final MobSpawner mobSpawner = new MobSpawner();
@@ -266,11 +277,19 @@ public class Game implements GameAccess {
         gameAudio = new GameAudio();
         gameAudio.init(); // never throws - degrades to silent no-ops if no device/OpenAL fails
 
-        titleScreen = new TitleScreen(new TitleScreen.Listener() {
+        guiEnv = new GuiEnv(options, atlas.getTextureId(), atlas.getUv(Tile.DIRT));
+        applyOptions();
+
+        titleScreen = new TitleScreen(guiEnv, new TitleScreen.Listener() {
             @Override
             public void onPlay() {
                 selectWorldScreen.refresh();
                 state = GameState.SELECT_WORLD;
+            }
+
+            @Override
+            public void onOptions() {
+                openOptions(GameState.TITLE);
             }
 
             @Override
@@ -279,7 +298,7 @@ public class Game implements GameAccess {
             }
         });
 
-        selectWorldScreen = new SelectWorldScreen(new SelectWorldScreen.Listener() {
+        selectWorldScreen = new SelectWorldScreen(guiEnv, new SelectWorldScreen.Listener() {
             @Override
             public void onLoadWorld(WorldIO.SavedWorld saved) {
                 loadWorld(saved);
@@ -293,14 +312,15 @@ public class Game implements GameAccess {
 
             @Override
             public void onBack() {
+                titleScreen.invalidate();
                 state = GameState.TITLE;
             }
         });
 
-        worldCreateScreen = new WorldCreateScreen(new WorldCreateScreen.Listener() {
+        worldCreateScreen = new WorldCreateScreen(guiEnv, new WorldCreateScreen.Listener() {
             @Override
-            public void onCreateWorld(WorldSettings settings) {
-                startNewWorld(settings);
+            public void onCreateWorld(WorldSettings settings, Long seed) {
+                startNewWorld(settings, seed != null ? seed : System.currentTimeMillis());
             }
 
             @Override
@@ -310,20 +330,33 @@ public class Game implements GameAccess {
             }
         });
 
-        pauseScreen = new PauseScreen(new PauseScreen.Listener() {
+        pauseScreen = new PauseScreen(guiEnv, new PauseScreen.Listener() {
             @Override
             public void onBackToGame() {
                 resumeGame();
             }
 
             @Override
-            public void onQuitToTitle() {
-                quitToTitle();
+            public void onOptions() {
+                openOptions(GameState.PAUSED);
             }
 
             @Override
-            public void onQuitGame() {
-                window.close();
+            public void onQuitToTitle() {
+                quitToTitle();
+            }
+        });
+
+        deathScreen = new DeathScreen(guiEnv, new DeathScreen.Listener() {
+            @Override
+            public void onRespawn() {
+                respawnPlayer();
+            }
+
+            @Override
+            public void onTitleScreen() {
+                respawnPlayer(); // a fresh life for whenever this save is loaded again
+                quitToTitle();
             }
         });
 
@@ -389,6 +422,8 @@ public class Game implements GameAccess {
             spawnY = (bestHeight > 0 ? bestHeight : spawnChunk.getColumnHeight(spawnLocalX, spawnLocalZ)) + 2;
         }
         player = new Player(new Vector3f(spawnLocalX + 0.5f, spawnY, spawnLocalZ + 0.5f));
+        spawnPoint.set(player.position);
+        player.setViewBobbing(options.viewBobbing);
 
         resetGameplayState(new Inventory(), settings.difficulty());
         weather = new Weather(seed);
@@ -433,6 +468,8 @@ public class Game implements GameAccess {
         saplingGrowth.registerChunk(spawnChunk); // rescans for any saplings that were saved mid-growth
 
         player = new Player(new Vector3f(meta.playerPos()));
+        spawnPoint.set(player.position);
+        player.setViewBobbing(options.viewBobbing);
         resetGameplayState(meta.inventory() != null ? meta.inventory() : new Inventory(), meta.settings().difficulty());
         if (meta.survival() != null) {
             WorldIO.SurvivalSnapshot s = meta.survival();
@@ -494,7 +531,53 @@ public class Game implements GameAccess {
         return out;
     }
 
+    private void openOptions(GameState parent) {
+        optionsParent = parent;
+        boolean inWorld = parent == GameState.PAUSED && world != null;
+        optionsScreen = OptionsScreens.create(new OptionsScreens.Context(guiEnv, this::applyOptions, this::closeOptions,
+                inWorld ? () -> survival.getDifficulty() : null,
+                inWorld ? d -> {
+                    survival.setDifficulty(d);
+                    currentSettings = new WorldSettings(currentSettings.name(), currentSettings.type(), d);
+                } : null));
+        state = GameState.OPTIONS;
+    }
+
+    private void closeOptions() {
+        options.save(GameOptions.DEFAULT_FILE);
+        optionsScreen = null;
+        if (optionsParent == GameState.PAUSED) pauseScreen.invalidate();
+        else titleScreen.invalidate();
+        state = optionsParent;
+    }
+
+    /** Pushes the current {@link GameOptions} into the engine; cheap and idempotent. */
+    private void applyOptions() {
+        options.clamp();
+        renderDistance = options.renderDistance;
+        window.setVsync(options.vsync);
+        window.setFullscreen(options.fullscreen);
+        if (player != null) player.setViewBobbing(options.viewBobbing);
+        gameAudio.setMasterVolume(options.masterVolume);
+        gameAudio.setCategoryVolume(com.example.audio.AudioCategory.BLOCKS, options.blocksVolume);
+        gameAudio.setCategoryVolume(com.example.audio.AudioCategory.PLAYER, options.playersVolume);
+        gameAudio.setCategoryVolume(com.example.audio.AudioCategory.AMBIENT, options.ambientVolume);
+        gameAudio.setCategoryVolume(com.example.audio.AudioCategory.WEATHER, options.weatherVolume);
+    }
+
+    /** Back to life at the world's spawn point with full health and hunger. */
+    private void respawnPlayer() {
+        player.teleport(spawnPoint.x, spawnPoint.y, spawnPoint.z);
+        survival.reset(player.position);
+        if (state == GameState.DEATH) {
+            window.captureMouse();
+            input.resyncMousePosition();
+            state = GameState.IN_GAME;
+        }
+    }
+
     private void pauseGame() {
+        pauseScreen.invalidate();
         window.releaseMouse();
         input.resyncMousePosition();
         state = GameState.PAUSED;
@@ -580,13 +663,9 @@ public class Game implements GameAccess {
                 tickCookingStations(dt);
                 updateCookingScreen();
             }
-            case PAUSED -> {
-                if (input.consumeKeyPressed(GLFW_KEY_ESCAPE)) {
-                    resumeGame();
-                } else {
-                    pauseScreen.update(dt, input, window.getWidth(), window.getHeight());
-                }
-            }
+            case PAUSED -> pauseScreen.update(dt, input, window.getWidth(), window.getHeight());
+            case OPTIONS -> optionsScreen.update(dt, input, window.getWidth(), window.getHeight());
+            case DEATH -> deathScreen.update(dt, input, window.getWidth(), window.getHeight());
         }
         input.endFrame();
     }
@@ -604,11 +683,19 @@ public class Game implements GameAccess {
             return;
         }
 
-        player.look(input.getMouseDeltaX(), input.getMouseDeltaY());
+        float mouseSpeed = options.mouseSpeedMultiplier();
+        player.look(input.getMouseDeltaX() * mouseSpeed, input.getMouseDeltaY() * mouseSpeed * (options.invertMouse ? -1f : 1f));
         player.update(dt, input, world, now, survival.getHunger().canSprint());
         survival.update(dt, player);
+        if (survival.getHealth().isDead()) {
+            deathScreen.invalidate();
+            window.releaseMouse();
+            input.resyncMousePosition();
+            state = GameState.DEATH;
+            return;
+        }
 
-        float targetFov = FOV_DEGREES + (player.isSprinting() ? SPRINT_FOV_BOOST : 0f);
+        float targetFov = options.fov + (player.isSprinting() ? SPRINT_FOV_BOOST : 0f);
         currentFov += (targetFov - currentFov) * Math.min(1f, FOV_LERP_RATE * dt);
         if (swingTimer > 0f) swingTimer = Math.max(0f, swingTimer - dt);
         if (playerAttackCooldown > 0f) playerAttackCooldown = Math.max(0f, playerAttackCooldown - dt);
@@ -662,9 +749,9 @@ public class Game implements GameAccess {
 
         int generated = 0;
         generation:
-        for (int dx = -RENDER_DISTANCE; dx <= RENDER_DISTANCE; dx++) {
-            for (int dz = -RENDER_DISTANCE; dz <= RENDER_DISTANCE; dz++) {
-                if (dx * dx + dz * dz > RENDER_DISTANCE * RENDER_DISTANCE) continue;
+        for (int dx = -renderDistance; dx <= renderDistance; dx++) {
+            for (int dz = -renderDistance; dz <= renderDistance; dz++) {
+                if (dx * dx + dz * dz > renderDistance * renderDistance) continue;
                 int cx = pcx + dx, cz = pcz + dz;
                 if (!world.hasChunk(cx, cz)) {
                     Chunk c = world.getOrCreateChunk(cx, cz);
@@ -680,7 +767,7 @@ public class Game implements GameAccess {
         }
 
         int unloaded = 0;
-        int unloadRadius = RENDER_DISTANCE + 2;
+        int unloadRadius = renderDistance + 2;
         Iterator<Map.Entry<Long, Chunk>> it = world.chunkMap().entrySet().iterator();
         while (it.hasNext()) {
             Map.Entry<Long, Chunk> entry = it.next();
@@ -1239,7 +1326,8 @@ public class Game implements GameAccess {
     private void render(float dt) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        if (world != null && (state == GameState.IN_GAME || state == GameState.PAUSED || state == GameState.INVENTORY || state == GameState.COOKING)) {
+        if (world != null && (state == GameState.IN_GAME || state == GameState.PAUSED || state == GameState.INVENTORY || state == GameState.COOKING
+                || state == GameState.DEATH || (state == GameState.OPTIONS && optionsParent == GameState.PAUSED))) {
             renderWorld(dt);
         }
 
@@ -1256,13 +1344,15 @@ public class Game implements GameAccess {
                 renderHud();
                 pauseScreen.render(uiRenderer, font, window.getWidth(), window.getHeight());
             }
+            case OPTIONS -> optionsScreen.render(uiRenderer, font, window.getWidth(), window.getHeight());
+            case DEATH -> deathScreen.render(uiRenderer, font, window.getWidth(), window.getHeight());
         }
         uiRenderer.end();
         glEnable(GL_DEPTH_TEST);
     }
 
     private void renderWorld(float dt) {
-        float surfaceFogEnd = RENDER_DISTANCE * Chunk.SIZE_X * 0.9f;
+        float surfaceFogEnd = renderDistance * Chunk.SIZE_X * 0.9f;
         float surfaceFogStart = surfaceFogEnd * 0.6f;
 
         Vector3f skyColor = computeSkyColor(dayTime);
@@ -2142,6 +2232,63 @@ public class Game implements GameAccess {
     }
 
     @Override
+    public void openMenu(String name) {
+        String page = name.startsWith("options:") ? name.substring("options:".length()) : "";
+        String base = name.startsWith("options") ? "options" : name;
+        switch (base) {
+            case "title" -> {
+                titleScreen.invalidate();
+                state = GameState.TITLE;
+            }
+            case "select" -> {
+                selectWorldScreen.refresh();
+                state = GameState.SELECT_WORLD;
+            }
+            case "create" -> {
+                worldCreateScreen.reset();
+                state = GameState.WORLD_CREATE;
+            }
+            case "options" -> {
+                boolean inWorld = world != null && (state == GameState.IN_GAME || state == GameState.PAUSED);
+                openOptions(inWorld ? GameState.PAUSED : GameState.TITLE);
+                if (!page.isEmpty()) {
+                    OptionsScreens.Context ctx = new OptionsScreens.Context(guiEnv, this::applyOptions, this::closeOptions,
+                            inWorld ? () -> survival.getDifficulty() : null, inWorld ? d -> survival.setDifficulty(d) : null);
+                    optionsScreen = OptionsScreens.create(ctx, page);
+                }
+            }
+            case "pause" -> {
+                if (world == null) throw new IllegalStateException("no active world");
+                pauseGame();
+            }
+            case "death" -> {
+                if (world == null) throw new IllegalStateException("no active world");
+                deathScreen.invalidate();
+                window.releaseMouse();
+                input.resyncMousePosition();
+                state = GameState.DEATH;
+            }
+            default -> throw new IllegalArgumentException("unknown menu: " + name);
+        }
+    }
+
+    @Override
+    public void click(int x, int y) {
+        input.simulateClick(x, y);
+    }
+
+    @Override
+    public void resizeWindow(int width, int height) {
+        window.resize(width, height);
+    }
+
+    @Override
+    public void setGuiScale(int scale) {
+        options.guiScale = scale;
+        applyOptions();
+    }
+
+    @Override
     public void spawnZombie(float x, float y, float z) {
         if (world == null) throw new IllegalStateException("no active world");
         if (!mobs.spawn(new Zombie(new Vector3f(x, y, z), 0f, () -> survival.getDifficulty()))) {
@@ -2240,6 +2387,11 @@ public class Game implements GameAccess {
     public void respawn() {
         if (world == null) throw new IllegalStateException("no active world");
         survival.getHealth().reset();
+        if (state == GameState.DEATH) {
+            window.captureMouse();
+            input.resyncMousePosition();
+            state = GameState.IN_GAME;
+        }
     }
 
     @Override

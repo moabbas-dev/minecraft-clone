@@ -105,6 +105,38 @@ public class WorldIO {
         }
     }
 
+    /** Changes only the display name stored in world.dat (the folder name stays, so saves are
+     *  never moved); every other byte - position, inventory, survival state - is copied through
+     *  untouched. Returns false (nothing changed) if the file is missing or unreadable. */
+    public static boolean renameWorld(String folderName, String newName) {
+        return renameWorld(worldDir(folderName), newName);
+    }
+
+    public static boolean renameWorld(File dir, String newName) {
+        File file = new File(dir, "world.dat");
+        if (!file.isFile() || newName == null || newName.isBlank()) return false;
+        try {
+            byte[] all = java.nio.file.Files.readAllBytes(file.toPath());
+            DataInputStream in = new DataInputStream(new java.io.ByteArrayInputStream(all));
+            long seed = in.readLong();
+            int type = in.readInt();
+            in.readUTF();
+            byte[] rest = in.readAllBytes();
+            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+            DataOutputStream out = new DataOutputStream(bytes);
+            out.writeLong(seed);
+            out.writeInt(type);
+            out.writeUTF(newName.trim());
+            out.write(rest);
+            out.flush();
+            java.nio.file.Files.write(file.toPath(), bytes.toByteArray());
+            return true;
+        } catch (IOException e) {
+            System.err.println("Failed to rename world in " + dir + ": " + e.getMessage());
+            return false;
+        }
+    }
+
     public static LoadedMeta loadMeta(File dir) {
         File file = new File(dir, "world.dat");
         if (!file.isFile()) return null;

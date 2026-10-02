@@ -86,6 +86,19 @@ public class Input implements InputState {
         return v;
     }
 
+    private boolean releaseSimulatedClick;
+
+    /** Test-controller only: moves the cursor to (x, y) framebuffer pixels and delivers one left
+     *  click (press now, release at the end of the next frame) through the same edge/state flags
+     *  real mouse input sets, so menus see it exactly like a physical click. */
+    public void simulateClick(double x, double y) {
+        lastMouseX = x;
+        lastMouseY = y;
+        mouseDown[GLFW_MOUSE_BUTTON_LEFT] = true;
+        mousePressedEdge[GLFW_MOUSE_BUTTON_LEFT] = true;
+        releaseSimulatedClick = true;
+    }
+
     public boolean isMouseDown(int button) {
         return mouseDown[button];
     }
@@ -140,6 +153,10 @@ public class Input implements InputState {
 
     /** Call once per frame after consuming deltas for the frame. */
     public void endFrame() {
+        if (releaseSimulatedClick) {
+            mouseDown[GLFW_MOUSE_BUTTON_LEFT] = false;
+            releaseSimulatedClick = false;
+        }
         mouseDeltaX = 0;
         mouseDeltaY = 0;
         scrollDelta = 0;

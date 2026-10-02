@@ -54,3 +54,5 @@ minecraft-sounds/
 
 ### Mac OS ###
 .DS_Store
+# Per-user menu settings written by the Options screens.
+options.txt

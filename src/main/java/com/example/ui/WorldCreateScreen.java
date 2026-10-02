@@ -1,26 +1,32 @@
 package com.example.ui;
 
-import com.example.engine.Font;
-import com.example.engine.Input;
-import com.example.engine.UiRenderer;
+import com.example.world.Difficulty;
+import com.example.world.WorldIO;
 import com.example.world.WorldSettings;
 
-import static org.lwjgl.glfw.GLFW.*;
-
-public class WorldCreateScreen implements Screen {
+/**
+ * Vanilla (1.8) "Create New World": world name + "Will be saved in", Game Mode, and a "More World
+ * Options..." page with seed and world type. Only the options this game actually supports are
+ * interactive (name, difficulty, seed, world type); the rest are shown inactive in their vanilla
+ * positions so the layout matches without pretending to features that do not exist.
+ */
+public class WorldCreateScreen extends McScreen {
     public interface Listener {
-        void onCreateWorld(WorldSettings settings);
+        /** @param seed null = random. */
+        void onCreateWorld(WorldSettings settings, Long seed);
 
         void onBack();
     }
 
     private final Listener listener;
     private final StringBuilder worldName = new StringBuilder("New World");
-    private WorldSettings.WorldType selectedType = null;
+    private final StringBuilder seedText = new StringBuilder();
+    private boolean moreOptions;
+    private WorldSettings.WorldType type = WorldSettings.WorldType.SURVIVAL;
+    private Difficulty difficulty = Difficulty.NORMAL;
 
-    private Button survivalCard, flatCard, createButton, backButton;
-
-    public WorldCreateScreen(Listener listener) {
+    public WorldCreateScreen(GuiEnv env, Listener listener) {
+        super(env);
         this.listener = listener;
     }
 
@@ -28,82 +34,111 @@ public class WorldCreateScreen implements Screen {
     public void reset() {
         worldName.setLength(0);
         worldName.append("New World");
-        selectedType = null;
+        seedText.setLength(0);
+        moreOptions = false;
+        type = WorldSettings.WorldType.SURVIVAL;
+        difficulty = Difficulty.NORMAL;
+        child = null;
+        invalidate();
     }
 
-    private void layout(int w, int h) {
-        float cardW = 220, cardH = 140, gap = 24;
-        float totalW = cardW * 2 + gap;
-        float startX = w / 2f - totalW / 2f;
-        float cardY = h / 2f - cardH / 2f;
-        survivalCard = new Button(startX, cardY, cardW, cardH, "Survival");
-        flatCard = new Button(startX + cardW + gap, cardY, cardW, cardH, "Flat");
-        createButton = new Button(w / 2f - 110, cardY + cardH + 50, 220, 44, "Create World");
-        backButton = new Button(20, h - 56, 100, 36, "Back");
+    /** Vanilla: blank = random, a number is used as-is, any other text is hashed. */
+    static Long parseSeed(String text) {
+        String t = text.trim();
+        if (t.isEmpty()) return null;
+        try {
+            return Long.parseLong(t);
+        } catch (NumberFormatException e) {
+            return (long) t.hashCode();
+        }
     }
 
-    @Override
-    public void update(float dt, Input input, int screenWidth, int screenHeight) {
-        layout(screenWidth, screenHeight);
-
-        String typed = input.consumeTypedChars();
-        for (int i = 0; i < typed.length(); i++) {
-            char c = typed.charAt(i);
-            if (worldName.length() < 24 && c >= 32 && c < 127) worldName.append(c);
-        }
-        if (input.consumeKeyPressed(GLFW_KEY_BACKSPACE) && worldName.length() > 0) {
-            worldName.deleteCharAt(worldName.length() - 1);
-        }
-
-        double mx = input.getMouseX(), my = input.getMouseY();
-        survivalCard.updateHover(mx, my);
-        flatCard.updateHover(mx, my);
-        createButton.updateHover(mx, my);
-        backButton.updateHover(mx, my);
-
-        if (input.consumeMousePressed(GLFW_MOUSE_BUTTON_LEFT)) {
-            if (survivalCard.contains(mx, my)) selectedType = WorldSettings.WorldType.SURVIVAL;
-            else if (flatCard.contains(mx, my)) selectedType = WorldSettings.WorldType.FLAT;
-            else if (backButton.contains(mx, my)) listener.onBack();
-            else if (createButton.contains(mx, my) && selectedType != null) {
-                String name = worldName.length() == 0 ? "New World" : worldName.toString();
-                listener.onCreateWorld(new WorldSettings(name, selectedType));
-            }
-        }
+    private static String title(Enum<?> e) {
+        String s = e.name().toLowerCase();
+        return Character.toUpperCase(s.charAt(0)) + s.substring(1);
     }
 
     @Override
-    public void render(UiRenderer ui, Font font, int screenWidth, int screenHeight) {
-        // See TitleScreen.render() - a mid-frame screen switch can call render() before
-        // this screen's own update() has run, so layout() must be safe to call from here too.
-        layout(screenWidth, screenHeight);
-
-        ui.drawColorQuad(0, 0, screenWidth, screenHeight, 0.15f, 0.15f, 0.19f, 1f);
-
-        String title = "Create New World";
-        float titleScale = 2.2f;
-        float tw = font.measureText(title, titleScale);
-        font.drawText(ui, title, screenWidth / 2f - tw / 2f, screenHeight * 0.1f, titleScale, 1f, 1f, 1f, 1f);
-
-        String nameLabel = "Name: " + worldName + "_";
-        float nameScale = 1.3f;
-        float nw = font.measureText(nameLabel, nameScale);
-        font.drawText(ui, nameLabel, screenWidth / 2f - nw / 2f, screenHeight * 0.26f, nameScale, 0.9f, 0.9f, 0.9f, 1f);
-
-        survivalCard.render(ui, font, selectedType == WorldSettings.WorldType.SURVIVAL);
-        flatCard.render(ui, font, selectedType == WorldSettings.WorldType.FLAT);
-
-        float descScale = 0.95f;
-        font.drawText(ui, "Rolling terrain,", survivalCard.x + 12, survivalCard.y + survivalCard.height - 46, descScale, 0.85f, 0.85f, 0.85f, 1f);
-        font.drawText(ui, "oceans and ores", survivalCard.x + 12, survivalCard.y + survivalCard.height - 26, descScale, 0.85f, 0.85f, 0.85f, 1f);
-        font.drawText(ui, "Superflat", flatCard.x + 12, flatCard.y + flatCard.height - 46, descScale, 0.85f, 0.85f, 0.85f, 1f);
-        font.drawText(ui, "starter world", flatCard.x + 12, flatCard.y + flatCard.height - 26, descScale, 0.85f, 0.85f, 0.85f, 1f);
-
-        boolean canCreate = selectedType != null;
-        createButton.render(ui, font, false);
-        if (!canCreate) {
-            ui.drawColorQuad(createButton.x, createButton.y, createButton.width, createButton.height, 0, 0, 0, 0.55f);
+    protected void init() {
+        int cx = guiW / 2;
+        if (!moreOptions) {
+            TextField name = new TextField(cx - 100, 60, 200, 20, worldName, 32);
+            name.setFocused(true);
+            widgets.add(name);
+            Button mode = new Button(cx - 75, 115, 150, 20, "Game Mode: Survival", () -> {
+            });
+            mode.active = false;
+            widgets.add(mode);
+            widgets.add(new Button(cx - 75, 161, 150, 20, () -> "Difficulty: " + title(difficulty), () -> {
+                difficulty = Difficulty.values()[(difficulty.ordinal() + 1) % Difficulty.values().length];
+            }));
+            widgets.add(new Button(cx - 75, 187, 150, 20, "More World Options...", () -> {
+                moreOptions = true;
+                invalidate();
+            }));
+        } else {
+            TextField seed = new TextField(cx - 100, 60, 200, 20, seedText, 32);
+            seed.setFocused(true);
+            widgets.add(seed);
+            Button structures = new Button(cx - 155, 100, 150, 20, "Generate Structures: OFF", () -> {
+            });
+            structures.active = false;
+            widgets.add(structures);
+            widgets.add(new Button(cx + 5, 100, 150, 20,
+                    () -> "World Type: " + (type == WorldSettings.WorldType.FLAT ? "Superflat" : "Default"), () -> {
+                type = type == WorldSettings.WorldType.FLAT ? WorldSettings.WorldType.SURVIVAL : WorldSettings.WorldType.FLAT;
+            }));
+            Button bonus = new Button(cx - 155, 151, 150, 20, "Bonus Chest: OFF", () -> {
+            });
+            bonus.active = false;
+            widgets.add(bonus);
+            Button cheats = new Button(cx + 5, 151, 150, 20, "Allow Cheats: OFF", () -> {
+            });
+            cheats.active = false;
+            widgets.add(cheats);
+            widgets.add(new Button(cx - 75, 187, 150, 20, "Done", () -> {
+                moreOptions = false;
+                invalidate();
+            }));
         }
-        backButton.render(ui, font, false);
+        widgets.add(new Button(cx - 155, guiH - 28, 150, 20, "Create New World", this::create));
+        widgets.add(new Button(cx + 5, guiH - 28, 150, 20, "Cancel", listener::onBack));
+    }
+
+    private void create() {
+        String n = worldName.toString().trim();
+        if (n.isEmpty()) n = "New World";
+        listener.onCreateWorld(new WorldSettings(n, type, difficulty), parseSeed(seedText.toString()));
+    }
+
+    @Override
+    protected void onEnter() {
+        create();
+    }
+
+    @Override
+    protected void onEscape() {
+        if (moreOptions) {
+            moreOptions = false;
+            invalidate();
+        } else {
+            listener.onBack();
+        }
+    }
+
+    @Override
+    protected void drawContent(GuiContext g) {
+        g.textCentered("Create New World", g.w / 2f, 20, 0xFFFFFF);
+        int cx = g.w / 2;
+        if (!moreOptions) {
+            g.text("World Name", cx - 100, 47, 0xA0A0A0);
+            String n = worldName.toString().trim();
+            g.text("Will be saved in: " + WorldIO.sanitizeFolderName(n.isEmpty() ? "New World" : n), cx - 100, 85, 0xA0A0A0);
+            g.text("Search for resources, craft, gain", cx - 100 + 25, 137, 0xA0A0A0);
+            g.text("levels, health and hunger", cx - 100 + 25, 148, 0xA0A0A0);
+        } else {
+            g.text("Seed for the World Generator", cx - 100, 47, 0xA0A0A0);
+            g.text("Leave blank for a random seed", cx - 100, 85, 0xA0A0A0);
+        }
     }
 }

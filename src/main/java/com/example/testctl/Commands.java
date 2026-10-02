@@ -43,6 +43,10 @@ public final class Commands {
             case "openInventory" -> openInventory(params);
             case "inventoryClick" -> inventoryClick(params);
             case "closeInventory" -> closeInventory();
+            case "openMenu" -> openMenu(params);
+            case "click" -> click(params);
+            case "resizeWindow" -> resizeWindow(params);
+            case "setGuiScale" -> setGuiScale(params);
             case "spawnZombie" -> spawnZombie(params);
             case "setMobSpawning" -> setMobSpawning(params);
             case "damageMobs" -> damageMobs(params);
@@ -279,6 +283,40 @@ public final class Commands {
             return Result.badRequest(e.getMessage());
         }
         return Result.ok("inventory closed");
+    }
+
+    private Result openMenu(Map<String, String> p) {
+        String name = p.get("name");
+        if (name == null || name.isBlank()) return Result.badRequest("openMenu requires a 'name' param");
+        try {
+            game.openMenu(name.toLowerCase(Locale.ROOT));
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return Result.badRequest(e.getMessage());
+        }
+        return Result.ok("opened menu " + name);
+    }
+
+    private Result click(Map<String, String> p) {
+        Integer x = parseInt(p, "x"), y = parseInt(p, "y");
+        if (x == null || y == null || x < 0 || y < 0) return Result.badRequest("click requires non-negative integer x and y");
+        game.click(x, y);
+        return Result.ok("clicked " + x + "," + y);
+    }
+
+    private Result resizeWindow(Map<String, String> p) {
+        Integer w = parseInt(p, "w"), h = parseInt(p, "h");
+        if (w == null || h == null || w < 100 || h < 100 || w > 8000 || h > 8000) {
+            return Result.badRequest("resizeWindow requires integer w and h in [100, 8000]");
+        }
+        game.resizeWindow(w, h);
+        return Result.ok("window resized to " + w + "x" + h);
+    }
+
+    private Result setGuiScale(Map<String, String> p) {
+        Integer s = parseInt(p, "scale");
+        if (s == null || s < 0 || s > 4) return Result.badRequest("setGuiScale requires an integer scale 0 (auto) to 4");
+        game.setGuiScale(s);
+        return Result.ok("gui scale " + s);
     }
 
     private Result spawnZombie(Map<String, String> p) {

@@ -122,6 +122,20 @@ public interface GameAccess {
     /** Damages every live mob through the real damage pipeline (DamageSource.PLAYER). */
     void damageMobs(float amount);
 
+    /** Switches to a menu screen by name: title, select, create, pause, death, options, or
+     *  options:video / options:sounds / options:controls / options:mouse / options:keybinds.
+     *  @throws IllegalArgumentException for an unknown name; IllegalStateException if it needs a world. */
+    void openMenu(String name);
+
+    /** One left click at framebuffer pixel (x, y) - the same path a real mouse click takes. */
+    void click(int x, int y);
+
+    /** Resizes the window (framebuffer) - for checking that menus re-layout responsively. */
+    void resizeWindow(int width, int height);
+
+    /** GUI scale option: 0 = Auto, 1..4 manual cap. */
+    void setGuiScale(int scale);
+
     /** Structured plain-text dump of player/biome/color/weather/time/streaming state. */
     String stateSnapshot();
 

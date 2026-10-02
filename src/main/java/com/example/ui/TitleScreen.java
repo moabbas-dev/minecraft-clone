@@ -1,66 +1,91 @@
 package com.example.ui;
 
-import com.example.engine.Font;
-import com.example.engine.Input;
-import com.example.engine.UiRenderer;
+import java.util.Random;
 
-import static org.lwjgl.glfw.GLFW.GLFW_MOUSE_BUTTON_LEFT;
-
-public class TitleScreen implements Screen {
+/**
+ * Vanilla main menu layout (1.8): block-letter logo, rotating yellow splash, Singleplayer /
+ * Multiplayer / Minecraft Realms stacked 24px apart (200x20) starting at h/4+48, then Options... and
+ * Quit Game as 98px halves 4px apart. Multiplayer and Realms exist in the layout but are inactive -
+ * this clone has no networking. The panorama is a procedural scrolling hill silhouette.
+ */
+public class TitleScreen extends McScreen {
     public interface Listener {
         void onPlay();
+
+        void onOptions();
 
         void onQuit();
     }
 
+    private static final String[] SPLASHES = {
+            "Also try Terraria!", "100% pure Java!", "Made from scratch!", "Check it out!", "Voxels everywhere!",
+            "Now with zombies!", "Cooking with fire!", "Hello, world!", "Mind the creeper!", "Block party!"};
+
     private final Listener listener;
-    private Button playButton;
-    private Button quitButton;
+    private final String splash;
 
-    public TitleScreen(Listener listener) {
+    public TitleScreen(GuiEnv env, Listener listener) {
+        super(env);
         this.listener = listener;
-    }
-
-    private void layout(int w, int h) {
-        float bw = 220, bh = 44;
-        float cx = w / 2f - bw / 2f;
-        playButton = new Button(cx, h / 2f - 10, bw, bh, "Play");
-        quitButton = new Button(cx, h / 2f + 46, bw, bh, "Quit");
+        this.splash = SPLASHES[new Random().nextInt(SPLASHES.length)];
     }
 
     @Override
-    public void update(float dt, Input input, int screenWidth, int screenHeight) {
-        layout(screenWidth, screenHeight);
-        double mx = input.getMouseX(), my = input.getMouseY();
-        playButton.updateHover(mx, my);
-        quitButton.updateHover(mx, my);
-        if (input.consumeMousePressed(GLFW_MOUSE_BUTTON_LEFT)) {
-            if (playButton.contains(mx, my)) listener.onPlay();
-            else if (quitButton.contains(mx, my)) listener.onQuit();
+    protected void init() {
+        int j = guiH / 4 + 48;
+        int cx = guiW / 2;
+        widgets.add(new Button(cx - 100, j, 200, 20, "Singleplayer", listener::onPlay));
+        Button multi = new Button(cx - 100, j + 24, 200, 20, "Multiplayer", () -> {
+        });
+        multi.active = false;
+        widgets.add(multi);
+        Button realms = new Button(cx - 100, j + 48, 200, 20, "Minecraft Realms", () -> {
+        });
+        realms.active = false;
+        widgets.add(realms);
+        widgets.add(new Button(cx - 100, j + 72 + 12, 98, 20, "Options...", listener::onOptions));
+        widgets.add(new Button(cx + 2, j + 72 + 12, 98, 20, "Quit Game", listener::onQuit));
+    }
+
+    @Override
+    protected void drawBackground(GuiContext g) {
+        float t = g.time;
+        g.gradient(0, 0, g.w, g.h * 0.62f, 0x6FA0E8, 1f, 0xC4DCF6, 1f);
+        // Two parallax hill layers scrolling slowly, like the rotating panorama.
+        for (int layer = 0; layer < 2; layer++) {
+            float speed = layer == 0 ? 2.5f : 6f;
+            int base = (int) (g.h * (layer == 0 ? 0.58f : 0.68f));
+            int color = layer == 0 ? 0x4C8A3A : 0x2F6B2A;
+            for (int x = 0; x < g.w; x += 2) {
+                double wx = (x + t * speed) * 0.045 + layer * 11.0;
+                int hgt = (int) (Math.sin(wx) * 7 + Math.sin(wx * 2.3 + 1.7) * 4 + Math.sin(wx * 0.7) * 6);
+                int top = base - hgt;
+                g.fill(x, top, 2, g.h - top, color);
+            }
         }
+        g.gradient(0, 0, g.w, g.h, 0x000000, 0.15f, 0x000000, 0.55f);
     }
 
     @Override
-    public void render(UiRenderer ui, Font font, int screenWidth, int screenHeight) {
-        // A screen transition can land here before this screen's own update() has run
-        // this frame (the switch happens mid-frame inside the previous screen's update),
-        // so layout() must be idempotent and safe to call from render() too.
-        layout(screenWidth, screenHeight);
+    protected void drawContent(GuiContext g) {
+        // Block-letter logo: black outline, darker drop, light stone fill.
+        String logo = "MINECRAFT";
+        float px = Math.max(3f, Math.min(5f, g.w / 70f));
+        px = (float) Math.floor(px);
+        float lw = g.font.width(logo, px);
+        float lx = g.w / 2f - lw / 2f, ly = 30;
+        int[][] outline = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}, {-1, -1}, {1, 1}, {-1, 1}, {1, -1}};
+        for (int[] o : outline) g.font.draw(g.ui, logo, lx + o[0], ly + o[1], px, 0x000000, false);
+        g.font.draw(g.ui, logo, lx + 1, ly + 2, px, 0x3F3F3F, false);
+        g.font.draw(g.ui, logo, lx, ly, px, 0xC2C2C2, false);
 
-        ui.drawColorQuad(0, 0, screenWidth, screenHeight * 0.55f, 0.4f, 0.62f, 0.88f, 1f);
-        ui.drawColorQuad(0, screenHeight * 0.55f, screenWidth, screenHeight * 0.45f, 0.5f, 0.7f, 0.38f, 1f);
+        // Splash: yellow, rotated -20 degrees, gently pulsing (vanilla scale formula).
+        float pulse = 1.8f - Math.abs((float) Math.sin((g.time * 1000f % 1000f) / 1000f * Math.PI * 2)) * 0.1f;
+        float sp = pulse * 100f / (g.font.width(splash) + 32);
+        g.font.drawRotated(g.ui, splash, g.w / 2f + 100, 78, (float) Math.toRadians(-20), Math.max(1f, sp), 1f, 1f, 0f, true);
 
-        String title = "MINECRAFT 1.8 CLONE";
-        float scale = 3f;
-        float tw = font.measureText(title, scale);
-        font.drawText(ui, title, screenWidth / 2f - tw / 2f, screenHeight * 0.18f, scale, 1f, 1f, 1f, 1f);
-
-        String subtitle = "A from-scratch voxel engine";
-        float subScale = 1.1f;
-        float sw = font.measureText(subtitle, subScale);
-        font.drawText(ui, subtitle, screenWidth / 2f - sw / 2f, screenHeight * 0.18f + font.lineHeight(scale) + 8, subScale, 0.9f, 0.95f, 1f, 1f);
-
-        playButton.render(ui, font, false);
-        quitButton.render(ui, font, false);
+        g.text("Minecraft 1.8 Clone", 2, g.h - 10, 0xFFFFFF);
+        String right = "Not affiliated with Mojang AB";
+        g.text(right, g.w - g.textWidth(right) - 2, g.h - 10, 0xFFFFFF);
     }
 }

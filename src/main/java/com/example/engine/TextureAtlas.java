@@ -242,6 +242,10 @@ public class TextureAtlas {
         return new float[]{u0, v0, u1, v1};
     }
 
+    public int getTextureId() {
+        return textureId;
+    }
+
     public void bind(int unit) {
         glActiveTexture(GL_TEXTURE0 + unit);
         glBindTexture(GL_TEXTURE_2D, textureId);

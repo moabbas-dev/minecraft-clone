@@ -16,6 +16,8 @@ public class Window {
     @Getter
     private int height;
     private boolean resized;
+    private boolean fullscreen;
+    private int winX, winY, winW, winH;
 
     public Window(int width, int height, String title) {
         this.width = width;
@@ -52,6 +54,36 @@ public class Window {
         GL.createCapabilities();
         glEnable(GL_MULTISAMPLE);
         glViewport(0, 0, width, height);
+    }
+
+    public void setVsync(boolean on) {
+        glfwSwapInterval(on ? 1 : 0);
+    }
+
+    /** Windowed <-> fullscreen on the primary monitor, remembering the windowed rect to restore. */
+    public void setFullscreen(boolean on) {
+        if (on == fullscreen) return;
+        if (on) {
+            int[] x = new int[1], y = new int[1], w = new int[1], h = new int[1];
+            glfwGetWindowPos(handle, x, y);
+            glfwGetWindowSize(handle, w, h);
+            winX = x[0];
+            winY = y[0];
+            winW = w[0];
+            winH = h[0];
+            long monitor = glfwGetPrimaryMonitor();
+            var mode = glfwGetVideoMode(monitor);
+            if (mode == null) return;
+            glfwSetWindowMonitor(handle, monitor, 0, 0, mode.width(), mode.height(), mode.refreshRate());
+        } else {
+            glfwSetWindowMonitor(handle, NULL, winX, winY, Math.max(winW, 320), Math.max(winH, 240), GLFW_DONT_CARE);
+        }
+        fullscreen = on;
+    }
+
+    /** Resizes the (windowed) window - used by the test controller to check responsive layouts. */
+    public void resize(int w, int h) {
+        glfwSetWindowSize(handle, w, h);
     }
 
     public void captureMouse() {

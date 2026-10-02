@@ -49,6 +49,7 @@ or downgrades a failing assertion.
 | `com.example.cooking` (`CookingMenuTest`) | Input/fuel slot pick-place (reusing `InventoryMenu`'s now-public static click helpers), output slot is take-only and grants proportional XP on a partial take, `close()` returns only the cursor and leaves the station's own contents untouched | No |
 | `com.example.entity` (`MobSystemTest`) | Entity/LivingEntity/Mob + goal AI + bounded A* navigation + `MobManager`/`MobSpawner`: gravity/landing, wall collision, path around a wall, 1-block step-up, target acquisition, stop at attack range, cooldown-gated attacks with per-difficulty damage via the shared damage pipeline, no attack through a wall (shared `Raycast`), death stops AI + single drop roll + delayed corpse removal, cap/despawn, ray-vs-mob test, spawn-rule rejections, 24-zombie tick cost | No |
 | `com.example.ui` (`CookingLayoutTest`) | Cooking screen geometry: slot hit-testing, no overlaps, everything inside the panel | No |
+| `com.example.ui` (`MenuSystemTest`) | Menu system: GUI-scale rule (largest integer scale keeping 320x240, manual cap), pixel-font glyph table/advance/line-height/128x128 sheet, options persistence + clamping + corrupt-file fallback, slider/button/text-field logic, vanilla seed parsing, world rename keeps every other saved byte | No |
 | `com.example.testctl` (`CommandsTest` additions) | `openCookingScreen`/`advanceSimulationTicks` parsing, validation, and error dispatch | No |
 
 None of the above needs LWJGL/GLFW/OpenGL. That's not an accident of test design - `Player`,
@@ -155,3 +156,11 @@ holding attack through the real left-click path took the zombie from 20 to 4 HP 
 it, dropping 2 Rotten Flesh as item entities and removing the corpse; a screenshot confirmed the
 box-humanoid model renders facing the player. Multi-zombie cost is covered by `MobSystemTest`,
 not a live frame-time measurement.
+
+**Menu-system milestone - live-controller pass actually performed:** every screen was opened
+(`openMenu`) and screenshotted: title, Select World, Create New World, Options hub, Video, Music &
+Sounds, Controls/Mouse/Key Binds, Game Menu, Death. Responsiveness was checked by `resizeWindow` to
+640x480, 900x400, 1280x720 and 1920x1080 (GUI scale 2/1/3/4 chosen automatically, layout intact).
+A real end-to-end click flow used `click` (same edge flags as a physical click): Singleplayer ->
+Create New World -> Create (world generated and entered) -> pause -> Options -> Difficulty (Normal
+-> Hard confirmed in `state`) -> Done -> Respawn from the death screen -> Save and Quit to Title.

@@ -17,8 +17,13 @@ public class UiRenderer {
     }
 
     public void begin(int screenWidth, int screenHeight) {
+        begin((float) screenWidth, (float) screenHeight);
+    }
+
+    /** Sets the logical coordinate space (e.g. framebuffer size / GUI scale) quads are drawn in. */
+    public void begin(float logicalWidth, float logicalHeight) {
         shader.bind();
-        shader.setUniform("uScreenSize", (float) screenWidth, (float) screenHeight);
+        shader.setUniform("uScreenSize", logicalWidth, logicalHeight);
     }
 
     public void drawColorQuad(float x, float y, float w, float h, float r, float g, float b, float a) {
@@ -47,6 +52,33 @@ public class UiRenderer {
                 x2, y2, u1, v1,
                 x3, y3, u0, v1
         };
+        shader.setUniform("uColor", r, g, b, a);
+        shader.setUniform("uUseTexture", 1);
+        mesh.upload(verts);
+        mesh.draw();
+    }
+
+    /** Fills a rectangle by repeating one texture rect every {@code tile} units, as a single batch
+     *  (partial edge tiles are cropped, not stretched) - the menu dirt background. */
+    public void drawTiled(int textureId, float[] uv, float x, float y, float w, float h, float tile,
+                          float r, float g, float b, float a) {
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, textureId);
+        shader.setUniform("uTexture", 0);
+        int cols = (int) Math.ceil(w / tile), rows = (int) Math.ceil(h / tile);
+        float[] verts = new float[cols * rows * 24];
+        int n = 0;
+        for (int row = 0; row < rows; row++) {
+            for (int col = 0; col < cols; col++) {
+                float x0 = x + col * tile, y0 = y + row * tile;
+                float fw = Math.min(tile, x + w - x0) / tile, fh = Math.min(tile, y + h - y0) / tile;
+                float x1 = x0 + fw * tile, y1 = y0 + fh * tile;
+                float u0 = uv[0], v0 = uv[1], u1 = uv[0] + (uv[2] - uv[0]) * fw, v1 = uv[1] + (uv[3] - uv[1]) * fh;
+                float[] q = {x0, y0, u0, v0, x0, y1, u0, v1, x1, y1, u1, v1, x0, y0, u0, v0, x1, y1, u1, v1, x1, y0, u1, v0};
+                System.arraycopy(q, 0, verts, n, 24);
+                n += 24;
+            }
+        }
         shader.setUniform("uColor", r, g, b, a);
         shader.setUniform("uUseTexture", 1);
         mesh.upload(verts);

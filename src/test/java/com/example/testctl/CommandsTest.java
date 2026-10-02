@@ -154,6 +154,34 @@ class CommandsTest {
             closeCalls++;
         }
 
+        int[] clicked;
+
+        @Override
+        public void click(int x, int y) {
+            clicked = new int[]{x, y};
+        }
+
+        String openedMenu;
+        int[] resized;
+        Integer guiScale;
+        boolean throwOnMenu;
+
+        @Override
+        public void openMenu(String name) {
+            if (throwOnMenu) throw new IllegalArgumentException("unknown menu: " + name);
+            openedMenu = name;
+        }
+
+        @Override
+        public void resizeWindow(int width, int height) {
+            resized = new int[]{width, height};
+        }
+
+        @Override
+        public void setGuiScale(int scale) {
+            guiScale = scale;
+        }
+
         Float spawnedX; Boolean mobSpawning; Float mobDamage; boolean throwOnSpawn;
 
         @Override
@@ -532,6 +560,24 @@ class CommandsTest {
         assertEquals(400, commands.execute("advanceSimulationTicks", params()).status());
         fake.throwOnAdvanceTicks = true;
         assertEquals(400, commands.execute("advanceSimulationTicks", params("ticks", "1")).status());
+    }
+
+    @Test
+    void menuAndWindowCommandsParseAndValidate() {
+        assertEquals(200, commands.execute("openMenu", params("name", "Options:Video")).status());
+        assertEquals("options:video", fake.openedMenu);
+        assertEquals(400, commands.execute("openMenu", params()).status());
+        fake.throwOnMenu = true;
+        assertEquals(400, commands.execute("openMenu", params("name", "nope")).status());
+        assertEquals(200, commands.execute("click", params("x", "10", "y", "20")).status());
+        assertEquals(20, fake.clicked[1]);
+        assertEquals(400, commands.execute("click", params("x", "10")).status());
+        assertEquals(200, commands.execute("resizeWindow", params("w", "800", "h", "600")).status());
+        assertEquals(800, fake.resized[0]);
+        assertEquals(400, commands.execute("resizeWindow", params("w", "5", "h", "600")).status());
+        assertEquals(200, commands.execute("setGuiScale", params("scale", "3")).status());
+        assertEquals(3, fake.guiScale);
+        assertEquals(400, commands.execute("setGuiScale", params("scale", "9")).status());
     }
 
     @Test
