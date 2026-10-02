@@ -154,6 +154,24 @@ class CommandsTest {
             closeCalls++;
         }
 
+        Float spawnedX; Boolean mobSpawning; Float mobDamage; boolean throwOnSpawn;
+
+        @Override
+        public void spawnZombie(float x, float y, float z) {
+            if (throwOnSpawn) throw new IllegalStateException("not in game");
+            spawnedX = x;
+        }
+
+        @Override
+        public void setMobSpawning(boolean enabled) {
+            mobSpawning = enabled;
+        }
+
+        @Override
+        public void damageMobs(float amount) {
+            mobDamage = amount;
+        }
+
         Integer cookingScreenX, cookingScreenY, cookingScreenZ;
         boolean throwOnOpenCooking;
         Integer advancedTicks;
@@ -514,6 +532,21 @@ class CommandsTest {
         assertEquals(400, commands.execute("advanceSimulationTicks", params()).status());
         fake.throwOnAdvanceTicks = true;
         assertEquals(400, commands.execute("advanceSimulationTicks", params("ticks", "1")).status());
+    }
+
+    @Test
+    void mobCommandsParseAndValidate() {
+        assertEquals(200, commands.execute("spawnZombie", params("x", "1", "y", "2", "z", "3")).status());
+        assertEquals(1f, fake.spawnedX);
+        assertEquals(400, commands.execute("spawnZombie", params("x", "1")).status());
+        fake.throwOnSpawn = true;
+        assertEquals(400, commands.execute("spawnZombie", params("x", "1", "y", "2", "z", "3")).status());
+        assertEquals(200, commands.execute("setMobSpawning", params("enabled", "false")).status());
+        assertEquals(false, fake.mobSpawning);
+        assertEquals(400, commands.execute("setMobSpawning", params("enabled", "maybe")).status());
+        assertEquals(200, commands.execute("damageMobs", params("amount", "5")).status());
+        assertEquals(5f, fake.mobDamage);
+        assertEquals(400, commands.execute("damageMobs", params("amount", "-1")).status());
     }
 
     @Test

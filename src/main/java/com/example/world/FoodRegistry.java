@@ -43,6 +43,10 @@ public final class FoodRegistry {
         FOODS.put(BlockType.BAKED_POTATO, new FoodProperties(5f, 6.0f, false));
         FOODS.put(BlockType.KELP, new FoodProperties(1f, 0.6f, false));
         FOODS.put(BlockType.DRIED_KELP, new FoodProperties(1f, 0.6f, false));
+
+        // Real vanilla value; real vanilla also gives rotten flesh an 80% chance of inflicting
+        // Hunger on eating - not modeled (no status-effect system exists), documented simplification.
+        FOODS.put(BlockType.ROTTEN_FLESH, new FoodProperties(4f, 0.8f, false));
     }
 
     public static boolean isFood(BlockType type) {

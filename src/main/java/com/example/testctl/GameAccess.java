@@ -112,6 +112,16 @@ public interface GameAccess {
      *  in-game. */
     void setHunger(float foodLevel, float saturation, float exhaustion);
 
+    /** Spawns a zombie standing at (x, y, z) through the real spawn path (cap applies).
+     *  @throws IllegalStateException when not in-game or the mob cap is reached. */
+    void spawnZombie(float x, float y, float z);
+
+    /** Turns the natural mob spawner on/off (tests want deterministic, manually placed mobs). */
+    void setMobSpawning(boolean enabled);
+
+    /** Damages every live mob through the real damage pipeline (DamageSource.PLAYER). */
+    void damageMobs(float amount);
+
     /** Structured plain-text dump of player/biome/color/weather/time/streaming state. */
     String stateSnapshot();
 

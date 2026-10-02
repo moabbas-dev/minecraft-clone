@@ -120,6 +120,9 @@ public class BlockTextureMap {
         uniform(BlockType.BAKED_POTATO, Tile.BAKED_POTATO);
         uniform(BlockType.KELP, Tile.KELP);
         uniform(BlockType.DRIED_KELP, Tile.DRIED_KELP);
+
+        // Mob-system milestone.
+        uniform(BlockType.ROTTEN_FLESH, Tile.ROTTEN_FLESH);
     }
 
     private void uniform(BlockType type, Tile tile) {

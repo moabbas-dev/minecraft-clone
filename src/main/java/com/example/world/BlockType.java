@@ -151,7 +151,11 @@ public enum BlockType {
     // Real vanilla Kelp is an underwater plant block that grows - this project has no
     // underwater-plant/farming system, so it's simplified to a plain item, like the foods above.
     KELP(154, "Kelp", false, true, -1f, 0f),
-    DRIED_KELP(155, "Dried Kelp", false, true, -1f, 0f);
+    DRIED_KELP(155, "Dried Kelp", false, true, -1f, 0f),
+    // Mob-system milestone: the one zombie drop. Real vanilla's rotten flesh also has a chance
+    // to inflict Hunger on eating - not modeled here (documented simplification, matching this
+    // file's own per-item confidence-level convention).
+    ROTTEN_FLESH(156, "Rotten Flesh", false, true, -1f, 0f);
 
     public final int id;
     public final String displayName;

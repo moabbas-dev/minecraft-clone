@@ -58,7 +58,8 @@ public class TextureAtlas {
             Tile.RAW_BEEF, Tile.RAW_PORKCHOP, Tile.COOKED_PORKCHOP, Tile.RAW_CHICKEN, Tile.COOKED_CHICKEN,
             Tile.RAW_MUTTON, Tile.COOKED_MUTTON, Tile.RAW_RABBIT, Tile.COOKED_RABBIT,
             Tile.COD, Tile.COOKED_COD, Tile.SALMON, Tile.COOKED_SALMON,
-            Tile.POTATO, Tile.BAKED_POTATO, Tile.KELP, Tile.DRIED_KELP);
+            Tile.POTATO, Tile.BAKED_POTATO, Tile.KELP, Tile.DRIED_KELP,
+            Tile.ROTTEN_FLESH);
 
     static {
         REAL_TEXTURE_PATHS.put(Tile.STONE, "textures/block/stone.png");
@@ -406,6 +407,10 @@ public class TextureAtlas {
             case BAKED_POTATO -> potatoIcon(img, rnd, new Color(150, 105, 60));
             case KELP -> kelpIcon(img, rnd, new Color(50, 110, 50));
             case DRIED_KELP -> kelpIcon(img, rnd, new Color(70, 90, 45));
+
+            // ---- Mob-system milestone ----
+            case ROTTEN_FLESH -> meatIcon(img, rnd, new Color(120, 110, 70), new Color(80, 95, 55));
+            case ZOMBIE_SKIN -> noisyFill(img, rnd, new Color(94, 135, 76), 12);
         }
         g.dispose();
         return img;

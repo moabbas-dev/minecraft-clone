@@ -33,5 +33,12 @@ public enum Tile {
     RAW_IRON, RAW_GOLD, RAW_COPPER,
     RAW_BEEF, RAW_PORKCHOP, COOKED_PORKCHOP, RAW_CHICKEN, COOKED_CHICKEN,
     RAW_MUTTON, COOKED_MUTTON, RAW_RABBIT, COOKED_RABBIT,
-    COD, COOKED_COD, SALMON, COOKED_SALMON, POTATO, BAKED_POTATO, KELP, DRIED_KELP
+    COD, COOKED_COD, SALMON, COOKED_SALMON, POTATO, BAKED_POTATO, KELP, DRIED_KELP,
+
+    // Mob-system milestone.
+    ROTTEN_FLESH,
+    /** Sickly green mob "skin" tile - no real Mojang mob textures exist in this project (see
+     *  the tools/food tiles above for the same situation), so every zombie body box is this one
+     *  flat procedural color. */
+    ZOMBIE_SKIN
 }

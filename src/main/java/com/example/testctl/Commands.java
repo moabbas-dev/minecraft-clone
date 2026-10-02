@@ -43,6 +43,9 @@ public final class Commands {
             case "openInventory" -> openInventory(params);
             case "inventoryClick" -> inventoryClick(params);
             case "closeInventory" -> closeInventory();
+            case "spawnZombie" -> spawnZombie(params);
+            case "setMobSpawning" -> setMobSpawning(params);
+            case "damageMobs" -> damageMobs(params);
             case "openCookingScreen" -> openCookingScreen(params);
             case "advanceSimulationTicks" -> advanceSimulationTicks(params);
             case "lookAt" -> lookAt(params);
@@ -276,6 +279,33 @@ public final class Commands {
             return Result.badRequest(e.getMessage());
         }
         return Result.ok("inventory closed");
+    }
+
+    private Result spawnZombie(Map<String, String> p) {
+        Float x = parseFloat(p, "x"), y = parseFloat(p, "y"), z = parseFloat(p, "z");
+        if (x == null || y == null || z == null) return Result.badRequest("spawnZombie requires numeric x, y, z");
+        try {
+            game.spawnZombie(x, y, z);
+        } catch (IllegalStateException e) {
+            return Result.badRequest(e.getMessage());
+        }
+        return Result.ok("zombie spawned at " + x + "," + y + "," + z);
+    }
+
+    private Result setMobSpawning(Map<String, String> p) {
+        String v = p.get("enabled");
+        if (v == null || !(v.equalsIgnoreCase("true") || v.equalsIgnoreCase("false"))) {
+            return Result.badRequest("setMobSpawning requires enabled=true|false");
+        }
+        game.setMobSpawning(Boolean.parseBoolean(v));
+        return Result.ok("mob spawning " + v.toLowerCase(Locale.ROOT));
+    }
+
+    private Result damageMobs(Map<String, String> p) {
+        Float amount = parseFloat(p, "amount");
+        if (amount == null || amount <= 0f) return Result.badRequest("damageMobs requires a positive numeric 'amount'");
+        game.damageMobs(amount);
+        return Result.ok("damaged mobs by " + amount);
     }
 
     private Result openCookingScreen(Map<String, String> p) {

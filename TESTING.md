@@ -47,6 +47,7 @@ or downgrades a failing assertion.
 | `com.example.cooking` (`CookingStationStateTest`) | The tick state machine: burn/cook progress, output safety (never overwrites incompatible output, never wastes fuel with no valid input, never consumes input without producing output), the exact "8 items per coal in every station type" fuel-efficiency invariant, and that specialized stations are only faster, never more efficient (first item at tick 100 vs. 200) | No |
 | `com.example.cooking` (`CookingStationManagerTest`) | Create/get/remove by position, snapshot/restore round-trip, and that `tickAll` only advances stations in loaded+generated chunks | No |
 | `com.example.cooking` (`CookingMenuTest`) | Input/fuel slot pick-place (reusing `InventoryMenu`'s now-public static click helpers), output slot is take-only and grants proportional XP on a partial take, `close()` returns only the cursor and leaves the station's own contents untouched | No |
+| `com.example.entity` (`MobSystemTest`) | Entity/LivingEntity/Mob + goal AI + bounded A* navigation + `MobManager`/`MobSpawner`: gravity/landing, wall collision, path around a wall, 1-block step-up, target acquisition, stop at attack range, cooldown-gated attacks with per-difficulty damage via the shared damage pipeline, no attack through a wall (shared `Raycast`), death stops AI + single drop roll + delayed corpse removal, cap/despawn, ray-vs-mob test, spawn-rule rejections, 24-zombie tick cost | No |
 | `com.example.ui` (`CookingLayoutTest`) | Cooking screen geometry: slot hit-testing, no overlaps, everything inside the panel | No |
 | `com.example.testctl` (`CommandsTest` additions) | `openCookingScreen`/`advanceSimulationTicks` parsing, validation, and error dispatch | No |
 
@@ -146,3 +147,11 @@ When you add or change something, before calling it finished:
 
 This file (and the table above) should stay accurate - if you add a package or defer something
 new, update it here too.
+
+**Mob-system milestone - live-controller pass actually performed:** `spawnZombie` on a flat
+world with natural spawning off; the zombie acquired the player, walked up, stopped at range and
+hit for 3.0 on a ~1s rhythm (Normal) until the player died and it went idle; after `respawn`,
+holding attack through the real left-click path took the zombie from 20 to 4 HP and then killed
+it, dropping 2 Rotten Flesh as item entities and removing the corpse; a screenshot confirmed the
+box-humanoid model renders facing the player. Multi-zombie cost is covered by `MobSystemTest`,
+not a live frame-time measurement.

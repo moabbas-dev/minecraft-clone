@@ -6,6 +6,11 @@ import com.example.cooking.CookingStationManager;
 import com.example.cooking.CookingStationState;
 import com.example.cooking.CookingStationType;
 import com.example.entity.ItemEntity;
+import com.example.entity.Mob;
+import com.example.entity.MobManager;
+import com.example.entity.MobSpawner;
+import com.example.entity.Targetable;
+import com.example.entity.mob.Zombie;
 import com.example.entity.ItemEntityManager;
 import com.example.fx.ParticleSystem;
 import com.example.inventory.Inventory;
@@ -170,6 +175,15 @@ public class Game implements GameAccess {
     private float dayTime = 0.5f;
     private float currentFov = FOV_DEGREES;
     private float swingTimer = 0f;
+    private final MobManager mobs = new MobManager();
+    private final MobSpawner mobSpawner = new MobSpawner();
+    private final PlayerTargetAdapter playerTarget = new PlayerTargetAdapter();
+    private final java.util.List<Targetable> mobTargets = java.util.List.of(playerTarget);
+    private Mesh mobMesh;
+    private final float[] mobScratch = new float[MobManager.MAX_MOBS * MobModelBuilder.FLOATS_PER_MOB];
+    private float playerAttackCooldown = 0f;
+    private static final float PLAYER_ATTACK_DAMAGE = 2f;
+    private static final float PLAYER_ATTACK_COOLDOWN_SECONDS = 0.5f;
     private boolean debugOverlay = false;
     /** 0=surface fog, 1=fully underwater fog - eased, see renderWorld. */
     private float underwaterBlend = 0f;
@@ -235,6 +249,7 @@ public class Game implements GameAccess {
         rainMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
         heldItemMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
         itemMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
+        mobMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
         particleMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
         crackOverlay = new CrackOverlay(CHUNK_VERTEX_LAYOUT);
 
@@ -490,8 +505,10 @@ public class Game implements GameAccess {
         mining.reset();
         itemEntities.clear();
         particles.clear();
+        mobs.clear();
         survival = new PlayerSurvival(difficulty);
         if (player != null) survival.reset(player.position);
+        playerTarget.bind(player, survival);
     }
 
     private void quitToTitle() {
@@ -584,6 +601,7 @@ public class Game implements GameAccess {
         float targetFov = FOV_DEGREES + (player.isSprinting() ? SPRINT_FOV_BOOST : 0f);
         currentFov += (targetFov - currentFov) * Math.min(1f, FOV_LERP_RATE * dt);
         if (swingTimer > 0f) swingTimer = Math.max(0f, swingTimer - dt);
+        if (playerAttackCooldown > 0f) playerAttackCooldown = Math.max(0f, playerAttackCooldown - dt);
 
         dayTime += dt / DAY_LENGTH_SECONDS;
         dayTime -= (float) Math.floor(dayTime);
@@ -739,7 +757,8 @@ public class Game implements GameAccess {
         // world-interacting actions is the smallest honest stop-gap (documented limitation).
         if (survival.getHealth().isDead()) return;
 
-        if (input.consumeMousePressed(GLFW_MOUSE_BUTTON_LEFT)) {
+        boolean leftPressed = input.consumeMousePressed(GLFW_MOUSE_BUTTON_LEFT);
+        if (leftPressed) {
             swingTimer = SWING_DURATION; // swings even on a whiff, matching vanilla's air-punch
         }
 
@@ -748,6 +767,22 @@ public class Game implements GameAccess {
         Raycast.Hit hit = Raycast.cast(world, eye, dir, REACH_DISTANCE);
 
         boolean attackHeld = input.isMouseDown(GLFW_MOUSE_BUTTON_LEFT) || forcedAttackHeld;
+
+        // Entity targeting: a mob nearer than any block hit is what the click is aimed at -
+        // attack it (cooldown-gated, via the shared damage pipeline) instead of mining.
+        float blockDist = hit == null ? Float.MAX_VALUE
+                : eye.distance(hit.x() + 0.5f, hit.y() + 0.5f, hit.z() + 0.5f);
+        float[] mobDist = new float[1];
+        Mob targetedMob = mobs.raycast(eye, dir, REACH_DISTANCE, mobDist);
+        if (targetedMob != null && mobDist[0] <= blockDist) {
+            mining.cancel();
+            if ((leftPressed || attackHeld) && playerAttackCooldown <= 0f) {
+                playerAttackCooldown = PLAYER_ATTACK_COOLDOWN_SECONDS;
+                swingTimer = SWING_DURATION;
+                targetedMob.damage(PLAYER_ATTACK_DAMAGE, com.example.survival.DamageSource.PLAYER);
+            }
+            attackHeld = false;
+        }
         MiningController.Result mined = mining.tick(world, hit, attackHeld, dt, inventory.selected().type());
         if (mined.mining() && swingTimer <= 0f) {
             swingTimer = SWING_DURATION; // repeat the punch while actively mining
@@ -1072,6 +1107,10 @@ public class Game implements GameAccess {
     }
 
     private void updateItemsAndEffects(float dt) {
+        playerTarget.bind(player, survival);
+        mobSpawner.tick(world, mobs, player.position, computeDaylightFactor(sunDirection(dayTime)),
+                () -> survival.getDifficulty(), gameplayRandom, dt);
+        mobs.tick(world, mobTargets, player.position, itemEntities, gameplayRandom, dt);
         itemEntities.update(world, dt);
         if (itemEntities.collect(player.position, inventory) > 0) gameAudio.playPickup();
         particles.update(dt);
@@ -1243,6 +1282,7 @@ public class Game implements GameAccess {
         chunkShader.setUniform("uAlpha", 1f);
         renderBlockCrack();
         renderDroppedItems();
+        renderMobs();
         renderParticles();
 
         renderSunAndMoon(eye, sunDir, stormFactor, weather.isThundering());
@@ -1297,6 +1337,25 @@ public class Game implements GameAccess {
         itemMesh.upload(itemScratch, n);
         chunkShader.setUniform("uModel", IDENTITY);
         itemMesh.draw();
+    }
+
+    private void renderMobs() {
+        java.util.List<Mob> list = mobs.mobs();
+        if (list.isEmpty()) return;
+        float[] uv = atlas.getUv(com.example.engine.Tile.ZOMBIE_SKIN);
+        int n = 0;
+        for (Mob m : list) {
+            int bx = (int) Math.floor(m.position.x), by = (int) Math.floor(m.position.y + 1f), bz = (int) Math.floor(m.position.z);
+            float sky = world.getSkyLight(bx, by, bz) / 15f, blk = world.getBlockLight(bx, by, bz) / 15f;
+            float[] tint = m.getHurtTime() > 0f || !m.isAlive() ? new float[]{1.6f, 0.5f, 0.5f} : NEUTRAL_ICON_TINT;
+            float yaw = m.getYaw();
+            float px = m.position.x, py = m.position.y, pz = m.position.z;
+            if (!m.isAlive()) py -= 0.0f; // corpse simply tints red until removed
+            n = MobModelBuilder.emitZombie(mobScratch, n, px, py, pz, yaw, m.getWalkPhase(), m.getWalkAmount(), uv, sky, blk, tint);
+        }
+        mobMesh.upload(mobScratch, n);
+        chunkShader.setUniform("uModel", IDENTITY);
+        mobMesh.draw();
     }
 
     private void renderParticles() {
@@ -2004,6 +2063,24 @@ public class Game implements GameAccess {
     }
 
     @Override
+    public void spawnZombie(float x, float y, float z) {
+        if (world == null) throw new IllegalStateException("no active world");
+        if (!mobs.spawn(new Zombie(new Vector3f(x, y, z), 0f, () -> survival.getDifficulty()))) {
+            throw new IllegalStateException("mob cap reached");
+        }
+    }
+
+    @Override
+    public void setMobSpawning(boolean enabled) {
+        mobSpawner.setEnabled(enabled);
+    }
+
+    @Override
+    public void damageMobs(float amount) {
+        for (Mob m : mobs.mobs()) m.damage(amount, com.example.survival.DamageSource.PLAYER);
+    }
+
+    @Override
     public void advanceSimulationTicks(int ticks) {
         if (world == null) throw new IllegalStateException("no active world");
         for (int i = 0; i < ticks; i++) cookingStations.tickAll(world);
@@ -2195,6 +2272,16 @@ public class Game implements GameAccess {
                     .append(" cookFraction=").append(st.cookFraction()).append('\n');
         }
         sb.append("survival.experience=").append(survival.getExperience()).append('\n');
+        sb.append("mobs.count=").append(mobs.size()).append(" spawning=").append(mobSpawner.isEnabled()).append("\n");
+        for (Mob m : mobs.mobs()) {
+            sb.append("mob=").append(m.getClass().getSimpleName())
+                    .append(" hp=").append(m.getHealth().getCurrentHealth()).append('/').append(m.getHealth().getMaxHealth())
+                    .append(" alive=").append(m.isAlive())
+                    .append(" pos=").append(String.format(Locale.ROOT, "%.2f,%.2f,%.2f", m.position.x, m.position.y, m.position.z))
+                    .append(" target=").append(m.hasTarget() ? "player" : "none")
+                    .append(" dist=").append(m.hasTarget() ? String.format(Locale.ROOT, "%.2f", m.distanceToTarget()) : "-")
+                    .append(" path=").append(m.getNavigator().hasValidPath() ? "VALID" : "NONE").append("\n");
+        }
         sb.append("items.dropped=").append(itemEntities.size()).append('\n');
         StringBuilder itemList = new StringBuilder();
         java.util.List<ItemEntity> dropped = itemEntities.entities();
@@ -2235,6 +2322,7 @@ public class Game implements GameAccess {
         rainMesh.destroy();
         heldItemMesh.destroy();
         itemMesh.destroy();
+        mobMesh.destroy();
         particleMesh.destroy();
         crackOverlay.destroy();
         chunkShader.destroy();

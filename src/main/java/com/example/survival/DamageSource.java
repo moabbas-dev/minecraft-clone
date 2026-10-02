@@ -12,8 +12,12 @@ public enum DamageSource {
     GENERIC,
     /** Wired up this round - see {@code PlayerSurvival}'s fall tracking. */
     FALL,
-    /** Not wired up yet - no mobs exist. Reserved so a future mob's attack calls this directly. */
+    /** Wired up this round - a mob's melee attack goal calls this directly (see
+     *  {@code com.example.entity.ai.MeleeAttackGoal}). */
     MOB,
+    /** Wired up this round - the player's own melee attack on a mob (see
+     *  {@code Game}'s entity-attack handling in {@code handleInteraction}). */
+    PLAYER,
     /** Not wired up yet - no fire/lava-contact detection exists. */
     FIRE,
     /** Not wired up yet - {@code Player.isHeadSubmerged()} exists, a breath/drown timer doesn't. */
