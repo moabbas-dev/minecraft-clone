@@ -98,7 +98,7 @@ class MenuSystemTest {
         java.nio.file.Files.writeString(bad.toPath(), "fov=notanumber\nrenderDistance=999\nmasterVolume=7\nguiScale=-4\n");
         GameOptions o = GameOptions.load(bad);
         assertEquals(70, o.fov);
-        assertEquals(12, o.renderDistance);
+        assertEquals(GameOptions.MAX_RENDER_DISTANCE, o.renderDistance);
         assertEquals(1f, o.masterVolume);
         assertEquals(0, o.guiScale);
     }
@@ -180,5 +180,58 @@ class MenuSystemTest {
         assertEquals(11f, m.survival().health());
         assertFalse(WorldIO.renameWorld(dir, "   "), "blank names are rejected");
         assertFalse(WorldIO.renameWorld(new File(dir, "missing"), "x"));
+    }
+
+    @Test
+    void optionsAreWrittenInTheVanillaKeyColonValueFormat(@TempDir File dir) throws Exception {
+        GameOptions o = new GameOptions();
+        o.fov = 90;
+        o.gamma = 1f;
+        o.maxFps = GameOptions.UNLIMITED_FPS;
+        o.toggleSprint = true;
+        o.hostileVolume = 0.25f;
+        o.keys.set(com.example.ui.KeyBindings.Bind.DROP, org.lwjgl.glfw.GLFW.GLFW_KEY_G);
+        File f = new File(dir, "options.txt");
+        o.save(f);
+        String text = java.nio.file.Files.readString(f.toPath());
+        assertTrue(text.contains("fov:0.5\n"), "fov is stored as (degrees - 70) / 40");
+        assertTrue(text.contains("gamma:1.0\n"));
+        assertTrue(text.contains("maxFps:260\n"));
+        assertTrue(text.contains("soundCategory_hostile:0.25\n"));
+        assertTrue(text.contains("key_key.attack:key.mouse.left\n"));
+        assertTrue(text.contains("key_key.drop:key.keyboard.g\n"));
+        assertFalse(text.contains("="), "no java-properties syntax");
+        GameOptions back = GameOptions.load(f);
+        assertEquals(90, back.fov);
+        assertEquals(1f, back.gamma);
+        assertEquals(GameOptions.UNLIMITED_FPS, back.maxFps);
+        assertTrue(back.toggleSprint);
+        assertEquals(0.25f, back.hostileVolume);
+        assertEquals(org.lwjgl.glfw.GLFW.GLFW_KEY_G, back.keys.get(com.example.ui.KeyBindings.Bind.DROP));
+    }
+
+    @Test
+    void aLegacyKeyEqualsValueOptionsFileIsStillRead(@TempDir File dir) throws Exception {
+        File f = new File(dir, "options.txt");
+        java.nio.file.Files.writeString(f.toPath(), "fov=100\nmasterVolume=0.3\nviewBobbing=false\nrenderDistance=8\n");
+        GameOptions o = GameOptions.load(f);
+        assertEquals(100, o.fov);
+        assertEquals(0.3f, o.masterVolume, 1e-6f);
+        assertFalse(o.viewBobbing);
+        assertEquals(8, o.renderDistance);
+    }
+
+    @Test
+    void keyBindingsDetectConflictsAndRoundTripIds() {
+        com.example.ui.KeyBindings k = new com.example.ui.KeyBindings();
+        assertFalse(k.conflicts(com.example.ui.KeyBindings.Bind.JUMP));
+        k.set(com.example.ui.KeyBindings.Bind.DROP, org.lwjgl.glfw.GLFW.GLFW_KEY_SPACE);
+        assertTrue(k.conflicts(com.example.ui.KeyBindings.Bind.JUMP));
+        assertTrue(k.conflicts(com.example.ui.KeyBindings.Bind.DROP));
+        assertEquals("key.keyboard.left.shift", com.example.ui.KeyBindings.idOf(org.lwjgl.glfw.GLFW.GLFW_KEY_LEFT_SHIFT));
+        assertEquals(com.example.ui.KeyBindings.MOUSE_BASE + 2, com.example.ui.KeyBindings.codeOf("key.mouse.middle"));
+        assertEquals(com.example.ui.KeyBindings.UNBOUND, com.example.ui.KeyBindings.codeOf("key.keyboard.unknown"));
+        k.reset();
+        assertFalse(k.conflicts(com.example.ui.KeyBindings.Bind.JUMP));
     }
 }

@@ -53,6 +53,7 @@ final class MobModelBuilder {
         int n;
         final float px, py, pz, cos, sin, tiltCos, tiltSin, sky, blockLight, texW, texH;
         final float[] tint;
+        float scale = 1f;
 
         Writer(float[] out, int n, float px, float py, float pz, float yaw, float tilt, float sky, float blockLight,
                float[] tint, int texW, int texH) {
@@ -79,7 +80,10 @@ final class MobModelBuilder {
          */
         void box(float mx, float my, float mz, int w, int h, int d, int u, int v, int quarter, boolean mirror) {
             float cx = -mx / 16f, cy = (24f - my) / 16f, cz = mz / 16f;
-            float lhx = w / 32f, lhy = h / 32f, lhz = d / 32f;
+            cx *= scale;
+            cy *= scale;
+            cz *= scale;
+            float lhx = w / 32f * scale, lhy = h / 32f * scale, lhz = d / 32f * scale;
             // World half extents: a quarter turn swaps the local Y and Z extents.
             float hx = lhx, hy = quarter == 0 ? lhy : lhz, hz = quarter == 0 ? lhz : lhy;
             for (int f = 0; f < 6; f++) {
@@ -141,7 +145,14 @@ final class MobModelBuilder {
     /** Writes one zombie at world feet position (px,py,pz) facing {@code yaw}; returns the new index. */
     static int emitZombie(float[] out, int n, float px, float py, float pz, float yaw, float tilt, float walkPhase,
                           float walkAmount, float sky, float blockLight, float[] tint) {
+        return emitZombie(out, n, px, py, pz, yaw, tilt, walkPhase, walkAmount, sky, blockLight, tint, 1f);
+    }
+
+    /** Same with a uniform {@code scale} (0.5 for baby zombies). */
+    static int emitZombie(float[] out, int n, float px, float py, float pz, float yaw, float tilt, float walkPhase,
+                          float walkAmount, float sky, float blockLight, float[] tint, float scale) {
         Writer w = new Writer(out, n, px, py, pz, yaw, tilt, sky, blockLight, tint, ZOMBIE_TEX_W, ZOMBIE_TEX_H);
+        w.scale = scale;
         float lift = (float) Math.sin(walkPhase) * 2f * walkAmount; // model pixels
         w.box(0, -4, 0, 8, 8, 8, 0, 0, 0, false);                     // head
         w.box(0, 6, 0, 8, 12, 4, 16, 16, 0, false);                   // torso

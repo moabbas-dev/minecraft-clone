@@ -83,6 +83,8 @@ public final class Shaders {
             uniform float uFogEnd;
             // Sky light fades toward night; block light (torches, glowstone...) does not.
             uniform float uDaylightFactor;
+            // Brightness option: 0.5 is vanilla default (no change), below darkens the dim end, above lifts it.
+            uniform float uGamma;
 
             out vec4 FragColor;
 
@@ -91,6 +93,8 @@ public final class Shaders {
                 if (texColor.a < 0.05) discard;
                 float light = max(vSkyShade * uDaylightFactor, vBlockLight);
                 light = max(light, 0.04);
+                float lift = (uGamma - 0.5) * 2.0;
+                light = lift >= 0.0 ? mix(light, 1.0 - (1.0 - light) * (1.0 - light), lift) : mix(light, light * light, -lift);
                 // vTint is (1,1,1) - a no-op multiply - for every face except grass-top/leaves,
                 // which carry the real per-column biome colormap color baked in at mesh time.
                 vec3 shaded = texColor.rgb * light * vTint;

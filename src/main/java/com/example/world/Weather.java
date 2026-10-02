@@ -11,10 +11,10 @@ import java.util.Random;
 public class Weather {
     public enum State {CLEAR, RAIN, THUNDER}
 
-    private static final float MIN_CLEAR_SECONDS = 90f;
-    private static final float MAX_CLEAR_SECONDS = 240f;
-    private static final float MIN_RAIN_SECONDS = 60f;
-    private static final float MAX_RAIN_SECONDS = 150f;
+    private static final float MIN_CLEAR_SECONDS = 600f; // vanilla 12000-180000 ticks
+    private static final float MAX_CLEAR_SECONDS = 9000f;
+    private static final float MIN_RAIN_SECONDS = 600f; // vanilla rain 12000-24000 ticks
+    private static final float MAX_RAIN_SECONDS = 1200f;
     private static final float THUNDER_CHANCE = 0.35f;
     private static final float LIGHTNING_MIN_INTERVAL = 4f;
     private static final float LIGHTNING_MAX_INTERVAL = 18f;

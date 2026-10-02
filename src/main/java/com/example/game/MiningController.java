@@ -65,6 +65,14 @@ public class MiningController {
      *                 speed calculation rather than resetting {@code progress}.
      */
     public Result tick(World world, Raycast.Hit hit, boolean attackHeld, float dt, BlockType heldTool) {
+        return tick(world, hit, attackHeld, dt, heldTool, 1f);
+    }
+
+    /**
+     * @param speedFactor extra multiplier on the mining speed: vanilla divides by 5 while airborne and by 5 with the
+     *                    head underwater, so the game passes 0.2, 0.2 or 0.04 here (1 otherwise).
+     */
+    public Result tick(World world, Raycast.Hit hit, boolean attackHeld, float dt, BlockType heldTool, float speedFactor) {
         if (cooldown > 0f) cooldown = Math.max(0f, cooldown - dt);
 
         if (hit == null || !attackHeld) {
@@ -95,7 +103,7 @@ public class MiningController {
             targetType = current;
             progress = 0f;
         }
-        required = handBreakTime / ToolEffectiveness.speedMultiplier(heldTool, current);
+        required = ToolEffectiveness.breakSeconds(heldTool, current) / Math.max(speedFactor, 0.001f);
         progress += dt;
 
         if (progress < required) return Result.MINING;

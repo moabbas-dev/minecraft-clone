@@ -34,8 +34,8 @@ public class Player {
     private static final float GRAVITY = 28f;
     private static final float TERMINAL_VELOCITY = -60f;
     private static final float JUMP_VELOCITY = 8.6f;
-    private static final float WALK_SPEED = 4.3f;
-    private static final float SPRINT_MULTIPLIER = 1.6f;
+    private static final float WALK_SPEED = 4.317f; // vanilla blocks/second
+    private static final float SPRINT_MULTIPLIER = 1.3f; // vanilla: 5.612 / 4.317
     private static final float SNEAK_MULTIPLIER = 0.3f;
     private static final float FLY_SPEED = 12f;
     private static final float MOUSE_SENSITIVITY = 0.0025f;
@@ -113,6 +113,30 @@ public class Player {
     private double lastSpacePressTime = -10;
     private double lastWPressTime = -10;
     private boolean sprintToggled = false;
+    // Rebindable controls (GLFW key codes, or 1000+button for the mouse); Game pushes the user's bindings in.
+    private int keyForward = GLFW_KEY_W, keyBack = GLFW_KEY_S, keyLeft = GLFW_KEY_A, keyRight = GLFW_KEY_D;
+    private int keyJump = GLFW_KEY_SPACE, keySneak = GLFW_KEY_LEFT_SHIFT, keySprint = GLFW_KEY_LEFT_CONTROL;
+    private boolean toggleSprintOption, toggleSneakOption, autoJumpOption;
+    private boolean sprintLatched, sneakLatched;
+
+    public void setControls(int forward, int back, int left, int right, int jump, int sneak, int sprint) {
+        keyForward = forward;
+        keyBack = back;
+        keyLeft = left;
+        keyRight = right;
+        keyJump = jump;
+        keySneak = sneak;
+        keySprint = sprint;
+    }
+
+    /** Vanilla's "Sprint: Toggle", "Sneak: Toggle" and "Auto-Jump" options. */
+    public void setControlOptions(boolean toggleSprint, boolean toggleSneak, boolean autoJump) {
+        this.toggleSprintOption = toggleSprint;
+        this.toggleSneakOption = toggleSneak;
+        this.autoJumpOption = autoJump;
+        if (!toggleSprint) sprintLatched = false;
+        if (!toggleSneak) sneakLatched = false;
+    }
     @Getter
     private boolean sprinting = false;
     private float currentEyeHeight = EYE_HEIGHT;
@@ -196,6 +220,15 @@ public class Player {
         return base;
     }
 
+    /** Auto-jump test: a solid block directly ahead at foot level with two free blocks above it. */
+    private boolean blockedByStep(World world, Vector3f wish) {
+        int bx = (int) Math.floor(position.x + wish.x * 0.6f);
+        int bz = (int) Math.floor(position.z + wish.z * 0.6f);
+        int by = (int) Math.floor(position.y + 0.05f);
+        return world.isSolidCollision(bx, by, bz) && !world.isSolidCollision(bx, by + 1, bz)
+                && !world.isSolidCollision(bx, by + 2, bz) && !world.isSolidCollision((int) Math.floor(position.x), by + 2, (int) Math.floor(position.z));
+    }
+
     /** Equivalent to {@link #update(float, InputState, World, double, boolean)} with sprinting
      *  always allowed - every caller that doesn't care about hunger (every test in this project
      *  today) keeps its exact previous behavior. */
@@ -213,7 +246,7 @@ public class Player {
      */
     public void update(float dt, InputState input, World world, double now, boolean canSprint) {
         justJumped = false;
-        if (input.consumeKeyPressed(GLFW_KEY_SPACE)) {
+        if (input.consumeKeyPressed(keyJump)) {
             if (now - lastSpacePressTime < DOUBLE_TAP_WINDOW) {
                 flying = !flying;
                 verticalVelocity = 0;
@@ -230,26 +263,33 @@ public class Player {
         Vector3f right = new Vector3f(-front.z, 0, front.x).normalize();
 
         Vector3f wish = new Vector3f();
-        if (input.isKeyDown(GLFW_KEY_W)) wish.add(forwardFlat);
-        if (input.isKeyDown(GLFW_KEY_S)) wish.sub(forwardFlat);
-        if (input.isKeyDown(GLFW_KEY_D)) wish.add(right);
-        if (input.isKeyDown(GLFW_KEY_A)) wish.sub(right);
+        if (input.isKeyDown(keyForward)) wish.add(forwardFlat);
+        if (input.isKeyDown(keyBack)) wish.sub(forwardFlat);
+        if (input.isKeyDown(keyRight)) wish.add(right);
+        if (input.isKeyDown(keyLeft)) wish.sub(right);
         if (wish.lengthSquared() > 1e-6f) wish.normalize();
 
-        boolean wDown = input.isKeyDown(GLFW_KEY_W);
-        if (input.consumeKeyPressed(GLFW_KEY_W)) {
+        boolean wDown = input.isKeyDown(keyForward);
+        if (input.consumeKeyPressed(keyForward)) {
             if (now - lastWPressTime < DOUBLE_TAP_WINDOW) {
                 sprintToggled = true;
             }
             lastWPressTime = now;
         }
 
-        sneaking = input.isKeyDown(GLFW_KEY_LEFT_SHIFT) && !flying;
+        if (input.consumeKeyPressed(keySneak) && toggleSneakOption) sneakLatched = !sneakLatched;
+        boolean sneakHeld = toggleSneakOption ? sneakLatched : input.isKeyDown(keySneak);
+        sneaking = sneakHeld && !flying;
         // Sprint stops the moment you're not actively holding W forward, or start sneaking -
         // matches vanilla (double-tap W to start, release W or sneak to stop). Ctrl still works
         // as a direct hold-to-sprint alternative alongside the double-tap toggle.
-        if (!wDown || sneaking) sprintToggled = false;
-        sprinting = canSprint && !sneaking && (sprintToggled || input.isKeyDown(GLFW_KEY_LEFT_CONTROL));
+        if (input.consumeKeyPressed(keySprint) && toggleSprintOption) sprintLatched = !sprintLatched;
+        if (!wDown || sneaking) {
+            sprintToggled = false;
+            sprintLatched = false;
+        }
+        boolean sprintHeld = toggleSprintOption ? sprintLatched : input.isKeyDown(keySprint);
+        sprinting = canSprint && !sneaking && (sprintToggled || sprintHeld);
 
         updateWaterState(world);
         // Flying overrides water physics entirely (matches the pre-existing precedent of
@@ -309,8 +349,8 @@ public class Player {
 
         if (flying) {
             float flyY = 0;
-            if (input.isKeyDown(GLFW_KEY_SPACE)) flyY += 1;
-            if (input.isKeyDown(GLFW_KEY_LEFT_SHIFT)) flyY -= 1;
+            if (input.isKeyDown(keyJump)) flyY += 1;
+            if (sneakHeld) flyY -= 1;
             dy = flyY * FLY_SPEED * dt;
             verticalVelocity = 0;
             onGround = false;
@@ -326,7 +366,7 @@ public class Player {
             // control - this is a plain if/else, so these can never stack into an unbounded
             // combined speed.
             float target;
-            if (input.isKeyDown(GLFW_KEY_SPACE)) target = SWIM_UP_SPEED;
+            if (input.isKeyDown(keyJump)) target = SWIM_UP_SPEED;
             else if (sneaking) target = -SWIM_DOWN_SPEED;
             else if (wDown) target = front.y * speed;
             else target = BUOYANCY_DRIFT_SPEED;
@@ -340,7 +380,7 @@ public class Player {
         } else {
             verticalVelocity -= GRAVITY * dt;
             verticalVelocity = Math.max(verticalVelocity, TERMINAL_VELOCITY);
-            if (wasInWater && !input.isKeyDown(GLFW_KEY_SPACE)) {
+            if (wasInWater && !input.isKeyDown(keyJump)) {
                 // Just surfaced and not actively still trying to rise: kill any leftover
                 // swim-up momentum so breaking the surface doesn't fling the player into the
                 // air like a jump. Gated on space specifically still being held (not just
@@ -350,7 +390,9 @@ public class Player {
                 // oscillating right at the surface line instead of ever actually climbing out.
                 verticalVelocity = Math.min(verticalVelocity, SURFACE_EXIT_SPEED_CAP);
             }
-            if (input.isKeyDown(GLFW_KEY_SPACE) && onGround) {
+            boolean autoJump = autoJumpOption && onGround && !sneaking && wish.lengthSquared() > 1e-6f
+                    && blockedByStep(world, wish);
+            if ((input.isKeyDown(keyJump) || autoJump) && onGround) {
                 verticalVelocity = JUMP_VELOCITY;
                 onGround = false;
                 justJumped = true;

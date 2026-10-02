@@ -128,11 +128,11 @@ class MobSystemTest {
     void attackDamageFollowsDifficulty() {
         assertEquals(2.5f, Zombie.attackDamageFor(Difficulty.EASY));
         assertEquals(3.0f, Zombie.attackDamageFor(Difficulty.NORMAL));
-        assertEquals(4.0f, Zombie.attackDamageFor(Difficulty.HARD));
+        assertEquals(4.5f, Zombie.attackDamageFor(Difficulty.HARD));
         difficulty = Difficulty.HARD;
         Dummy d = new Dummy(6f, GROUND, 4.5f);
         run(zombie(4.5f, GROUND, 4.5f), List.of(d), 2f);
-        assertEquals(4.0f, d.lastAmount, 1e-4f);
+        assertEquals(4.5f, d.lastAmount, 1e-4f);
     }
 
     @Test

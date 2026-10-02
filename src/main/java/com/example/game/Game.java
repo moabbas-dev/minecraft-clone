@@ -72,8 +72,8 @@ public class Game implements GameAccess {
     private static final long FRAME_WARN_THRESHOLD_NANOS = 20_000_000L; // flag frames slower than 20ms
     private static final float REACH_DISTANCE = 5.0f;
     private static final float SKY_R = 0.53f, SKY_G = 0.81f, SKY_B = 0.92f;
-    /** Full day/night cycle length. Vanilla is 1200s (20 min); shortened a bit here. */
-    private static final float DAY_LENGTH_SECONDS = 600f;
+    /** Full day/night cycle length: vanilla's 1200 s (20 min). */
+    private static final float DAY_LENGTH_SECONDS = 1200f; // vanilla: 24000 ticks = 20 minutes
     private static final float CELESTIAL_DISTANCE = 180f;
     private static final float CELESTIAL_SIZE = 28f;
     private static final int RAIN_PARTICLE_COUNT = 1000;
@@ -196,6 +196,12 @@ public class Game implements GameAccess {
     private final java.util.List<Targetable> mobTargets = java.util.List.of(playerTarget);
     private Mesh mobMesh;
     private float lastHurtCooldown;
+    private final com.example.entity.XpOrbManager xpOrbs = new com.example.entity.XpOrbManager();
+    private final com.example.entity.FallingBlockManager fallingBlocks = new com.example.entity.FallingBlockManager();
+    private boolean hideHud;
+    private boolean difficultyLocked;
+    private float eatTimer, eatSoundTimer;
+    private int lastLevel;
     private final java.util.Map<String, com.example.engine.EntityTexture> mobSkins = new java.util.LinkedHashMap<>();
     private final float[] mobScratch = new float[MobManager.MAX_MOBS * MobModelBuilder.FLOATS_PER_MOB];
     /** Vanilla survival reach for hitting entities (blocks use REACH_DISTANCE). */
@@ -283,6 +289,7 @@ public class Game implements GameAccess {
         crackOverlay = new CrackOverlay(CHUNK_VERTEX_LAYOUT);
 
         gameAudio = new GameAudio();
+        mobs.setXpOrbs(xpOrbs);
         mobs.setSoundSink(e -> {
             if (player != null && player.position.distanceSquared(e.x(), e.y(), e.z()) < 32f * 32f) {
                 gameAudio.play(e.id(), new Vector3f(e.x(), e.y(), e.z()));
@@ -489,6 +496,10 @@ public class Game implements GameAccess {
             survival.loadState(s.health(), s.foodLevel(), s.saturation(), s.exhaustion());
         }
         WorldIO.loadArmor(dir, survival.getArmor());
+        WorldIO.Extras extras = WorldIO.loadExtras(dir);
+        survival.loadExperience(extras.experience(), extras.score());
+        difficultyLocked = extras.difficultyLocked();
+        lastLevel = survival.getLevel();
         for (WorldIO.MobSnapshot ms : WorldIO.loadMobs(dir)) {
             Mob m = com.example.entity.mob.MobTypes.create(ms.type(), new Vector3f(ms.x(), ms.y(), ms.z()), ms.yaw(),
                     () -> survival.getDifficulty());
@@ -520,6 +531,7 @@ public class Game implements GameAccess {
     /** Writes world metadata and every currently-loaded chunk to disk. Safe to call with no active world. */
     private void saveWorld() {
         if (world == null || currentWorldFolder == null) return;
+        fallingBlocks.settleAll(world, itemEntities, gameplayRandom); // nothing in mid-air is lost to a save
         File dir = WorldIO.worldDir(currentWorldFolder);
         WorldIO.SurvivalSnapshot survivalSnapshot = new WorldIO.SurvivalSnapshot(
                 survival.getHealth().getCurrentHealth(), survival.getHunger().getFoodLevel(),
@@ -538,6 +550,7 @@ public class Game implements GameAccess {
         }
         WorldIO.saveMobs(dir, savedMobs);
         WorldIO.saveArmor(dir, survival.getArmor());
+        WorldIO.saveExtras(dir, new WorldIO.Extras(survival.getExperience(), survival.getScore(), difficultyLocked));
     }
 
     /** These two conversions exist purely because {@code world.WorldIO} deliberately doesn't
@@ -565,13 +578,23 @@ public class Game implements GameAccess {
     private void openOptions(GameState parent) {
         optionsParent = parent;
         boolean inWorld = parent == GameState.PAUSED && world != null;
-        optionsScreen = OptionsScreens.create(new OptionsScreens.Context(guiEnv, this::applyOptions, this::closeOptions,
+        optionsScreen = OptionsScreens.create(newOptionsContext(inWorld));
+        state = GameState.OPTIONS;
+    }
+
+    private OptionsScreens.Context newOptionsContext(boolean inWorld) {
+        OptionsScreens.Context ctx = new OptionsScreens.Context(guiEnv, this::applyOptions, this::closeOptions,
                 inWorld ? () -> survival.getDifficulty() : null,
                 inWorld ? d -> {
+                    if (difficultyLocked) return;
                     survival.setDifficulty(d);
                     currentSettings = new WorldSettings(currentSettings.name(), currentSettings.type(), d);
-                } : null));
-        state = GameState.OPTIONS;
+                } : null);
+        if (inWorld) {
+            ctx.isLocked = () -> difficultyLocked;
+            ctx.lock = () -> difficultyLocked = true;
+        }
+        return ctx;
     }
 
     private void closeOptions() {
@@ -594,6 +617,32 @@ public class Game implements GameAccess {
         gameAudio.setCategoryVolume(com.example.audio.AudioCategory.PLAYER, options.playersVolume);
         gameAudio.setCategoryVolume(com.example.audio.AudioCategory.AMBIENT, options.ambientVolume);
         gameAudio.setCategoryVolume(com.example.audio.AudioCategory.WEATHER, options.weatherVolume);
+        gameAudio.setCategoryVolume(com.example.audio.AudioCategory.HOSTILE, options.hostileVolume);
+        gameAudio.setCategoryVolume(com.example.audio.AudioCategory.NEUTRAL, options.neutralVolume);
+        applyPlayerControls();
+    }
+
+    /** Pushes the rebindable controls and the sprint/sneak/auto-jump options into the player. */
+    private void applyPlayerControls() {
+        if (player == null) return;
+        com.example.ui.KeyBindings k = options.keys;
+        player.setControls(k.get(com.example.ui.KeyBindings.Bind.FORWARD), k.get(com.example.ui.KeyBindings.Bind.BACK),
+                k.get(com.example.ui.KeyBindings.Bind.LEFT), k.get(com.example.ui.KeyBindings.Bind.RIGHT),
+                k.get(com.example.ui.KeyBindings.Bind.JUMP), k.get(com.example.ui.KeyBindings.Bind.SNEAK),
+                k.get(com.example.ui.KeyBindings.Bind.SPRINT));
+        player.setControlOptions(options.toggleSprint, options.toggleCrouch, options.autoJump);
+    }
+
+    private int keyCode(com.example.ui.KeyBindings.Bind b) {
+        return options.keys.get(b);
+    }
+
+    private boolean pressed(com.example.ui.KeyBindings.Bind b) {
+        return input.consumeKeyPressed(keyCode(b));
+    }
+
+    private boolean held(com.example.ui.KeyBindings.Bind b) {
+        return input.isKeyDown(keyCode(b));
     }
 
     /** Back to life at the world's spawn point with full health and hunger. */
@@ -630,7 +679,12 @@ public class Game implements GameAccess {
         itemEntities.clear();
         particles.clear();
         mobs.clear();
+        xpOrbs.clear();
+        fallingBlocks.clear();
+        difficultyLocked = false;
+        eatTimer = 0f;
         survival = new PlayerSurvival(difficulty);
+        lastLevel = 0;
         if (player != null) survival.reset(player.position);
         playerTarget.bind(player, survival);
     }
@@ -666,6 +720,7 @@ public class Game implements GameAccess {
             testCommandQueue.drain(); // run any pending controller commands before this frame renders
             render(dt);
             window.update();
+            limitFrameRate(frameStartNanos);
 
             // update(), render() and the buffer swap all run sequentially on this one thread -
             // there is no separate render thread here, so a stall in any of them freezes input
@@ -709,9 +764,20 @@ public class Game implements GameAccess {
         if (input.consumeKeyPressed(GLFW_KEY_F3)) {
             debugOverlay = !debugOverlay;
         }
-        if (input.consumeKeyPressed(GLFW_KEY_E)) {
+        if (input.consumeKeyPressed(GLFW_KEY_F1)) hideHud = !hideHud;
+        if (pressed(com.example.ui.KeyBindings.Bind.SCREENSHOT)) takeUserScreenshot();
+        if (pressed(com.example.ui.KeyBindings.Bind.FULLSCREEN)) {
+            options.fullscreen = !options.fullscreen;
+            applyOptions();
+            options.save(GameOptions.DEFAULT_FILE);
+        }
+        if (pressed(com.example.ui.KeyBindings.Bind.INVENTORY)) {
             openInventory(2);
             return;
+        }
+        applyPlayerControls();
+        if (pressed(com.example.ui.KeyBindings.Bind.DROP)) {
+            dropHeldItem(input.isKeyDown(GLFW_KEY_LEFT_CONTROL) || input.isKeyDown(GLFW_KEY_RIGHT_CONTROL));
         }
 
         float mouseSpeed = options.mouseSpeedMultiplier();
@@ -719,6 +785,7 @@ public class Game implements GameAccess {
         player.update(dt, input, world, now, survival.getHunger().canSprint());
         survival.update(dt, player);
         if (survival.getHealth().isDead()) {
+            dropEverythingOnDeath();
             deathScreen.invalidate();
             window.releaseMouse();
             input.resyncMousePosition();
@@ -726,7 +793,7 @@ public class Game implements GameAccess {
             return;
         }
 
-        float targetFov = options.fov + (player.isSprinting() ? SPRINT_FOV_BOOST : 0f);
+        float targetFov = options.fov * options.sprintFovFactor(player.isSprinting());
         currentFov += (targetFov - currentFov) * Math.min(1f, FOV_LERP_RATE * dt);
         if (swingTimer > 0f) swingTimer = Math.max(0f, swingTimer - dt);
         attackTimer += dt;
@@ -768,10 +835,11 @@ public class Game implements GameAccess {
         if (scroll > 0) inventory.cycleSelection(-1);
         else if (scroll < 0) inventory.cycleSelection(1);
 
-        int[] numberKeys = {GLFW_KEY_1, GLFW_KEY_2, GLFW_KEY_3, GLFW_KEY_4, GLFW_KEY_5,
-                GLFW_KEY_6, GLFW_KEY_7, GLFW_KEY_8, GLFW_KEY_9};
-        for (int i = 0; i < numberKeys.length && i < inventory.getHotbarSize(); i++) {
-            if (input.consumeKeyPressed(numberKeys[i])) inventory.selectSlot(i);
+        com.example.ui.KeyBindings.Bind[] hotbarBinds = {
+                com.example.ui.KeyBindings.Bind.HOTBAR_1, com.example.ui.KeyBindings.Bind.HOTBAR_2, com.example.ui.KeyBindings.Bind.HOTBAR_3, com.example.ui.KeyBindings.Bind.HOTBAR_4, com.example.ui.KeyBindings.Bind.HOTBAR_5,
+                com.example.ui.KeyBindings.Bind.HOTBAR_6, com.example.ui.KeyBindings.Bind.HOTBAR_7, com.example.ui.KeyBindings.Bind.HOTBAR_8, com.example.ui.KeyBindings.Bind.HOTBAR_9};
+        for (int i = 0; i < hotbarBinds.length && i < inventory.getHotbarSize(); i++) {
+            if (pressed(hotbarBinds[i])) inventory.selectSlot(i);
         }
         if (inventory.getSelectedSlot() != previous) {
             hotbarLabelTimer = HOTBAR_LABEL_DURATION;
@@ -959,7 +1027,7 @@ public class Game implements GameAccess {
         // world-interacting actions is the smallest honest stop-gap (documented limitation).
         if (survival.getHealth().isDead()) return;
 
-        boolean leftPressed = input.consumeMousePressed(GLFW_MOUSE_BUTTON_LEFT);
+        boolean leftPressed = pressed(com.example.ui.KeyBindings.Bind.ATTACK);
         if (forcedAttackPresses > 0) {
             forcedAttackPresses--;
             leftPressed = true;
@@ -972,7 +1040,7 @@ public class Game implements GameAccess {
         Vector3f dir = player.frontVector();
         Raycast.Hit hit = Raycast.cast(world, eye, dir, REACH_DISTANCE);
 
-        boolean attackHeld = input.isMouseDown(GLFW_MOUSE_BUTTON_LEFT) || forcedAttackHeld;
+        boolean attackHeld = held(com.example.ui.KeyBindings.Bind.ATTACK) || forcedAttackHeld;
 
         // Entity targeting: a mob nearer than any block hit is what the click is aimed at -
         // attack it (cooldown-gated, via the shared damage pipeline) instead of mining.
@@ -989,17 +1057,46 @@ public class Game implements GameAccess {
         // A click on a mob or on empty air is an attack swing (and restarts the cooldown); a click on a
         // block is mining and leaves the cooldown alone.
         if (leftPressed && (aimingAtMob || hit == null)) performPlayerAttack(aimingAtMob ? targetedMob : null);
-        MiningController.Result mined = mining.tick(world, hit, attackHeld, dt, inventory.selected().type());
+        float miningSpeedFactor = (player.isOnGround() || player.isFlying() ? 1f : 0.2f) * (player.isHeadSubmerged() ? 0.2f : 1f);
+        MiningController.Result mined = mining.tick(world, hit, attackHeld, dt, inventory.selected().type(), miningSpeedFactor);
         if (mined.mining() && swingTimer <= 0f) {
             swingTimer = SWING_DURATION; // repeat the punch while actively mining
             gameAudio.playDig(hit.type(), new Vector3f(hit.x() + 0.5f, hit.y() + 0.5f, hit.z() + 0.5f)); // one hit-tick per swing
         }
-        if (mined.broken()) onBlockBroken(mined);
+        if (mined.broken()) {
+            onBlockBroken(mined);
+            fallingBlocks.checkColumn(world, mined.x(), mined.y() + 1, mined.z());
+        }
 
-        boolean use = input.consumeMousePressed(GLFW_MOUSE_BUTTON_RIGHT);
+        if (pressed(com.example.ui.KeyBindings.Bind.PICK_ITEM) && hit != null) pickBlock(hit.type());
+
+        // Eating: hold use on a food item (vanilla 32 ticks, dried kelp 16); releasing or switching cancels.
+        ItemStack heldForEat = inventory.selected();
+        FoodProperties eatFood = heldForEat.isEmpty() ? null : FoodRegistry.propertiesFor(heldForEat.type());
+        if (eatFood != null && held(com.example.ui.KeyBindings.Bind.USE) && survival.getHunger().canEat(eatFood)) {
+            float duration = heldForEat.type() == BlockType.DRIED_KELP ? 0.8f : 1.6f;
+            eatTimer += dt;
+            eatSoundTimer += dt;
+            if (eatSoundTimer >= 0.2f) { // vanilla: an eating sound every 4 ticks
+                eatSoundTimer = 0f;
+                gameAudio.play("eat", null);
+            }
+            if (eatTimer >= duration) {
+                eatTimer = 0f;
+                tryEat(heldForEat.type());
+                gameAudio.play("burp", null);
+            }
+        } else {
+            eatTimer = 0f;
+            eatSoundTimer = 0f;
+        }
+
+        boolean use = pressed(com.example.ui.KeyBindings.Bind.USE);
+        boolean forcedUse = false;
         if (forcedUseRequests > 0) {
             forcedUseRequests--;
             use = true;
+            forcedUse = true;
         }
         if (use) {
             ItemStack held = inventory.selected();
@@ -1009,7 +1106,7 @@ public class Game implements GameAccess {
                 inventory.set(inventory.getSelectedSlot(), survival.getArmor().equip(held));
                 gameAudio.play("armor.equip." + armorMaterial(held.type()), null);
             } else if (food != null) {
-                tryEat(held.type());
+                if (forcedUse) tryEat(held.type()); // the test controller eats instantly; real input holds use
             } else if (hit != null) {
                 // Using a crafting table opens the 3x3 crafting screen instead of placing a block
                 // (sneaking still places, like vanilla).
@@ -1024,6 +1121,7 @@ public class Game implements GameAccess {
                 }
                 BlockPlacer.Result placed = BlockPlacer.tryPlace(world, inventory, hit, this::blockIntersectsPlayer, saplingGrowth);
                 if (placed.placed()) {
+                    fallingBlocks.checkColumn(world, placed.x(), placed.y(), placed.z());
                     swingTimer = SWING_DURATION;
                     gameAudio.playPlace(placed.type(), new Vector3f(placed.x() + 0.5f, placed.y() + 0.5f, placed.z() + 0.5f));
                     CookingStationType placedStation = cookingStationTypeOf(placed.type());
@@ -1116,7 +1214,7 @@ public class Game implements GameAccess {
     }
 
     private void updateInventoryScreen() {
-        if (input.consumeKeyPressed(GLFW_KEY_E) || input.consumeKeyPressed(GLFW_KEY_ESCAPE)) {
+        if (pressed(com.example.ui.KeyBindings.Bind.INVENTORY) || input.consumeKeyPressed(GLFW_KEY_ESCAPE)) {
             closeInventory();
             return;
         }
@@ -1373,6 +1471,16 @@ public class Game implements GameAccess {
 
     private void updateItemsAndEffects(float dt) {
         playerTarget.bind(player, survival);
+        mobs.setEnvironment(computeDaylightFactor(sunDirection(dayTime)), weather.isRaining());
+        if (survival.getDifficulty() == Difficulty.PEACEFUL) mobs.removeHostile();
+        fallingBlocks.update(world, dt, itemEntities, gameplayRandom);
+        xpOrbs.update(world, player.position, dt, v -> {
+            survival.addExperience((float) v);
+            gameAudio.play("xp.pickup", null);
+        });
+        int level = survival.getLevel();
+        if (level > lastLevel) gameAudio.play("levelup", null);
+        lastLevel = level;
         float cooldown = survival.getHealth().hurtCooldownRemaining();
         if (cooldown > lastHurtCooldown + 1e-4f && survival.getHealth().isAlive()) gameAudio.play("player.hurt", null);
         lastHurtCooldown = cooldown;
@@ -1535,6 +1643,7 @@ public class Game implements GameAccess {
         chunkShader.setUniform("uFogStart", fogStart);
         chunkShader.setUniform("uFogEnd", fogEnd);
         chunkShader.setUniform("uDaylightFactor", daylightFactor);
+        chunkShader.setUniform("uGamma", options.gamma);
         chunkShader.setUniform("uWindTime", windTime);
         chunkShader.setUniform("uWindStrength", WIND_STRENGTH);
         atlas.bind(0);
@@ -1556,6 +1665,8 @@ public class Game implements GameAccess {
         renderBlockCrack();
         renderDroppedItems();
         renderMobs();
+        renderXpOrbs();
+        renderFallingBlocks();
         renderParticles();
 
         renderSunAndMoon(eye, sunDir, stormFactor, weather.isThundering());
@@ -1613,6 +1724,23 @@ public class Game implements GameAccess {
         itemMesh.draw();
     }
 
+    private void renderFallingBlocks() {
+        java.util.List<com.example.entity.FallingBlockManager.Falling> list = fallingBlocks.entities();
+        if (list.isEmpty()) return;
+        int n = 0;
+        for (com.example.entity.FallingBlockManager.Falling f : list) {
+            if (n + 6 * 11 * 6 > itemScratch.length) break;
+            ItemModelBuilder.Model m = itemModelFor(f.type);
+            int bx = (int) Math.floor(f.position.x), by = (int) Math.floor(f.position.y + 0.5f), bz = (int) Math.floor(f.position.z);
+            n = ItemModelBuilder.emitCube(itemScratch, n, f.position.x, f.position.y + 0.5f, f.position.z, 0.5f, 1f, 0f, m,
+                    world.getSkyLight(bx, by, bz) / 15f, world.getBlockLight(bx, by, bz) / 15f);
+        }
+        if (n == 0) return;
+        itemMesh.upload(itemScratch, n);
+        chunkShader.setUniform("uModel", IDENTITY);
+        itemMesh.draw();
+    }
+
     private void renderMobs() {
         java.util.List<Mob> list = mobs.mobs();
         if (list.isEmpty()) return;
@@ -1630,7 +1758,8 @@ public class Game implements GameAccess {
                 if (n + MobModelBuilder.FLOATS_PER_MOB > mobScratch.length) break;
                 int bx = (int) Math.floor(m.position.x), by = (int) Math.floor(m.position.y + 1f), bz = (int) Math.floor(m.position.z);
                 float sky = world.getSkyLight(bx, by, bz) / 15f, blk = world.getBlockLight(bx, by, bz) / 15f;
-                float[] tint = m.getHurtTime() > 0f || !m.isAlive() ? new float[]{1.6f, 0.5f, 0.5f} : NEUTRAL_ICON_TINT;
+                float[] tint = m.getHurtTime() > 0f || !m.isAlive() ? new float[]{1.6f, 0.5f, 0.5f}
+                        : m.isOnFire() ? new float[]{1.5f, 0.85f, 0.45f} : NEUTRAL_ICON_TINT;
                 float tilt = m.isAlive() ? 0f : (float) (Math.PI / 2) * Math.min(1f, m.getDeathTime());
                 float yaw = m.getYaw();
                 float px = m.position.x, py = m.position.y, pz = m.position.z;
@@ -1640,7 +1769,7 @@ public class Game implements GameAccess {
                     case "cow" -> n = MobModelBuilder.emitCow(mobScratch, n, px, py, pz, yaw, tilt, walk, amt, sky, blk, tint);
                     case "chicken" -> n = MobModelBuilder.emitChicken(mobScratch, n, px, py, pz, yaw, tilt, walk, amt,
                             !m.isOnGround(), sky, blk, tint);
-                    default -> n = MobModelBuilder.emitZombie(mobScratch, n, px, py, pz, yaw, tilt, walk, amt, sky, blk, tint);
+                    default -> n = MobModelBuilder.emitZombie(mobScratch, n, px, py, pz, yaw, tilt, walk, amt, sky, blk, tint, m.isBaby() ? 0.5f : 1f);
                 }
             }
             if (n == 0) continue;
@@ -1649,6 +1778,179 @@ public class Game implements GameAccess {
             mobMesh.draw();
         }
         atlas.bind(0); // everything drawn after the mobs expects the block atlas on unit 0
+    }
+
+    /** Experience orbs: small camera-facing quads, full bright, pulsing between green and yellow like vanilla. */
+    private void renderXpOrbs() {
+        java.util.List<com.example.entity.XpOrbManager.Orb> orbs = xpOrbs.orbs();
+        if (orbs.isEmpty()) return;
+        Vector3f front = player.frontVector();
+        Vector3f right = new Vector3f(-front.z, 0, front.x);
+        if (right.lengthSquared() < 1e-6f) right.set(1, 0, 0);
+        right.normalize();
+        Vector3f up = new Vector3f(right).cross(front).normalize();
+        float[] uv = atlas.getUv(com.example.engine.Tile.SNOW_BLOCK);
+        int n = 0;
+        for (com.example.entity.XpOrbManager.Orb o : orbs) {
+            if (n + 6 * 11 > mobScratch.length) break;
+            float size = 0.12f + 0.012f * (10 - o.sizeIndex());
+            float pulse = (float) (Math.sin(o.age * 6.0 + o.value) * 0.5 + 0.5);
+            float r = 0.35f + 0.65f * pulse, g = 1f, b = 0.1f;
+            float[][] c = {{-1, -1}, {1, -1}, {1, 1}, {-1, 1}};
+            int[] order = {0, 1, 2, 0, 2, 3};
+            float[][] uvc = {{uv[0], uv[3]}, {uv[2], uv[3]}, {uv[2], uv[1]}, {uv[0], uv[1]}};
+            for (int k : order) {
+                mobScratch[n++] = o.position.x + (right.x * c[k][0] + up.x * c[k][1]) * size;
+                mobScratch[n++] = o.position.y + 0.15f + (right.y * c[k][0] + up.y * c[k][1]) * size;
+                mobScratch[n++] = o.position.z + (right.z * c[k][0] + up.z * c[k][1]) * size;
+                mobScratch[n++] = uvc[k][0];
+                mobScratch[n++] = uvc[k][1];
+                mobScratch[n++] = 1f;
+                mobScratch[n++] = 1f;
+                mobScratch[n++] = r;
+                mobScratch[n++] = g;
+                mobScratch[n++] = b;
+                mobScratch[n++] = 0f;
+            }
+        }
+        if (n == 0) return;
+        mobMesh.upload(mobScratch, n);
+        chunkShader.setUniform("uModel", IDENTITY);
+        mobMesh.draw();
+    }
+
+    private void drawAirBubbles(HudTextures t, float hx, float y, float s) {
+        float air = survival.getAirTicks();
+        if (t.air == null || t.airBursting == null) return;
+        if (air >= PlayerSurvival.MAX_AIR_TICKS && !player.isHeadSubmerged()) return;
+        int full = (int) Math.ceil((air - 2) * 10.0 / PlayerSurvival.MAX_AIR_TICKS);
+        int total = (int) Math.ceil(air * 10.0 / PlayerSurvival.MAX_AIR_TICKS);
+        for (int i = 0; i < Math.max(total, 0); i++) {
+            float x = hx + (182 - 9) * s - i * 8 * s;
+            HudTextures.draw(uiRenderer, i < full ? t.air : t.airBursting, x, y, s);
+        }
+    }
+
+    private void drawExperienceBar(HudTextures t, float hx, int h, float s) {
+        if (t.xpBackground == null || t.xpProgress == null) return;
+        float y = h - 29 * s;
+        HudTextures.draw(uiRenderer, t.xpBackground, hx, y, s);
+        HudTextures.drawFractionX(uiRenderer, t.xpProgress, hx, y, s, survival.getLevelProgress());
+        int level = survival.getLevel();
+        if (level > 0) {
+            String text = Integer.toString(level);
+            float scale = s * 0.9f;
+            float tw = font.measureText(text, scale);
+            float tx = hx + 91 * s - tw / 2f, ty = y - 7 * s;
+            for (float[] o : new float[][]{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
+                font.drawText(uiRenderer, text, tx + o[0] * s * 0.5f, ty + o[1] * s * 0.5f, scale, 0f, 0f, 0f, 1f);
+            }
+            font.drawText(uiRenderer, text, tx, ty, scale, 0.5f, 1f, 0.125f, 1f);
+        }
+    }
+
+    /** Attack charge 0..1 for the held item (1 = ready), shared by the HUD indicator. */
+    private float attackCharge() {
+        ItemStack held = inventory.selected();
+        BlockType type = held.isEmpty() ? null : held.type();
+        return com.example.combat.CombatMath.charge(attackTimer * 20f, com.example.combat.WeaponStats.periodTicks(type));
+    }
+
+    private void drawAttackIndicator(HudTextures t, int w, int h, float hx, float hy, float s) {
+        if (options.attackIndicator == 0) return;
+        float charge = attackCharge();
+        if (options.attackIndicator == 1 && t.crosshairIndicatorBg != null && t.crosshairIndicatorProgress != null) {
+            float cx = w / 2f, cy = h / 2f;
+            if (charge < 1f) {
+                float x = cx - 8 * s, y = cy + 9 * s;
+                HudTextures.draw(uiRenderer, t.crosshairIndicatorBg, x, y, s);
+                HudTextures.drawFractionX(uiRenderer, t.crosshairIndicatorProgress, x, y, s, charge);
+            }
+        } else if (options.attackIndicator == 2 && t.hotbarIndicatorBg != null && t.hotbarIndicatorProgress != null && charge < 1f) {
+            float x = hx + 182 * s + 6 * s, y = h - 20 * s;
+            HudTextures.draw(uiRenderer, t.hotbarIndicatorBg, x, y, s);
+            HudTextures.drawFractionY(uiRenderer, t.hotbarIndicatorProgress, x, y, s, charge);
+        }
+    }
+
+    private long lastFrameEndNanos;
+
+    /** Vanilla Max Framerate: sleep out the rest of the frame when below the "Unlimited" setting. */
+    private void limitFrameRate(long frameStartNanos) {
+        if (options.maxFps >= GameOptions.UNLIMITED_FPS) return;
+        long target = 1_000_000_000L / options.maxFps;
+        long remaining = target - (System.nanoTime() - frameStartNanos);
+        if (remaining > 1_000_000L) {
+            try {
+                Thread.sleep(remaining / 1_000_000L - 1);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+        while (System.nanoTime() - frameStartNanos < target) Thread.onSpinWait();
+    }
+
+    /** F2: saves the current frame to screenshots/ with a timestamp name. */
+    private void takeUserScreenshot() {
+        try {
+            File dir = new File("screenshots");
+            dir.mkdirs();
+            String name = new java.text.SimpleDateFormat("yyyy-MM-dd_HH.mm.ss").format(new java.util.Date());
+            File saved = new File(captureScreenshotTo(dir, name));
+            log.info("Screenshot saved to {}", saved.getPath());
+        } catch (IOException | RuntimeException e) {
+            log.warn("Screenshot failed: {}", e.toString());
+        }
+    }
+
+    /** Q drops one item, Ctrl+Q the whole stack, tossed along the view with a 2 s pickup delay. */
+    private void dropHeldItem(boolean wholeStack) {
+        int slot = inventory.getSelectedSlot();
+        ItemStack s = inventory.get(slot);
+        if (s.isEmpty()) return;
+        int n = wholeStack ? s.count() : 1;
+        Vector3f eye = player.eyePosition();
+        itemEntities.throwItem(s.type(), n, s.damage(), eye, player.frontVector(), gameplayRandom);
+        inventory.removeFromSlot(slot, n);
+        swingTimer = SWING_DURATION;
+    }
+
+    /** Middle click: select the hotbar slot holding the targeted block, or swap it in from the main inventory. */
+    private void pickBlock(BlockType type) {
+        if (type == null || type == BlockType.AIR) return;
+        for (int i = 0; i < inventory.getHotbarSize(); i++) {
+            if (!inventory.get(i).isEmpty() && inventory.get(i).type() == type) {
+                inventory.selectSlot(i);
+                hotbarLabelTimer = HOTBAR_LABEL_DURATION;
+                return;
+            }
+        }
+        for (int i = inventory.getHotbarSize(); i < inventory.slotCount(); i++) {
+            if (!inventory.get(i).isEmpty() && inventory.get(i).type() == type) {
+                int sel = inventory.getSelectedSlot();
+                ItemStack a = inventory.get(sel), b = inventory.get(i);
+                inventory.set(sel, b);
+                inventory.set(i, a);
+                hotbarLabelTimer = HOTBAR_LABEL_DURATION;
+                return;
+            }
+        }
+    }
+
+    /** Vanilla death: every inventory and armor stack drops where the player died, and the XP spills as orbs. */
+    private void dropEverythingOnDeath() {
+        Vector3f at = new Vector3f(player.position.x, player.position.y + 0.9f, player.position.z);
+        for (int i = 0; i < inventory.slotCount(); i++) {
+            ItemStack s = inventory.get(i);
+            if (!s.isEmpty()) itemEntities.spawn(s.type(), s.count(), s.damage(), at, gameplayRandom);
+            inventory.set(i, ItemStack.EMPTY);
+        }
+        for (com.example.combat.EquipmentSlot slot : com.example.combat.EquipmentSlot.values()) {
+            ItemStack s = survival.getArmor().get(slot);
+            if (!s.isEmpty()) itemEntities.spawn(s.type(), 1, s.damage(), at, gameplayRandom);
+        }
+        survival.getArmor().clear();
+        xpOrbs.spawn(survival.takeDeathExperience(), at, gameplayRandom);
     }
 
     private void renderParticles() {
@@ -1996,6 +2298,7 @@ public class Game implements GameAccess {
     }
 
     private void renderHud() {
+        if (hideHud) return;
         float cx = window.getWidth() / 2f;
         float cy = window.getHeight() / 2f;
         uiRenderer.drawColorQuad(cx - 5, cy - 1, 10, 2, 1, 1, 1, 0.9f);
@@ -2092,6 +2395,10 @@ public class Game implements GameAccess {
                 else if (v == 1) HudTextures.draw(uiRenderer, t.armorHalf, x, ay, s);
             }
         }
+
+        drawAirBubbles(t, hx, heartsY - 10 * s, s);
+        drawExperienceBar(t, hx, h, s);
+        drawAttackIndicator(t, w, h, hx, hy, s);
 
         int sel = inventory.getSelectedSlot();
         for (int i = 0; i < 9; i++) {
@@ -2472,9 +2779,7 @@ public class Game implements GameAccess {
                 boolean inWorld = world != null && (state == GameState.IN_GAME || state == GameState.PAUSED);
                 openOptions(inWorld ? GameState.PAUSED : GameState.TITLE);
                 if (!page.isEmpty()) {
-                    OptionsScreens.Context ctx = new OptionsScreens.Context(guiEnv, this::applyOptions, this::closeOptions,
-                            inWorld ? () -> survival.getDifficulty() : null, inWorld ? d -> survival.setDifficulty(d) : null);
-                    optionsScreen = OptionsScreens.create(ctx, page);
+                    optionsScreen = OptionsScreens.create(newOptionsContext(inWorld), page);
                 }
             }
             case "pause" -> {
@@ -2575,6 +2880,10 @@ public class Game implements GameAccess {
 
     @Override
     public String captureScreenshot(String name) throws IOException {
+        return captureScreenshotTo(new File("test-output/screenshots"), name);
+    }
+
+    private String captureScreenshotTo(File dir, String name) throws IOException {
         int width = window.getWidth();
         int height = window.getHeight();
         ByteBuffer buffer = org.lwjgl.BufferUtils.createByteBuffer(width * height * 4);
@@ -2591,7 +2900,6 @@ public class Game implements GameAccess {
             }
         }
 
-        File dir = new File("test-output/screenshots");
         dir.mkdirs();
         File out = new File(dir, name + ".png");
         ImageIO.write(image, "png", out);

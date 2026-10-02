@@ -93,15 +93,36 @@ public final class ToolEffectiveness {
 
     /** Ore blocks that need at least this harvest level to drop anything (0 = no minimum -
      *  breakable, and its normal drop obtainable, by hand or any tool). */
-    private static final Map<BlockType, Integer> REQUIRED_HARVEST_LEVEL = Map.of(
-            BlockType.COAL_ORE, Tier.WOOD.harvestLevel,
-            BlockType.IRON_ORE, Tier.STONE.harvestLevel,
-            // Real vanilla actually requires an iron pickaxe for gold ore; simplified to stone
-            // here since this project has no gold-tier tool and gold is otherwise unobtainable
-            // survival-wise anyway (documented simplification, not a claim about real vanilla).
-            BlockType.GOLD_ORE, Tier.STONE.harvestLevel,
-            BlockType.COPPER_ORE, Tier.STONE.harvestLevel,
-            BlockType.DIAMOND_ORE, Tier.IRON.harvestLevel);
+    private static final Map<BlockType, Integer> REQUIRED_HARVEST_LEVEL = buildRequiredLevels();
+
+    private static Map<BlockType, Integer> buildRequiredLevels() {
+        Map<BlockType, Integer> m = new java.util.EnumMap<>(BlockType.class);
+        // Vanilla: every block a pickaxe is "correct" for drops nothing without one (stone by hand yields no cobblestone)...
+        for (BlockType b : PICKAXE_BLOCKS) m.put(b, Tier.WOOD.harvestLevel);
+        // ...and these need a better tier (vanilla: gold, diamond need iron; iron needs stone; obsidian needs diamond).
+        m.put(BlockType.IRON_ORE, Tier.STONE.harvestLevel);
+        m.put(BlockType.COPPER_ORE, Tier.STONE.harvestLevel);
+        m.put(BlockType.IRON_BLOCK, Tier.STONE.harvestLevel);
+        m.put(BlockType.GOLD_ORE, Tier.IRON.harvestLevel);
+        m.put(BlockType.DIAMOND_ORE, Tier.IRON.harvestLevel);
+        m.put(BlockType.GOLD_BLOCK, Tier.IRON.harvestLevel);
+        m.put(BlockType.DIAMOND_BLOCK, Tier.IRON.harvestLevel);
+        m.put(BlockType.OBSIDIAN, Tier.DIAMOND.harvestLevel);
+        m.put(BlockType.SNOW_BLOCK, Tier.WOOD.harvestLevel); // needs a shovel for its snowballs
+        return m;
+    }
+
+    /**
+     * Vanilla break time in seconds with {@code tool} (null = bare hand): {@code hardness * 1.5 / speed} when the
+     * item can harvest the block, {@code hardness * 5 / speed} when it cannot, where speed is the tier multiplier
+     * for a correct tool and 1 otherwise. Unbreakable blocks return -1.
+     */
+    public static float breakSeconds(BlockType tool, BlockType block) {
+        if (block == null || block.hardness < 0f) return -1f;
+        if (block == BlockType.TNT) return block.handBreakSeconds();
+        float base = canHarvest(tool, block) ? block.hardness * 1.5f : block.hardness * 5f;
+        return base / speedMultiplier(tool, block);
+    }
 
     public static boolean isTool(BlockType type) {
         return TOOLS.containsKey(type);

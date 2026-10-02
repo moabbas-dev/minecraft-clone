@@ -9,6 +9,8 @@ import java.nio.IntBuffer;
 import static org.lwjgl.glfw.GLFW.*;
 
 public class Input implements InputState {
+    /** Binding codes at or above this are mouse buttons ({@code MOUSE_CODE_BASE + button}); see KeyBindings. */
+    public static final int MOUSE_CODE_BASE = 1000;
     private final long window;
     private final boolean[] keysDown = new boolean[GLFW_KEY_LAST + 1];
     private final boolean[] keysPressedEdge = new boolean[GLFW_KEY_LAST + 1];
@@ -76,11 +78,15 @@ public class Input implements InputState {
 
     @Override
     public boolean isKeyDown(int key) {
+        if (key >= MOUSE_CODE_BASE) return isMouseDown(key - MOUSE_CODE_BASE);
+        if (key < 0 || key >= keysDown.length) return false;
         return keysDown[key];
     }
 
     @Override
     public boolean consumeKeyPressed(int key) {
+        if (key >= MOUSE_CODE_BASE) return consumeMousePressed(key - MOUSE_CODE_BASE);
+        if (key < 0 || key >= keysPressedEdge.length) return false;
         boolean v = keysPressedEdge[key];
         keysPressedEdge[key] = false;
         return v;
@@ -100,10 +106,11 @@ public class Input implements InputState {
     }
 
     public boolean isMouseDown(int button) {
-        return mouseDown[button];
+        return button >= 0 && button < mouseDown.length && mouseDown[button];
     }
 
     public boolean consumeMousePressed(int button) {
+        if (button < 0 || button >= mousePressedEdge.length) return false;
         boolean v = mousePressedEdge[button];
         mousePressedEdge[button] = false;
         return v;
@@ -115,6 +122,30 @@ public class Input implements InputState {
 
     public double getMouseY() {
         return lastMouseY;
+    }
+
+    /** First keyboard key pressed since the last call (clearing every edge), or -1; used by the rebind screen. */
+    public int consumeAnyKeyPressed() {
+        int found = -1;
+        for (int k = 0; k < keysPressedEdge.length; k++) {
+            if (keysPressedEdge[k]) {
+                if (found < 0) found = k;
+                keysPressedEdge[k] = false;
+            }
+        }
+        return found;
+    }
+
+    /** First mouse button pressed since the last call (clearing every edge), or -1. */
+    public int consumeAnyMousePressed() {
+        int found = -1;
+        for (int b = 0; b < mousePressedEdge.length; b++) {
+            if (mousePressedEdge[b]) {
+                if (found < 0) found = b;
+                mousePressedEdge[b] = false;
+            }
+        }
+        return found;
     }
 
     /** Returns and clears the Unicode text typed since the last call (for text fields). */

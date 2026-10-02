@@ -70,7 +70,7 @@ public class WorldCreateScreen extends McScreen {
             mode.active = false;
             widgets.add(mode);
             widgets.add(new Button(cx - 75, 161, 150, 20, () -> "Difficulty: " + title(difficulty), () -> {
-                difficulty = Difficulty.values()[(difficulty.ordinal() + 1) % Difficulty.values().length];
+                difficulty = difficulty.next();
             }));
             widgets.add(new Button(cx - 75, 187, 150, 20, "More World Options...", () -> {
                 moreOptions = true;

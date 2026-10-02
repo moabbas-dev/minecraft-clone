@@ -1,6 +1,7 @@
 package com.example.game;
 
 import com.example.world.BlockType;
+import com.example.world.ToolEffectiveness;
 import com.example.world.FlatWorldGenerator;
 import com.example.world.Raycast;
 import com.example.world.World;
@@ -40,7 +41,7 @@ class MiningControllerTest {
     @Test
     void theBlockSurvivesUntilTheTimerCompletes() {
         world.setBlock(5, 10, 5, BlockType.STONE);
-        float required = BlockType.STONE.handBreakSeconds();
+        float required = ToolEffectiveness.breakSeconds(null, BlockType.STONE);
         int ticksBefore = (int) (required / DT) - 3;
         for (int i = 0; i < ticksBefore; i++) {
             assertFalse(mining.tick(world, hit(5, 10, 5), true, DT).broken());
@@ -55,8 +56,11 @@ class MiningControllerTest {
         assertNotNull(r);
         assertEquals(BlockType.AIR, world.getBlock(5, 10, 5));
         assertEquals(BlockType.STONE, r.brokenType());
+        assertTrue(r.drops().isEmpty(), "vanilla: stone broken by hand drops nothing");
+        world.setBlock(5, 10, 5, BlockType.DIRT);
+        r = mineUntilBroken(hit(5, 10, 5), 600);
         assertEquals(1, r.drops().size());
-        assertEquals(BlockType.COBBLESTONE, r.drops().get(0).item());
+        assertEquals(BlockType.DIRT, r.drops().get(0).item());
         assertEquals(1, r.drops().get(0).count());
         // The block is gone, so continuing to hold the button on that spot must never break/drop again.
         for (int i = 0; i < 120; i++) assertFalse(mining.tick(world, hit(5, 10, 5), true, DT).broken());
@@ -86,7 +90,7 @@ class MiningControllerTest {
     void switchingTargetsRestartsProgressAndNeverBreaksTheOldBlock() {
         world.setBlock(5, 10, 5, BlockType.STONE);
         world.setBlock(6, 10, 5, BlockType.STONE);
-        int nearlyDone = (int) (BlockType.STONE.handBreakSeconds() / DT) - 5;
+        int nearlyDone = (int) (ToolEffectiveness.breakSeconds(null, BlockType.STONE) / DT) - 5;
         for (int i = 0; i < nearlyDone; i++) mining.tick(world, hit(5, 10, 5), true, DT);
         int stageBefore = mining.crackStage();
         assertTrue(stageBefore >= MiningController.CRACK_STAGES - 2, "sanity: nearly finished, stage=" + stageBefore);
@@ -101,7 +105,7 @@ class MiningControllerTest {
     @Test
     void aBlockChangedByAnotherSystemMidBreakRestartsInsteadOfUsingTheOldTimer() {
         world.setBlock(5, 10, 5, BlockType.STONE);
-        int nearlyDone = (int) (BlockType.STONE.handBreakSeconds() / DT) - 5;
+        int nearlyDone = (int) (ToolEffectiveness.breakSeconds(null, BlockType.STONE) / DT) - 5;
         for (int i = 0; i < nearlyDone; i++) mining.tick(world, hit(5, 10, 5), true, DT);
 
         world.setBlock(5, 10, 5, BlockType.OBSIDIAN); // something else swapped the block

@@ -51,6 +51,11 @@ public class HungerComponent {
         }
     }
 
+    /** True when {@link #eat} would accept this food (not full, or the food can be eaten while full). */
+    public boolean canEat(FoodProperties food) {
+        return foodLevel < MAX_FOOD || food.canEatWhenFull();
+    }
+
     public boolean canSprint() {
         return foodLevel > SPRINT_DISABLE_THRESHOLD;
     }

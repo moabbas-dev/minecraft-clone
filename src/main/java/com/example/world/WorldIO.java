@@ -329,6 +329,32 @@ public class WorldIO {
         }
     }
 
+    /** Player extras that live beside the survival snapshot: XP, this life's score and the difficulty lock. */
+    public record Extras(float experience, float score, boolean difficultyLocked) {
+    }
+
+    public static void saveExtras(File dir, Extras e) {
+        dir.mkdirs();
+        try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(new File(dir, "extras.dat"))))) {
+            out.writeFloat(e.experience());
+            out.writeFloat(e.score());
+            out.writeBoolean(e.difficultyLocked());
+        } catch (IOException ex) {
+            System.err.println("Failed to save extras: " + ex.getMessage());
+        }
+    }
+
+    /** Defaults (no XP, unlocked) when the world has no extras file yet. */
+    public static Extras loadExtras(File dir) {
+        File file = new File(dir, "extras.dat");
+        if (!file.isFile()) return new Extras(0f, 0f, false);
+        try (DataInputStream in = new DataInputStream(new BufferedInputStream(new FileInputStream(file)))) {
+            return new Extras(in.readFloat(), in.readFloat(), in.readBoolean());
+        } catch (IOException ex) {
+            return new Extras(0f, 0f, false);
+        }
+    }
+
     public static void deleteWorld(String folderName) {
         deleteRecursively(worldDir(folderName));
     }

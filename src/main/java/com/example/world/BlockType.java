@@ -183,7 +183,12 @@ public enum BlockType {
     DIAMOND_HELMET(180, "Diamond Helmet", false, true, -1f, 0f),
     DIAMOND_CHESTPLATE(181, "Diamond Chestplate", false, true, -1f, 0f),
     DIAMOND_LEGGINGS(182, "Diamond Leggings", false, true, -1f, 0f),
-    DIAMOND_BOOTS(183, "Diamond Boots", false, true, -1f, 0f);
+    DIAMOND_BOOTS(183, "Diamond Boots", false, true, -1f, 0f),
+    FLINT(184, "Flint", false, true, -1f, 0f),
+    CLAY_BALL(185, "Clay Ball", false, true, -1f, 0f),
+    SNOWBALL(186, "Snowball", false, true, -1f, 0f),
+    GLOWSTONE_DUST(187, "Glowstone Dust", false, true, -1f, 0f),
+    BOOK(188, "Book", false, true, -1f, 0f);
 
     public final int id;
     public final String displayName;

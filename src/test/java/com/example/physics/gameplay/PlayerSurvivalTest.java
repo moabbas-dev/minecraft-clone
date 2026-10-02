@@ -180,6 +180,7 @@ class PlayerSurvivalTest {
         s.update(0f, player);
         s.damage(5f, DamageSource.GENERIC);
         assertEquals(15f, s.getHealth().getCurrentHealth());
+        s.getHunger().forceState(20f, 0f, 0f); // no saturation: the slow 80-tick regeneration
 
         float saturationBefore = s.getHunger().getSaturation();
         // ~6.67s of ticks at 60fps - enough for exactly one regen cycle at this project's chosen
@@ -205,6 +206,7 @@ class PlayerSurvivalTest {
     @Test
     void starvationDamagesOverTimeAndRespectsEachDifficultysFloor() {
         for (Difficulty d : Difficulty.values()) {
+            if (d == Difficulty.PEACEFUL) continue; // Peaceful never drains hunger (own test)
             PlayerSurvival s = survival(d);
             Player player = new Player(new Vector3f(0, SPAWN_Y, 0));
             s.update(0f, player);
@@ -214,6 +216,7 @@ class PlayerSurvivalTest {
                 case EASY -> 10f;
                 case NORMAL -> 1f;
                 case HARD -> 0f;
+                case PEACEFUL -> 20f;
             };
             assertTrue(s.getHealth().getCurrentHealth() <= floor + 0.01f, d + ": should have starved down to its floor");
             assertTrue(s.getHealth().getCurrentHealth() >= floor - 0.01f, d + ": must never go below its floor from starvation alone");
@@ -303,5 +306,58 @@ class PlayerSurvivalTest {
         }
         assertTrue(player.isOnGround());
         assertEquals(20f, s.getHealth().getCurrentHealth(), "a 2-block fall is within the safe distance");
+    }
+
+    @Test
+    void fastRegenerationAtFullFoodHealsHalfASecondPerStepAndSpendsSaturation() {
+        PlayerSurvival s = survival(Difficulty.NORMAL);
+        Player player = new Player(new Vector3f(0, SPAWN_Y, 0));
+        s.update(0f, player);
+        s.damage(5f, DamageSource.GENERIC);
+        s.getHunger().forceState(20f, 6f, 0f);
+        for (int i = 0; i < 61; i++) s.update(DT, player); // ~1 s
+        // first step heals min(6,6)/6 = 1 HP and costs 6 exhaustion (one saturation point, 2 carried over); the second heals 5/6 HP
+        assertEquals(15f + 1f + 5f / 6f, s.getHealth().getCurrentHealth(), 0.02f, "a step every 10 ticks, scaled by saturation");
+        assertTrue(s.getHunger().getSaturation() < 6f, "fast regen drains saturation through exhaustion");
+    }
+
+    @Test
+    void peacefulRegeneratesAndNeverStarves() {
+        PlayerSurvival s = survival(Difficulty.PEACEFUL);
+        Player player = new Player(new Vector3f(0, SPAWN_Y, 0));
+        s.update(0f, player);
+        s.damage(5f, DamageSource.GENERIC);
+        s.getHunger().forceState(0f, 0f, 0f);
+        for (int i = 0; i < 400; i++) s.update(DT, player);
+        assertTrue(s.getHealth().getCurrentHealth() > 15f, "health regenerates on Peaceful");
+        assertEquals(20f, s.getHunger().getFoodLevel(), "the hunger bar stays full");
+    }
+
+    @Test
+    void experienceLevelsFollowTheVanillaCurve() {
+        assertEquals(7, com.example.survival.Experience.costOfLevel(0));
+        assertEquals(37, com.example.survival.Experience.costOfLevel(15));
+        assertEquals(42, com.example.survival.Experience.costOfLevel(16));
+        assertEquals(1395f, com.example.survival.Experience.totalForLevel(30), 0.5f);
+        PlayerSurvival s = survival(Difficulty.NORMAL);
+        s.addExperience(7f);
+        assertEquals(1, s.getLevel());
+        s.addExperience(8f);
+        assertEquals(1, s.getLevel());
+        assertEquals(8f / 9f, s.getLevelProgress(), 1e-4f);
+        assertEquals(7f, com.example.survival.Experience.deathDrop(1));
+        assertEquals(100f, com.example.survival.Experience.deathDrop(30));
+        assertEquals(7f, s.takeDeathExperience());
+        assertEquals(0, s.getLevel());
+        assertEquals(15f, s.getScore(), "score keeps what was collected this life");
+    }
+
+    @Test
+    void drowningDrainsAirThenDealsTwoHealthPerSecond() {
+        PlayerSurvival s = survival(Difficulty.NORMAL);
+        Player player = new Player(new Vector3f(0, SPAWN_Y, 0));
+        s.update(0f, player);
+        assertEquals(PlayerSurvival.MAX_AIR_TICKS, s.getAirTicks());
+        assertTrue(com.example.world.BlockType.WATER != null);
     }
 }

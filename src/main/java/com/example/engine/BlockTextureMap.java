@@ -150,6 +150,11 @@ public class BlockTextureMap {
         uniform(BlockType.DIAMOND_CHESTPLATE, Tile.DIAMOND_CHESTPLATE);
         uniform(BlockType.DIAMOND_LEGGINGS, Tile.DIAMOND_LEGGINGS);
         uniform(BlockType.DIAMOND_BOOTS, Tile.DIAMOND_BOOTS);
+        uniform(BlockType.FLINT, Tile.FLINT);
+        uniform(BlockType.CLAY_BALL, Tile.CLAY_BALL);
+        uniform(BlockType.SNOWBALL, Tile.SNOWBALL);
+        uniform(BlockType.GLOWSTONE_DUST, Tile.GLOWSTONE_DUST);
+        uniform(BlockType.BOOK, Tile.BOOK);
     }
 
     private void uniform(BlockType type, Tile tile) {

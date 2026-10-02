@@ -23,8 +23,13 @@ public final class BlockDrops {
     }
 
     /** One possible outcome: {@code item} in a quantity between min and max inclusive. */
-    public record Drop(BlockType item, int min, int max) {
+    public record Drop(BlockType item, int min, int max, float chance) {
+        public Drop(BlockType item, int min, int max) {
+            this(item, min, max, 1f);
+        }
+
         public Drop {
+            if (chance < 0f || chance > 1f) throw new IllegalArgumentException("invalid drop chance: " + chance);
             if (item == null || item == BlockType.AIR) throw new IllegalArgumentException("invalid drop item: " + item);
             if (min < 0 || max < min) throw new IllegalArgumentException("invalid drop quantity: " + min + ".." + max);
         }
@@ -46,12 +51,25 @@ public final class BlockDrops {
         OVERRIDES.put(BlockType.STONE, List.of(Drop.of(BlockType.COBBLESTONE)));
         OVERRIDES.put(BlockType.GRASS_BLOCK, List.of(Drop.of(BlockType.DIRT)));
 
-        // Leaves drop nothing (real vanilla's sapling/apple chances are not modeled yet).
+        // Leaves roll their drops independently (vanilla): sapling 5% (jungle 2.5%), 1-2 sticks 2%, and an apple
+        // 0.5% from oak and dark oak only. Only the oak sapling item exists, so every species drops that one.
         for (BlockType leaf : new BlockType[]{
                 BlockType.OAK_LEAVES, BlockType.BIRCH_LEAVES, BlockType.SPRUCE_LEAVES, BlockType.JUNGLE_LEAVES,
                 BlockType.ACACIA_LEAVES, BlockType.MANGROVE_LEAVES, BlockType.DARK_OAK_LEAVES, BlockType.CHERRY_LEAVES}) {
-            OVERRIDES.put(leaf, NOTHING);
+            float sapling = leaf == BlockType.JUNGLE_LEAVES ? 0.025f : 0.05f;
+            boolean apples = leaf == BlockType.OAK_LEAVES || leaf == BlockType.DARK_OAK_LEAVES;
+            List<Drop> rolls = new java.util.ArrayList<>();
+            rolls.add(new Drop(BlockType.OAK_SAPLING_STAGE_0, 1, 1, sapling));
+            rolls.add(new Drop(BlockType.STICK, 1, 2, 0.02f));
+            if (apples) rolls.add(new Drop(BlockType.APPLE, 1, 1, 0.005f));
+            OVERRIDES.put(leaf, List.copyOf(rolls));
         }
+        // Other vanilla item drops.
+        OVERRIDES.put(BlockType.CLAY, List.of(new Drop(BlockType.CLAY_BALL, 4, 4)));
+        OVERRIDES.put(BlockType.SNOW_BLOCK, List.of(new Drop(BlockType.SNOWBALL, 4, 4))); // needs a shovel (ToolEffectiveness)
+        OVERRIDES.put(BlockType.GLOWSTONE, List.of(new Drop(BlockType.GLOWSTONE_DUST, 2, 4)));
+        OVERRIDES.put(BlockType.BOOKSHELF, List.of(new Drop(BlockType.BOOK, 3, 3)));
+        OVERRIDES.put(BlockType.GRAVEL, List.of(new Drop(BlockType.FLINT, 1, 1, 0.1f))); // else gravel itself, see resolve
 
         // All four sapling growth stages are one collectible item: only stage 0 is placeable
         // (BlockType.PLACEABLE), stages 1-3 are SaplingGrowth's internal states.
@@ -102,7 +120,11 @@ public final class BlockDrops {
         List<Drop> drops = dropsFor(broken);
         if (drops.isEmpty()) return List.of();
         List<Resolved> result = new java.util.ArrayList<>(drops.size());
+        if (broken == BlockType.GRAVEL) { // vanilla: 10% flint, otherwise the gravel block itself (never both)
+            return List.of(new Resolved(random.nextFloat() < 0.1f ? BlockType.FLINT : BlockType.GRAVEL, 1));
+        }
         for (Drop d : drops) {
+            if (d.chance() < 1f && random.nextFloat() >= d.chance()) continue;
             int count = d.min() == d.max() ? d.min() : d.min() + random.nextInt(d.max() - d.min() + 1);
             if (count > 0) result.add(new Resolved(d.item(), count));
         }

@@ -71,6 +71,48 @@ public abstract class Mob extends LivingEntity {
 
     public abstract float getMoveSpeed();
 
+    /** Hostile mobs despawn on Peaceful and use the hostile sound category. */
+    public boolean isHostile() {
+        return false;
+    }
+
+    /** Set by MobManager each tick: direct sunlight reaches this mob (daytime, open sky, dry, not raining). */
+    @Getter
+    @Setter
+    private boolean sunlit;
+    private float fireSeconds;
+    private float fireTimer;
+    /** Seconds since a player was last within 32 blocks (vanilla random-despawn clock). */
+    public float farFromPlayerSeconds;
+
+    /** Sets the mob alight for {@code seconds} (never shortens an existing burn). */
+    public void setOnFire(float seconds) {
+        if (seconds > fireSeconds) fireSeconds = seconds;
+    }
+
+    public boolean isOnFire() {
+        return fireSeconds > 0f;
+    }
+
+    private void tickFire(World world, float dt) {
+        if (fireSeconds <= 0f) return;
+        if (isInWater(world)) {
+            fireSeconds = 0f;
+            return;
+        }
+        fireSeconds -= dt;
+        fireTimer += dt;
+        if (fireTimer >= 1f) { // vanilla: 1 HP per second while burning
+            fireTimer -= 1f;
+            damage(1f, com.example.survival.DamageSource.FIRE);
+        }
+    }
+
+    /** Baby variant flag (zombies only so far): half size, faster. */
+    public boolean isBaby() {
+        return false;
+    }
+
     /** Stable id used in saves ("zombie", "pig", ...). */
     public abstract String typeId();
 
@@ -191,6 +233,7 @@ public abstract class Mob extends LivingEntity {
         }
         speedMultiplier = 1f;
         lastDt = dt;
+        tickFire(world, dt);
         onTick(world, dt);
         goals.tick(this, world, candidates, dt);
         applyMovement(world, dt);

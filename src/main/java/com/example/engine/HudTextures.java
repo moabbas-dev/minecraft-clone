@@ -28,6 +28,10 @@ public final class HudTextures {
 
     /** Optional: null when the armor sprites are missing (the armor bar is then simply not drawn). */
     public Sprite armorEmpty, armorHalf, armorFull;
+    /** Optional: air bubbles, XP bar and attack-indicator sprites (each group simply skipped when missing). */
+    public Sprite air, airBursting, xpBackground, xpProgress;
+    public Sprite crosshairIndicatorBg, crosshairIndicatorProgress, crosshairIndicatorFull;
+    public Sprite hotbarIndicatorBg, hotbarIndicatorProgress;
     public final Sprite hotbar, hotbarSelection, heartContainer, heartFull, heartHalf, foodEmpty, foodFull, foodHalf;
 
     private HudTextures(Sprite hotbar, Sprite hotbarSelection, Sprite heartContainer, Sprite heartFull, Sprite heartHalf,
@@ -55,9 +59,26 @@ public final class HudTextures {
             } catch (IOException | RuntimeException e) {
                 t.armorEmpty = t.armorHalf = t.armorFull = null;
             }
+            t.air = optional("air.png");
+            t.airBursting = optional("air_bursting.png");
+            t.xpBackground = optional("experience_bar_background.png");
+            t.xpProgress = optional("experience_bar_progress.png");
+            t.crosshairIndicatorBg = optional("crosshair_attack_indicator_background.png");
+            t.crosshairIndicatorProgress = optional("crosshair_attack_indicator_progress.png");
+            t.crosshairIndicatorFull = optional("crosshair_attack_indicator_full.png");
+            t.hotbarIndicatorBg = optional("hotbar_attack_indicator_background.png");
+            t.hotbarIndicatorProgress = optional("hotbar_attack_indicator_progress.png");
             return t;
         } catch (IOException | RuntimeException e) {
             log.info("Real HUD sprites not available ({}) - using the plain HUD", e.getMessage());
+            return null;
+        }
+    }
+
+    private static Sprite optional(String name) {
+        try {
+            return load(name);
+        } catch (IOException | RuntimeException e) {
             return null;
         }
     }
@@ -90,6 +111,21 @@ public final class HudTextures {
     /** Draws a whole sprite with its top-left at (x, y), each sprite pixel {@code scale} screen pixels. */
     public static void draw(UiRenderer ui, Sprite s, float x, float y, float scale) {
         ui.drawTexturedQuad(x, y, s.w() * scale, s.h() * scale, FULL_UV, s.id(), 1f, 1f, 1f, 1f);
+    }
+
+    /** Draws the left {@code fraction} of a sprite (a progress bar), full height. */
+    public static void drawFractionX(UiRenderer ui, Sprite s, float x, float y, float scale, float fraction) {
+        fraction = Math.max(0f, Math.min(1f, fraction));
+        if (fraction <= 0f) return;
+        ui.drawTexturedQuad(x, y, s.w() * scale * fraction, s.h() * scale, new float[]{0f, 0f, fraction, 1f}, s.id(), 1f, 1f, 1f, 1f);
+    }
+
+    /** Draws the bottom {@code fraction} of a sprite (a vertical progress bar). */
+    public static void drawFractionY(UiRenderer ui, Sprite s, float x, float y, float scale, float fraction) {
+        fraction = Math.max(0f, Math.min(1f, fraction));
+        if (fraction <= 0f) return;
+        float h = s.h() * scale * fraction;
+        ui.drawTexturedQuad(x, y + s.h() * scale - h, s.w() * scale, h, new float[]{0f, 1f - fraction, 1f, 1f}, s.id(), 1f, 1f, 1f, 1f);
     }
 
     public void destroy() {

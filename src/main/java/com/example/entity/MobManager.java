@@ -22,6 +22,32 @@ import java.util.Random;
  */
 public class MobManager {
     public static final int MAX_MOBS = 160;
+    private XpOrbManager xpOrbs;
+
+    /** When set, a player-killed mob drops real XP orbs instead of queuing XP for direct pickup. */
+    public void setXpOrbs(XpOrbManager orbs) {
+        this.xpOrbs = orbs;
+    }
+    private float daylightFactor = 0f;
+    private boolean raining;
+
+    /** Fed by the game each frame so zombies know whether the sun reaches them. */
+    public void setEnvironment(float daylightFactor, boolean raining) {
+        this.daylightFactor = daylightFactor;
+        this.raining = raining;
+    }
+
+    /** Peaceful removes every hostile mob at once, like vanilla. */
+    public void removeHostile() {
+        mobs.removeIf(Mob::isHostile);
+    }
+
+    private boolean sunReaches(World world, Mob m) {
+        if (daylightFactor < 0.6f || raining || m.isInWater(world)) return false;
+        int x = (int) Math.floor(m.position.x), z = (int) Math.floor(m.position.z);
+        int headY = (int) Math.floor(m.position.y + m.getHeight() - 0.1f);
+        return world.getSkyLight(x, headY, z) >= 15;
+    }
     private java.util.function.Consumer<Mob.SoundEvent> soundSink = e -> {
     };
 
@@ -33,7 +59,7 @@ public class MobManager {
     /** Mobs farther than this from the player are not simulated (they simply wait). */
     public static final float SIMULATION_DISTANCE = 64f;
     public static final float CORPSE_SECONDS = 1.0f;
-    public static final float DESPAWN_DISTANCE = 96f;
+    public static final float DESPAWN_DISTANCE = 128f; // vanilla: beyond 128 blocks a mob despawns at once
 
     private final List<Mob> mobs = new ArrayList<>();
     private final List<Mob> view = Collections.unmodifiableList(mobs);
@@ -92,6 +118,7 @@ public class MobManager {
             Mob m = mobs.get(i);
             if (!chunkLoaded(world, m.position.x, m.position.z)) continue; // frozen
             if (m.isAlive() && m.position.distanceSquared(playerPos) > SIMULATION_DISTANCE * SIMULATION_DISTANCE) continue;
+            m.setSunlit(m.isAlive() && sunReaches(world, m));
             m.tick(world, candidates, dt);
             com.example.world.BlockType laid = m.isAlive() ? m.takeLaidItem() : null;
             if (laid != null) {
@@ -101,9 +128,12 @@ public class MobManager {
 
             if (!m.isAlive() && !deadHandled.contains(m)) {
                 deadHandled.add(m);
-                if (m.getLastDamageSource() == com.example.survival.DamageSource.PLAYER) pendingExperience += m.xpReward(random);
                 corpseTimers.put(m, CORPSE_SECONDS);
                 Vector3f at = new Vector3f(m.position.x, m.position.y + m.getHeight() * 0.5f, m.position.z);
+                if (m.getLastDamageSource() == com.example.survival.DamageSource.PLAYER) {
+                    if (xpOrbs != null) xpOrbs.spawn(m.xpReward(random), at, random);
+                    else pendingExperience += m.xpReward(random);
+                }
                 for (BlockDrops.Resolved d : m.getDrops(random)) {
                     items.spawn(d.item(), d.count(), at, random);
                 }
@@ -117,8 +147,18 @@ public class MobManager {
                 float left = corpseTimers.getOrDefault(m, 0f) - dt;
                 corpseTimers.put(m, left);
                 remove = left <= 0f;
-            } else if (!m.isPersistent() && m.position.distance(playerPos) > DESPAWN_DISTANCE) {
-                remove = true;
+            } else if (!m.isPersistent()) {
+                float dist = m.position.distance(playerPos);
+                if (dist > DESPAWN_DISTANCE) {
+                    remove = true;
+                } else if (dist > 32f) {
+                    // Vanilla: after 30 s without a player within 32 blocks, 1/800 per tick to despawn.
+                    m.farFromPlayerSeconds += dt;
+                    float perFrame = 1f - (float) Math.pow(1f - 1f / 800f, dt * 20f);
+                    remove = m.farFromPlayerSeconds > 30f && random.nextFloat() < perFrame;
+                } else {
+                    m.farFromPlayerSeconds = 0f;
+                }
             }
             if (remove) {
                 mobs.remove(i);

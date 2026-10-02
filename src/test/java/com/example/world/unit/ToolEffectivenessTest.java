@@ -74,7 +74,7 @@ class ToolEffectivenessTest {
 
     @Test
     void ungatedBlocksAreAlwaysHarvestableToolOrNot() {
-        for (BlockType b : new BlockType[]{BlockType.STONE, BlockType.DIRT, BlockType.OAK_LOG, BlockType.SAND}) {
+        for (BlockType b : new BlockType[]{BlockType.DIRT, BlockType.OAK_LOG, BlockType.SAND}) {
             assertTrue(ToolEffectiveness.canHarvest(null, b), b + " needs no tool at all");
             assertTrue(ToolEffectiveness.canHarvest(BlockType.WOODEN_AXE, b), b + " is harvestable with any (even wrong) tool");
         }

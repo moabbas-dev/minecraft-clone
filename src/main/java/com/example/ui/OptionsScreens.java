@@ -24,6 +24,9 @@ public final class OptionsScreens {
         /** null when no world is open (Options opened from the title screen). */
         public final Supplier<Difficulty> getDifficulty;
         public final Consumer<Difficulty> setDifficulty;
+        /** Difficulty lock (vanilla padlock next to the Difficulty button); null when no world is open. */
+        public java.util.function.BooleanSupplier isLocked;
+        public Runnable lock;
 
         public Context(GuiEnv env, Runnable onChanged, Runnable onClose, Supplier<Difficulty> getDifficulty,
                        Consumer<Difficulty> setDifficulty) {
@@ -147,10 +150,24 @@ public final class OptionsScreens {
                 ctx.onChanged.run();
             }));
             if (ctx.getDifficulty != null) {
-                widgets.add(new Button(right(), row(0), 150, 20, () -> "Difficulty: " + cap(ctx.getDifficulty.get()), () -> {
+                boolean locked = ctx.isLocked != null && ctx.isLocked.getAsBoolean();
+                Button diff = new Button(right(), row(0), 130, 20,
+                        () -> "Difficulty: " + ctx.getDifficulty.get().label(), () -> {
+                    ctx.setDifficulty.accept(ctx.getDifficulty.get().next());
+                });
+                diff.active = !locked;
+                widgets.add(diff);
+                // The padlock: locking is permanent for the world and asks first, like vanilla.
+                Button lockButton = new Button(right() + 130, row(0), 20, 20, locked ? "L" : "U", () -> {
                     Difficulty d = ctx.getDifficulty.get();
-                    ctx.setDifficulty.accept(Difficulty.values()[(d.ordinal() + 1) % Difficulty.values().length]);
-                }));
+                    openChild(new ConfirmScreen(ctx.env, "Lock Difficulty?",
+                            "Lock this world to " + d.label() + "? You will never be able to change it again!", "Lock", () -> {
+                        if (ctx.lock != null) ctx.lock.run();
+                        invalidate();
+                    }));
+                });
+                lockButton.active = !locked && ctx.lock != null;
+                widgets.add(lockButton);
             }
             inactive(left(), row(1), "Skin Customization...");
             link(right(), row(1), "Music & Sounds...", () -> new Sounds(ctx));
@@ -160,11 +177,6 @@ public final class OptionsScreens {
             inactive(right(), row(3), "Chat Settings...");
             inactive(left(), row(4), "Resource Packs...");
             inactive(right(), row(4), "Accessibility Settings...");
-        }
-
-        private static String cap(Enum<?> e) {
-            String s = e.name().toLowerCase();
-            return Character.toUpperCase(s.charAt(0)) + s.substring(1);
         }
     }
 
@@ -176,22 +188,46 @@ public final class OptionsScreens {
         @Override
         void build() {
             inactive(left(), row(0), "Graphics: Fancy");
-            widgets.add(new Slider(right(), row(0), 150, 20, (o.renderDistance - 2) / 10f,
-                    v -> "Render Distance: " + (2 + Math.round(v * 10)) + " chunks", v -> {
-                o.renderDistance = 2 + Math.round(v * 10);
+            widgets.add(new Slider(right(), row(0), 150, 20, (o.renderDistance - 2) / (float) (GameOptions.MAX_RENDER_DISTANCE - 2),
+                    v -> "Render Distance: " + (2 + Math.round(v * (GameOptions.MAX_RENDER_DISTANCE - 2))) + " chunks", v -> {
+                o.renderDistance = 2 + Math.round(v * (GameOptions.MAX_RENDER_DISTANCE - 2));
                 ctx.onChanged.run();
             }));
             inactive(left(), row(1), "Smooth Lighting: ON");
-            toggle(right(), row(1), "Use VSync", () -> o.vsync, b -> o.vsync = b);
-            toggle(left(), row(2), "View Bobbing", () -> o.viewBobbing, b -> o.viewBobbing = b);
-            widgets.add(new Button(right(), row(2), 150, 20, () -> "GUI Scale: " + guiScaleName(o.guiScale), () -> {
+            widgets.add(new Slider(right(), row(1), 150, 20, (o.maxFps - 10) / 250f,
+                    v -> "Max Framerate: " + GameOptions.fpsLabel(10 + Math.round(v * 25) * 10), v -> {
+                o.maxFps = 10 + Math.round(v * 25) * 10;
+                ctx.onChanged.run();
+            }));
+            toggle(left(), row(2), "Use VSync", () -> o.vsync, b -> o.vsync = b);
+            toggle(right(), row(2), "View Bobbing", () -> o.viewBobbing, b -> o.viewBobbing = b);
+            widgets.add(new Button(left(), row(3), 150, 20, () -> "GUI Scale: " + guiScaleName(o.guiScale), () -> {
                 o.guiScale = (o.guiScale + 1) % 5;
                 ctx.onChanged.run();
             }));
-            toggle(left(), row(3), "Fullscreen", () -> o.fullscreen, b -> o.fullscreen = b);
-            inactive(right(), row(3), "Clouds: Fancy");
-            inactive(left(), row(4), "Particles: All");
-            inactive(right(), row(4), "Mipmap Levels: 4");
+            widgets.add(new Button(right(), row(3), 150, 20, () -> "Attack Indicator: " + attackName(o.attackIndicator), () -> {
+                o.attackIndicator = (o.attackIndicator + 1) % 3;
+                ctx.onChanged.run();
+            }));
+            widgets.add(new Slider(left(), row(4), 150, 20, o.gamma, v -> "Brightness: " + GameOptions.gammaLabel(v), v -> {
+                o.gamma = v;
+                ctx.onChanged.run();
+            }));
+            toggle(right(), row(4), "Fullscreen", () -> o.fullscreen, b -> o.fullscreen = b);
+            widgets.add(new Slider(left(), row(5), 150, 20, o.fovEffectScale,
+                    v -> "FOV Effects: " + (v == 0f ? "Off" : Math.round(v * 100) + "%"), v -> {
+                o.fovEffectScale = v;
+                ctx.onChanged.run();
+            }));
+            inactive(right(), row(5), "Clouds: Fancy");
+        }
+
+        static String attackName(int v) {
+            return switch (v) {
+                case 0 -> "Off";
+                case 1 -> "Crosshair";
+                default -> "Hotbar";
+            };
         }
 
         static String guiScaleName(int s) {
@@ -214,7 +250,15 @@ public final class OptionsScreens {
         void build() {
             link(left(), row(0), "Mouse Settings...", () -> new Mouse(ctx));
             link(right(), row(0), "Key Binds...", () -> new KeyBinds(ctx));
-            inactive(left(), row(1), "Auto-Jump: OFF");
+            widgets.add(new Button(left(), row(1), 150, 20, () -> "Sneak: " + (o.toggleCrouch ? "Toggle" : "Hold"), () -> {
+                o.toggleCrouch = !o.toggleCrouch;
+                ctx.onChanged.run();
+            }));
+            widgets.add(new Button(right(), row(1), 150, 20, () -> "Sprint: " + (o.toggleSprint ? "Toggle" : "Hold"), () -> {
+                o.toggleSprint = !o.toggleSprint;
+                ctx.onChanged.run();
+            }));
+            toggle(left(), row(2), "Auto-Jump", () -> o.autoJump, b -> o.autoJump = b);
         }
     }
 
@@ -249,25 +293,30 @@ public final class OptionsScreens {
             }));
         }
 
+        /** A sound category nothing plays yet: shown in its vanilla slot, but inactive. */
+        private void unused(int x, int y, String name, float value) {
+            inactive(x, y, name + ": " + Math.round(value * 100) + "%");
+        }
+
         @Override
         void build() {
             volume(left(), row(0), 310, "Master Volume", () -> o.masterVolume, v -> o.masterVolume = v);
-            volume(left(), row(1) + 4, 150, "Blocks", () -> o.blocksVolume, v -> o.blocksVolume = v);
-            volume(right(), row(1) + 4, 150, "Players", () -> o.playersVolume, v -> o.playersVolume = v);
-            volume(left(), row(2) + 4, 150, "Ambient/Environment", () -> o.ambientVolume, v -> o.ambientVolume = v);
-            volume(right(), row(2) + 4, 150, "Weather", () -> o.weatherVolume, v -> o.weatherVolume = v);
+            unused(left(), row(1), "Music", o.musicVolume);
+            unused(right(), row(1), "Jukebox/Noteblocks", o.recordVolume);
+            volume(left(), row(2), 150, "Weather", () -> o.weatherVolume, v -> o.weatherVolume = v);
+            volume(right(), row(2), 150, "Blocks", () -> o.blocksVolume, v -> o.blocksVolume = v);
+            volume(left(), row(3), 150, "Hostile Creatures", () -> o.hostileVolume, v -> o.hostileVolume = v);
+            volume(right(), row(3), 150, "Friendly Creatures", () -> o.neutralVolume, v -> o.neutralVolume = v);
+            volume(left(), row(4), 150, "Players", () -> o.playersVolume, v -> o.playersVolume = v);
+            volume(right(), row(4), 150, "Ambient/Environment", () -> o.ambientVolume, v -> o.ambientVolume = v);
+            unused(left(), row(5), "Voice/Speech", o.voiceVolume);
         }
     }
 
-    /** Read-only list of the game's fixed key bindings (rebinding is not supported). */
+    /** Vanilla key rebinding: click a binding, press a key or mouse button (Esc unbinds); duplicates show red. */
     private static final class KeyBinds extends Page {
-        private static final String[][] BINDS = {
-                {"Move Forward", "W"}, {"Move Backward", "S"}, {"Strafe Left", "A"}, {"Strafe Right", "D"},
-                {"Jump / Swim Up", "Space"}, {"Sneak / Swim Down", "Left Shift"}, {"Sprint", "Left Ctrl"},
-                {"Toggle Flying", "2x Space"}, {"Attack / Destroy", "Left Button"}, {"Use Item / Place Block", "Right Button"},
-                {"Open Inventory", "E"}, {"Hotbar Slots 1-9", "1 - 9"}, {"Debug Overlay", "F3"}, {"Game Menu", "Escape"},
-        };
         private float scroll;
+        private KeyBindings.Bind waiting;
 
         KeyBinds(Context ctx) {
             super(ctx, "Key Binds");
@@ -277,25 +326,70 @@ public final class OptionsScreens {
         void build() {
         }
 
+        private int maxScroll() {
+            return Math.max(0, KeyBindings.Bind.values().length * 24 - (guiH - 80));
+        }
+
         @Override
         protected void init() {
-            widgets.add(new Button(guiW / 2 - 100, guiH - 28, 200, 20, "Done", this::done));
+            KeyBindings.Bind[] binds = KeyBindings.Bind.values();
+            for (int i = 0; i < binds.length; i++) {
+                KeyBindings.Bind b = binds[i];
+                int y = 36 + i * 24 - Math.round(scroll);
+                if (y < 30 || y > guiH - 56) continue;
+                widgets.add(new Button(guiW / 2 - 5, y, 95, 20, () -> keyLabel(b), () -> waiting = b));
+                widgets.add(new Button(guiW / 2 + 95, y, 50, 20, "Reset", () -> {
+                    o.keys.set(b, b.defaultCode);
+                    ctx.onChanged.run();
+                }));
+            }
+            widgets.add(new Button(guiW / 2 - 155, guiH - 28, 150, 20, "Reset Keys", () -> {
+                o.keys.reset();
+                ctx.onChanged.run();
+            }));
+            widgets.add(new Button(guiW / 2 + 5, guiH - 28, 150, 20, "Done", this::done));
+        }
+
+        private String keyLabel(KeyBindings.Bind b) {
+            String n = KeyBindings.displayName(o.keys.get(b));
+            if (waiting == b) return "> " + n + " <";
+            return o.keys.conflicts(b) ? "[ " + n + " ]" : n;
+        }
+
+        @Override
+        protected void tick(float dt, com.example.engine.Input input) {
+            if (waiting == null) return;
+            int key = input.consumeAnyKeyPressed();
+            int mouse = input.consumeAnyMousePressed();
+            int code = Integer.MIN_VALUE;
+            if (key == org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE) code = KeyBindings.UNBOUND;
+            else if (key >= 0 && KeyBindings.isBindable(key)) code = key;
+            else if (mouse >= 0 && KeyBindings.isBindable(KeyBindings.MOUSE_BASE + mouse)) code = KeyBindings.MOUSE_BASE + mouse;
+            if (code != Integer.MIN_VALUE) {
+                o.keys.set(waiting, code);
+                waiting = null;
+                ctx.onChanged.run();
+            }
+        }
+
+        @Override
+        protected void onEscape() {
+            if (waiting == null) super.onEscape();
         }
 
         @Override
         protected void onScroll(double delta) {
-            scroll = Math.max(0, Math.min(scroll - (float) delta * 20f, Math.max(0, BINDS.length * 24 - (guiH - 80))));
+            scroll = Math.max(0, Math.min(scroll - (float) delta * 20f, maxScroll()));
+            invalidate();
         }
 
         @Override
         protected void drawContent(GuiContext g) {
-            g.textCentered(title, g.w / 2f, 15, 0xFFFFFF);
-            for (int i = 0; i < BINDS.length; i++) {
-                float y = 36 + i * 24 - scroll;
-                if (y < 30 || y > g.h - 52) continue;
-                g.text(BINDS[i][0], g.w / 2f - 155, y + 6, 0xFFFFFF);
-                Button.drawFrame(g, g.w / 2f + 55, y, 100, 20, Button.DISABLED_FILL, false);
-                g.textCentered(BINDS[i][1], g.w / 2f + 105, y + 6, 0xA0A0A0);
+            KeyBindings.Bind[] binds = KeyBindings.Bind.values();
+            for (int i = 0; i < binds.length; i++) {
+                float y = 36 + i * 24 - Math.round(scroll);
+                if (y < 30 || y > g.h - 56) continue;
+                g.text(binds[i].label, g.w / 2f - 155, y + 6, o.keys.conflicts(binds[i]) ? 0xFF5555 : 0xFFFFFF);
             }
             g.dirtStrip(0, g.h - 40, g.w, 40);
             g.dirtStrip(0, 0, g.w, 30);

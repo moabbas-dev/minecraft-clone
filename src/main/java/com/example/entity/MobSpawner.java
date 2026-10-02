@@ -40,7 +40,7 @@ public class MobSpawner {
      *                        scaled by it so "dark" means the right thing at night outdoors. */
     public void tick(World world, MobManager mobs, Vector3f playerPos, float daylightFactor,
                      Supplier<Difficulty> difficulty, Random random, float dt) {
-        if (!enabled) return;
+        if (!enabled || difficulty.get() == Difficulty.PEACEFUL) return;
         timer -= dt;
         if (timer > 0f) return;
         timer = ATTEMPT_INTERVAL_SECONDS;
@@ -55,7 +55,8 @@ public class MobSpawner {
         if (!isValidSpawn(world, x, y, z, playerPos, daylightFactor)) return;
 
         Vector3f at = new Vector3f(x + 0.5f, y, z + 0.5f);
-        mobs.spawn(new Zombie(at, random.nextFloat() * (float) (Math.PI * 2), difficulty));
+        boolean baby = random.nextFloat() < 0.05f; // vanilla: 5% of zombies are babies
+        mobs.spawn(new Zombie(at, random.nextFloat() * (float) (Math.PI * 2), difficulty, baby));
     }
 
     /** Standable Y near the player's own height (bounded vertical scan, not the whole column). */
@@ -85,7 +86,7 @@ public class MobSpawner {
         float dx = x + 0.5f - playerPos.x, dz = z + 0.5f - playerPos.z;
         if (dx * dx + dz * dz < MIN_DISTANCE * MIN_DISTANCE) return false; // never on top of the player
         int sky = Math.round(world.getSkyLight(x, y, z) * daylightFactor);
-        int light = Math.max(sky, world.getBlockLight(x, y, z));
-        return light <= MAX_SPAWN_LIGHT;
+        // Vanilla 1.18+: block light must be 0 and sky light at most 7.
+        return world.getBlockLight(x, y, z) == 0 && sky <= MAX_SPAWN_LIGHT;
     }
 }

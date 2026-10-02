@@ -23,7 +23,9 @@ class BlockDropsTest {
 
     @Test
     void stoneDropsCobblestoneAndGrassDropsDirt() {
-        assertEquals(List.of(new BlockDrops.Resolved(BlockType.COBBLESTONE, 1)), roll(BlockType.STONE));
+        assertEquals(List.of(), roll(BlockType.STONE), "vanilla: stone needs a pickaxe to drop anything");
+        assertEquals(List.of(new BlockDrops.Resolved(BlockType.COBBLESTONE, 1)),
+                BlockDrops.resolve(BlockType.STONE, new Random(1), BlockType.WOODEN_PICKAXE));
         assertEquals(List.of(new BlockDrops.Resolved(BlockType.DIRT, 1)), roll(BlockType.GRASS_BLOCK));
     }
 
@@ -108,7 +110,58 @@ class BlockDropsTest {
 
     @Test
     void anUngatedBlockDropsTheSameWayRegardlessOfTheHeldTool() {
-        assertEquals(BlockDrops.resolve(BlockType.STONE, new Random(1), null),
-                BlockDrops.resolve(BlockType.STONE, new Random(1), BlockType.WOODEN_PICKAXE));
+        assertEquals(BlockDrops.resolve(BlockType.DIRT, new Random(1), null),
+                BlockDrops.resolve(BlockType.DIRT, new Random(1), BlockType.WOODEN_PICKAXE));
+    }
+
+    @Test
+    void leavesRollSaplingStickAndAppleIndependentlyAtVanillaChances() {
+        Random r = new Random(5);
+        int saplings = 0, sticks = 0, apples = 0, n = 200000;
+        for (int i = 0; i < n; i++) {
+            for (BlockDrops.Resolved d : BlockDrops.resolve(BlockType.OAK_LEAVES, r)) {
+                if (d.item() == BlockType.OAK_SAPLING_STAGE_0) saplings++;
+                if (d.item() == BlockType.STICK) sticks += d.count();
+                if (d.item() == BlockType.APPLE) apples++;
+            }
+        }
+        assertEquals(0.05, saplings / (double) n, 0.003);
+        assertEquals(0.02 * 1.5, sticks / (double) n, 0.004, "2% x 1-2 sticks");
+        assertEquals(0.005, apples / (double) n, 0.0012);
+        for (BlockDrops.Resolved d : BlockDrops.resolve(BlockType.BIRCH_LEAVES, new Random(1))) assertNotEquals(BlockType.APPLE, d.item());
+    }
+
+    @Test
+    void gravelDropsFlintTenPercentOfTheTimeElseItself() {
+        Random r = new Random(9);
+        int flint = 0, n = 50000;
+        for (int i = 0; i < n; i++) {
+            List<BlockDrops.Resolved> d = BlockDrops.resolve(BlockType.GRAVEL, r);
+            assertEquals(1, d.size());
+            if (d.get(0).item() == BlockType.FLINT) flint++;
+            else assertEquals(BlockType.GRAVEL, d.get(0).item());
+        }
+        assertEquals(0.1, flint / (double) n, 0.01);
+    }
+
+    @Test
+    void itemDropsMatchVanilla() {
+        assertEquals(List.of(new BlockDrops.Resolved(BlockType.CLAY_BALL, 4)), roll(BlockType.CLAY));
+        assertEquals(List.of(new BlockDrops.Resolved(BlockType.BOOK, 3)), roll(BlockType.BOOKSHELF));
+        assertEquals(List.of(), roll(BlockType.SNOW_BLOCK), "snowballs need a shovel");
+        assertEquals(List.of(new BlockDrops.Resolved(BlockType.SNOWBALL, 4)),
+                BlockDrops.resolve(BlockType.SNOW_BLOCK, new Random(1), BlockType.WOODEN_SHOVEL));
+        int dust = BlockDrops.resolve(BlockType.GLOWSTONE, new Random(2)).get(0).count();
+        assertTrue(dust >= 2 && dust <= 4);
+    }
+
+    @Test
+    void harvestTiersFollowVanilla() {
+        assertTrue(com.example.world.ToolEffectiveness.canHarvest(BlockType.IRON_PICKAXE, BlockType.GOLD_ORE));
+        assertFalse(com.example.world.ToolEffectiveness.canHarvest(BlockType.STONE_PICKAXE, BlockType.GOLD_ORE));
+        assertFalse(com.example.world.ToolEffectiveness.canHarvest(BlockType.IRON_PICKAXE, BlockType.OBSIDIAN));
+        assertTrue(com.example.world.ToolEffectiveness.canHarvest(BlockType.DIAMOND_PICKAXE, BlockType.OBSIDIAN));
+        assertEquals(7.5f, com.example.world.ToolEffectiveness.breakSeconds(null, BlockType.STONE), 1e-4f, "1.5 hardness x 5 by hand");
+        assertEquals(1.5f * 1.5f / 2f, com.example.world.ToolEffectiveness.breakSeconds(BlockType.WOODEN_PICKAXE, BlockType.STONE), 1e-4f);
     }
 }

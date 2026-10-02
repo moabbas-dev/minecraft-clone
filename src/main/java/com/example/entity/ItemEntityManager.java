@@ -97,6 +97,26 @@ public class ItemEntityManager {
         }
     }
 
+    /** Seconds before a player-thrown item can be picked up again (vanilla: 40 ticks). */
+    public static final float THROWN_PICKUP_DELAY_SECONDS = 2f;
+
+    /** Vanilla Q-toss velocity in blocks/second: along the view direction at 0.3 b/tick, +0.1 up, with a little scatter. */
+    public static Vector3f throwVelocity(Vector3f front, Random random) {
+        float k = random.nextFloat() * (float) (Math.PI * 2), l = random.nextFloat() * 0.02f;
+        return new Vector3f(front.x * 0.3f + l * (float) Math.cos(k), front.y * 0.3f + 0.1f + 0.1f * (random.nextFloat() - random.nextFloat()),
+                front.z * 0.3f + l * (float) Math.sin(k)).mul(20f);
+    }
+
+    /** Throws a stack from {@code from} (eye height) along {@code front}; it cannot be picked up for 2 seconds. */
+    public void throwItem(BlockType type, int count, int damage, Vector3f from, Vector3f front, Random random) {
+        if (type == null || type == BlockType.AIR || count <= 0) return;
+        ItemEntity e = new ItemEntity(type, count, THROWN_PICKUP_DELAY_SECONDS, damage);
+        e.position.set(from.x, from.y - HEIGHT / 2f, from.z);
+        e.velocity.set(throwVelocity(front, random));
+        if (entities.size() >= MAX_ENTITIES) entities.remove(0);
+        entities.add(e);
+    }
+
     public void update(World world, float dt) {
         for (int i = 0; i < entities.size(); i++) {
             ItemEntity e = entities.get(i);

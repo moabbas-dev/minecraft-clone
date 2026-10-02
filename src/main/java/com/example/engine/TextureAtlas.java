@@ -65,7 +65,8 @@ public class TextureAtlas {
             Tile.POTATO, Tile.BAKED_POTATO, Tile.KELP, Tile.DRIED_KELP,
             Tile.ROTTEN_FLESH,
             Tile.WOODEN_SWORD, Tile.STONE_SWORD, Tile.IRON_SWORD, Tile.LEATHER, Tile.FEATHER, Tile.EGG, Tile.LEATHER_HELMET, Tile.LEATHER_CHESTPLATE, Tile.LEATHER_LEGGINGS, Tile.LEATHER_BOOTS, Tile.IRON_HELMET, Tile.IRON_CHESTPLATE, Tile.IRON_LEGGINGS, Tile.IRON_BOOTS, Tile.GOLD_HELMET, Tile.GOLD_CHESTPLATE, Tile.GOLD_LEGGINGS, Tile.GOLD_BOOTS,
-            Tile.DIAMOND, Tile.DIAMOND_SWORD, Tile.DIAMOND_AXE, Tile.DIAMOND_PICKAXE, Tile.DIAMOND_SHOVEL, Tile.DIAMOND_HELMET, Tile.DIAMOND_CHESTPLATE, Tile.DIAMOND_LEGGINGS, Tile.DIAMOND_BOOTS);
+            Tile.DIAMOND, Tile.DIAMOND_SWORD, Tile.DIAMOND_AXE, Tile.DIAMOND_PICKAXE, Tile.DIAMOND_SHOVEL, Tile.DIAMOND_HELMET, Tile.DIAMOND_CHESTPLATE, Tile.DIAMOND_LEGGINGS, Tile.DIAMOND_BOOTS,
+            Tile.FLINT, Tile.CLAY_BALL, Tile.SNOWBALL, Tile.GLOWSTONE_DUST, Tile.BOOK);
 
     static {
         REAL_TEXTURE_PATHS.put(Tile.STONE, "textures/block/stone.png");
@@ -156,6 +157,11 @@ public class TextureAtlas {
         REAL_TEXTURE_PATHS.put(Tile.GOLD_CHESTPLATE, "textures/item/golden_chestplate.png");
         REAL_TEXTURE_PATHS.put(Tile.GOLD_LEGGINGS, "textures/item/golden_leggings.png");
         REAL_TEXTURE_PATHS.put(Tile.GOLD_BOOTS, "textures/item/golden_boots.png");
+        REAL_TEXTURE_PATHS.put(Tile.FLINT, "textures/item/flint.png");
+        REAL_TEXTURE_PATHS.put(Tile.CLAY_BALL, "textures/item/clay_ball.png");
+        REAL_TEXTURE_PATHS.put(Tile.SNOWBALL, "textures/item/snowball.png");
+        REAL_TEXTURE_PATHS.put(Tile.GLOWSTONE_DUST, "textures/item/glowstone_dust.png");
+        REAL_TEXTURE_PATHS.put(Tile.BOOK, "textures/item/book.png");
         REAL_TEXTURE_PATHS.put(Tile.DIAMOND, "textures/item/diamond.png");
         REAL_TEXTURE_PATHS.put(Tile.DIAMOND_SWORD, "textures/item/diamond_sword.png");
         REAL_TEXTURE_PATHS.put(Tile.DIAMOND_AXE, "textures/item/diamond_axe.png");
@@ -508,6 +514,11 @@ public class TextureAtlas {
             case DIAMOND_PICKAXE -> pickaxeIcon(img, rnd, new Color(110, 235, 220));
             case DIAMOND_SHOVEL -> shovelIcon(img, rnd, new Color(110, 235, 220));
             case DIAMOND_HELMET, DIAMOND_CHESTPLATE, DIAMOND_LEGGINGS, DIAMOND_BOOTS -> blockyIcon(img, rnd, new Color(110, 235, 220));
+            case FLINT -> blockyIcon(img, rnd, new Color(70, 70, 75));
+            case CLAY_BALL -> potatoIcon(img, rnd, new Color(160, 166, 180));
+            case SNOWBALL -> potatoIcon(img, rnd, new Color(245, 250, 250));
+            case GLOWSTONE_DUST -> blockyIcon(img, rnd, new Color(255, 210, 90));
+            case BOOK -> blockyIcon(img, rnd, new Color(140, 85, 45));
             case PIG_SKIN -> noisyFill(img, rnd, new Color(236, 160, 160), 10);
             case COW_SKIN -> speckledNoise(img, rnd, new Color(98, 66, 40), new Color[]{new Color(235, 235, 235), new Color(60, 40, 25)}, 55);
             case CHICKEN_SKIN -> noisyFill(img, rnd, new Color(240, 240, 240), 8);
