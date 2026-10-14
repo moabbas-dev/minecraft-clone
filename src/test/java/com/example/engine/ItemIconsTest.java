@@ -73,8 +73,16 @@ class ItemIconsTest {
 
     @Test
     void nonItemTilesAreNotHandled() {
-        for (Tile t : new Tile[]{Tile.STONE, Tile.GRASS_TOP, Tile.WATER, Tile.SUN, Tile.OAK_SAPLING, Tile.SKIN, Tile.ZOMBIE_SKIN, Tile.CHEST}) {
+        for (Tile t : new Tile[]{Tile.STONE, Tile.GRASS_TOP, Tile.WATER, Tile.SUN, Tile.SKIN, Tile.ZOMBIE_SKIN, Tile.CHEST}) {
             assertNull(ItemIcons.draw(t), t.name());
         }
+    }
+
+    @Test
+    void theSaplingIsACutoutSpriteNotAFilledSquare() {
+        BufferedImage s = ItemIcons.draw(Tile.OAK_SAPLING);
+        assertNotNull(s);
+        assertTrue(!visible(s, 0, 0) && !visible(s, 15, 0) && !visible(s, 0, 15) && !visible(s, 15, 15));
+        assertTrue(visible(s, 8, 14), "the trunk reaches the bottom");
     }
 }

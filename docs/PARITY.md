@@ -81,59 +81,59 @@ Columns: stack size, durability, mining/drop result, icon. Icon status refers to
 
 | Item | Kind | Stack | Dur. | Hardness / mining / drop | Icon | Status | Notes / commit |
 |---|---|---:|---:|---|---|---|---|
-| Stone (`STONE`) | block | 64 |  | 1.5 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Grass Block (`GRASS_BLOCK`) | block | 64 |  | 0.6 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Dirt (`DIRT`) | block | 64 |  | 0.5 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Cobblestone (`COBBLESTONE`) | block | 64 |  | 2 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Oak Wood Planks (`OAK_PLANKS`) | block | 64 |  | 2 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Bedrock (`BEDROCK`) | block | 64 |  | -1 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Water (`WATER`) | block | 64 |  | -1 [U] | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Sand (`SAND`) | block | 64 |  | 0.5 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Gravel (`GRAVEL`) | block | 64 |  | 0.6 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Gold Ore (`GOLD_ORE`) | block | 64 |  | 3 ok | wrong: noise fill, no vanilla pattern | [ ] | drops raw item (G1) |
-| Iron Ore (`IRON_ORE`) | block | 64 |  | 3 ok | wrong: noise fill, no vanilla pattern | [ ] | drops raw item (G1) |
-| Coal Ore (`COAL_ORE`) | block | 64 |  | 3 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Oak Wood (`OAK_LOG`) | block | 64 |  | 2 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Oak Leaves (`OAK_LEAVES`) | block | 64 |  | 0.2 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Glass (`GLASS`) | block | 64 |  | 0.3 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Sandstone (`SANDSTONE`) | block | 64 |  | 0.8 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Block of Gold (`GOLD_BLOCK`) | block | 64 |  | 3 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Block of Iron (`IRON_BLOCK`) | block | 64 |  | 5 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Bricks (`BRICKS`) | block | 64 |  | 2 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
-| TNT (`TNT`) | block | 64 |  | 0 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Bookshelf (`BOOKSHELF`) | block | 64 |  | 1.5 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Mossy Cobblestone (`MOSSY_COBBLESTONE`) | block | 64 |  | 2 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Obsidian (`OBSIDIAN`) | block | 64 |  | 50 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Chest (`CHEST`) | block | 64 |  | 2.5 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Diamond Ore (`DIAMOND_ORE`) | block | 64 |  | 3 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Block of Diamond (`DIAMOND_BLOCK`) | block | 64 |  | 5 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Crafting Table (`CRAFTING_TABLE`) | block | 64 |  | 2.5 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Furnace (`FURNACE`) | block | 64 |  | 3.5 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Ice (`ICE`) | block | 64 |  | 0.5 [U] | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Snow Block (`SNOW_BLOCK`) | block | 64 |  | 0.2 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Clay (`CLAY`) | block | 64 |  | 0.6 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Pumpkin (`PUMPKIN`) | block | 64 |  | 1 ok | wrong: noise fill, no vanilla pattern | [ ] | axe is the fast tool (G1) |
-| Netherrack (`NETHERRACK`) | block | 64 |  | 0.4 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Glowstone (`GLOWSTONE`) | block | 64 |  | 0.3 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Terracotta (`TERRACOTTA`) | block | 64 |  | 1.25 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Red Sand (`RED_SAND`) | block | 64 |  | 0.5 [U] | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Birch Wood (`BIRCH_LOG`) | block | 64 |  | 2 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Birch Leaves (`BIRCH_LEAVES`) | block | 64 |  | 0.2 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Spruce Wood (`SPRUCE_LOG`) | block | 64 |  | 2 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Spruce Leaves (`SPRUCE_LEAVES`) | block | 64 |  | 0.2 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Jungle Wood (`JUNGLE_LOG`) | block | 64 |  | 2 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Jungle Leaves (`JUNGLE_LEAVES`) | block | 64 |  | 0.2 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Acacia Wood (`ACACIA_LOG`) | block | 64 |  | 2 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Acacia Leaves (`ACACIA_LEAVES`) | block | 64 |  | 0.2 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Mangrove Wood (`MANGROVE_LOG`) | block | 64 |  | 2 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Mangrove Leaves (`MANGROVE_LEAVES`) | block | 64 |  | 0.2 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Dark Oak Wood (`DARK_OAK_LOG`) | block | 64 |  | 2 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Dark Oak Leaves (`DARK_OAK_LEAVES`) | block | 64 |  | 0.2 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Cherry Wood (`CHERRY_LOG`) | block | 64 |  | 2 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Cherry Leaves (`CHERRY_LEAVES`) | block | 64 |  | 0.2 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Mud (`MUD`) | block | 64 |  | 0.5 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Mangrove Roots (`MANGROVE_ROOTS`) | block | 64 |  | 0.7 [U] | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Oak Sapling (`OAK_SAPLING_STAGE_0`) | block | 64 |  | 0 [U] | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Stone (`STONE`) | block | 64 | | 1.5 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Grass Block (`GRASS_BLOCK`) | block | 64 | | 0.6 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Dirt (`DIRT`) | block | 64 | | 0.5 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Cobblestone (`COBBLESTONE`) | block | 64 | | 2 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Oak Wood Planks (`OAK_PLANKS`) | block | 64 | | 2 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Bedrock (`BEDROCK`) | block | 64 | | -1 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Water (`WATER`) | block | 64 | | -1 [U] | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Sand (`SAND`) | block | 64 | | 0.5 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Gravel (`GRAVEL`) | block | 64 | | 0.6 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Gold Ore (`GOLD_ORE`) | block | 64 | | 3 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. drops raw item (G1) |
+| Iron Ore (`IRON_ORE`) | block | 64 | | 3 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. drops raw item (G1) |
+| Coal Ore (`COAL_ORE`) | block | 64 | | 3 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Oak Wood (`OAK_LOG`) | block | 64 | | 2 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Oak Leaves (`OAK_LEAVES`) | block | 64 | | 0.2 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Glass (`GLASS`) | block | 64 | | 0.3 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Sandstone (`SANDSTONE`) | block | 64 | | 0.8 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Block of Gold (`GOLD_BLOCK`) | block | 64 | | 3 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Block of Iron (`IRON_BLOCK`) | block | 64 | | 5 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Bricks (`BRICKS`) | block | 64 | | 2 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| TNT (`TNT`) | block | 64 | | 0 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Bookshelf (`BOOKSHELF`) | block | 64 | | 1.5 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Mossy Cobblestone (`MOSSY_COBBLESTONE`) | block | 64 | | 2 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Obsidian (`OBSIDIAN`) | block | 64 | | 50 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Chest (`CHEST`) | block | 64 | | 2.5 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Diamond Ore (`DIAMOND_ORE`) | block | 64 | | 3 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Block of Diamond (`DIAMOND_BLOCK`) | block | 64 | | 5 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Crafting Table (`CRAFTING_TABLE`) | block | 64 | | 2.5 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Furnace (`FURNACE`) | block | 64 | | 3.5 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Ice (`ICE`) | block | 64 | | 0.5 [U] | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Snow Block (`SNOW_BLOCK`) | block | 64 | | 0.2 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Clay (`CLAY`) | block | 64 | | 0.6 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Pumpkin (`PUMPKIN`) | block | 64 | | 1 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. axe is the fast tool (G1) |
+| Netherrack (`NETHERRACK`) | block | 64 | | 0.4 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Glowstone (`GLOWSTONE`) | block | 64 | | 0.3 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Terracotta (`TERRACOTTA`) | block | 64 | | 1.25 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Red Sand (`RED_SAND`) | block | 64 | | 0.5 [U] | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Birch Wood (`BIRCH_LOG`) | block | 64 | | 2 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Birch Leaves (`BIRCH_LEAVES`) | block | 64 | | 0.2 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Spruce Wood (`SPRUCE_LOG`) | block | 64 | | 2 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Spruce Leaves (`SPRUCE_LEAVES`) | block | 64 | | 0.2 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Jungle Wood (`JUNGLE_LOG`) | block | 64 | | 2 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Jungle Leaves (`JUNGLE_LEAVES`) | block | 64 | | 0.2 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Acacia Wood (`ACACIA_LOG`) | block | 64 | | 2 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Acacia Leaves (`ACACIA_LEAVES`) | block | 64 | | 0.2 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Mangrove Wood (`MANGROVE_LOG`) | block | 64 | | 2 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Mangrove Leaves (`MANGROVE_LEAVES`) | block | 64 | | 0.2 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Dark Oak Wood (`DARK_OAK_LOG`) | block | 64 | | 2 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Dark Oak Leaves (`DARK_OAK_LEAVES`) | block | 64 | | 0.2 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Cherry Wood (`CHERRY_LOG`) | block | 64 | | 2 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Cherry Leaves (`CHERRY_LEAVES`) | block | 64 | | 0.2 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Mud (`MUD`) | block | 64 | | 0.5 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Mangrove Roots (`MANGROVE_ROOTS`) | block | 64 | | 0.7 [U] | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Oak Sapling (`OAK_SAPLING_STAGE_0`) | block | 64 | | 0 [U] | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
 | Stick (`STICK`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
 | Wooden Pickaxe (`WOODEN_PICKAXE`) | item | 1 | 59 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
 | Stone Pickaxe (`STONE_PICKAXE`) | item | 1 | 131 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
@@ -147,10 +147,10 @@ Columns: stack size, durability, mining/drop result, icon. Icon status refers to
 | Apple (`APPLE`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
 | Bread (`BREAD`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
 | Cooked Beef (`COOKED_BEEF`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Blast Furnace (`BLAST_FURNACE`) | block | 64 |  | 3.5 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Smoker (`SMOKER`) | block | 64 |  | 3.5 [U] | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Copper Ore (`COPPER_ORE`) | block | 64 |  | 3 [U] | wrong: noise fill, no vanilla pattern | [ ] | drops raw item (G1) |
-| Smooth Stone (`SMOOTH_STONE`) | block | 64 |  | 2 [U] | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Blast Furnace (`BLAST_FURNACE`) | block | 64 | | 3.5 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Smoker (`SMOKER`) | block | 64 | | 3.5 [U] | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
+| Copper Ore (`COPPER_ORE`) | block | 64 | | 3 [U] | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. drops raw item (G1) |
+| Smooth Stone (`SMOOTH_STONE`) | block | 64 | | 2 [U] | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
 | Coal (`COAL`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
 | Charcoal (`CHARCOAL`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
 | Iron Ingot (`IRON_INGOT`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |

@@ -657,6 +657,25 @@ public final class ItemIcons {
         return g.image();
     }
 
+    private static BufferedImage sapling() {
+        Canvas g = new Canvas();
+        int leaf = c(62, 142, 38);
+        g.line(8, 15, 8, 9, c(104, 74, 40));
+        g.line(9, 15, 9, 11, c(80, 56, 30));
+        g.ellipse(8, 6, 3.8, 3.2, leaf);
+        g.ellipse(4.6, 9.4, 2.8, 2.2, leaf);
+        g.ellipse(11.6, 9.0, 2.8, 2.2, leaf);
+        g.set(6, 4, c(130, 210, 84));
+        g.set(7, 4, c(130, 210, 84));
+        g.set(4, 8, c(110, 190, 70));
+        g.set(10, 7, c(110, 190, 70));
+        g.set(9, 8, c(36, 100, 26));
+        g.set(5, 10, c(36, 100, 26));
+        g.set(12, 10, c(36, 100, 26));
+        g.outline(c(24, 56, 20));
+        return g.image();
+    }
+
     private static BufferedImage spiderEye() {
         Canvas g = new Canvas();
         g.ellipse(8, 8, 5, 5, c(164, 36, 52));
@@ -757,6 +776,7 @@ public final class ItemIcons {
             case ARROW -> arrow();
             case STRING -> string();
             case SPIDER_EYE -> spiderEye();
+            case OAK_SAPLING -> sapling();
             default -> null;
         };
     }
