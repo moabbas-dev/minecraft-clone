@@ -84,8 +84,10 @@ class CookingLayoutTest {
         check(layout, p, Inventory.HOTBAR_SIZE, 8, 84);
         check(layout, p, 0, 8, 142);
         InventoryLayout.Rect arrow = layout.arrow(), flame = layout.flame();
-        assertEquals(p.x() + 79 * 3f, arrow.x(), 0.01f);
-        assertEquals(p.y() + 34 * 3f, arrow.y(), 0.01f);
+        assertEquals(p.x() + 80 * 3f, arrow.x(), 0.01f);
+        assertEquals(p.y() + 35 * 3f, arrow.y(), 0.01f);
+        assertEquals(22 * 3f, arrow.w(), 0.01f);
+        assertEquals(15 * 3f, arrow.h(), 0.01f);
         assertEquals(p.x() + 56 * 3f, flame.x(), 0.01f);
         assertEquals(p.y() + 36 * 3f, flame.y(), 0.01f);
     }

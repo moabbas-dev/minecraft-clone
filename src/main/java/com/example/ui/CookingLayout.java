@@ -55,9 +55,9 @@ public final class CookingLayout {
         return top + 72 * s;
     }
 
-    /** The 24 x 17 progress arrow. */
+    /** The 22 x 15 progress arrow at (80,35) (measured from the real furnace screen). */
     public InventoryLayout.Rect arrow() {
-        return new InventoryLayout.Rect(left + 79 * s, top + 34 * s, 24 * s, 17 * s);
+        return new InventoryLayout.Rect(left + 80 * s, top + 35 * s, 22 * s, 15 * s);
     }
 
     /** The 14 x 14 area of the flame icon. */

@@ -118,8 +118,10 @@ public class CookingStationState {
             }
             // Burning but nothing valid to cook right now: the fuel still burns down (it was
             // already committed), progress simply doesn't advance - matches real vanilla.
-        } else {
-            cookProgressTicks = 0; // the fire went out - progress resets, same as vanilla
+        } else if (cookProgressTicks > 0) {
+            // Vanilla: with the fire out, progress on the current item drains at two ticks per tick (it is not lost at once),
+            // so refuelling quickly keeps most of it (docs/vanilla-rules.md 2.1, minecraft.wiki Smelting).
+            cookProgressTicks = Math.max(0, cookProgressTicks - 2);
         }
     }
 

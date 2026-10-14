@@ -60,23 +60,34 @@ public final class GuiPainter {
     }
 
     /**
-     * A right-pointing arrow of {@code w x h} GUI pixels, grey, with the left {@code progress} fraction filled white.
+     * Pixel extent of row {@code row} of the arrow, as {x start, x end exclusive}: a 3-px shaft in the middle and a
+     * triangular head whose base is a full column {@code h} tall and which narrows by 1 px per row to a tip
+     * {@code (h+1)/2} px long. Measured from the real furnace / crafting-table / inventory screens: 22x15 (shaft 14),
+     * 22x15, and 16x13 (shaft 9).
+     */
+    static int[] arrowRow(int w, int h, int row) {
+        int headW = (h + 1) / 2;
+        int shaftLen = w - headW;
+        int mid = (h - 1) / 2;
+        int dy = Math.abs(row - mid);
+        int end = shaftLen + headW - dy;
+        int start = dy <= 1 ? 0 : shaftLen;
+        return new int[]{start, end};
+    }
+
+    /**
+     * A right-pointing arrow filling the rect (see {@link #arrowRow}), grey, with the left {@code progress} fraction white.
      */
     public static void arrow(UiRenderer ui, InventoryLayout.Rect r, float s, float progress) {
         int w = Math.round(r.w() / s), h = Math.round(r.h() / s);
-        int headLen = Math.max(4, h / 2 + 1);
-        int shaftEnd = w - headLen;
-        float mid = (h - 1) / 2f;
+        float filledUntil = Math.max(0f, Math.min(1f, progress)) * w;
         for (int row = 0; row < h; row++) {
-            float dy = Math.abs(row - mid);
-            int shaftHalf = Math.max(1, h / 6);
-            int end = dy <= shaftHalf ? w : shaftEnd + Math.round((1 - dy / (mid + 0.5f)) * headLen);
-            int x0 = 0;
-            while (x0 < end) {
-                float filledUntil = progress * w;
+            int[] ext = arrowRow(w, h, row);
+            int x0 = ext[0];
+            while (x0 < ext[1]) {
                 boolean filled = x0 + 0.5f < filledUntil;
                 int x1 = x0;
-                while (x1 < end && ((x1 + 0.5f < filledUntil) == filled)) x1++;
+                while (x1 < ext[1] && ((x1 + 0.5f < filledUntil) == filled)) x1++;
                 quad(ui, r.x() + x0 * s, r.y() + row * s, (x1 - x0) * s, s, filled ? 0xFFFFFF : 0x8B8B8B, 1f);
                 x0 = x1;
             }
@@ -108,12 +119,12 @@ public final class GuiPainter {
             for (int x = 0; x < FLAME[y].length(); x++) {
                 char c = FLAME[y].charAt(x);
                 if (c == '.') continue;
-                boolean lit = y >= litFrom;
+                if (y < litFrom) continue; // vanilla draws nothing for the unlit part of the flame
                 int rgb = switch (c) {
-                    case '#' -> lit ? 0x5A2400 : 0x3C3C3C;
-                    case 'y' -> lit ? 0xFFD23A : 0x6E6E6E;
-                    case 'o' -> lit ? 0xF58A1E : 0x5A5A5A;
-                    default -> lit ? 0xD84A12 : 0x505050;
+                    case '#' -> 0x5A2400;
+                    case 'y' -> 0xFFD23A;
+                    case 'o' -> 0xF58A1E;
+                    default -> 0xD84A12;
                 };
                 quad(ui, r.x() + x * s, r.y() + y * s, s, s, rgb, 1f);
             }

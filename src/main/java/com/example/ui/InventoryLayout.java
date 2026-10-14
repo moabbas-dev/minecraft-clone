@@ -80,10 +80,10 @@ public final class InventoryLayout {
         return top + 72 * s;
     }
 
-    /** The "crafts into" arrow between the grid and the result slot. */
+    /** The "crafts into" arrow between the grid and the result: 16x13 at (135,29) in the player inventory, 22x15 at (90,35) at the table. */
     public Rect arrow() {
-        return gridSize == 2 ? new Rect(left + 135 * s, top + 31 * s, 16 * s, 11 * s)
-                : new Rect(left + 90 * s, top + 36 * s, 24 * s, 17 * s);
+        return gridSize == 2 ? new Rect(left + 135 * s, top + 29 * s, 16 * s, 13 * s)
+                : new Rect(left + 90 * s, top + 35 * s, 22 * s, 15 * s);
     }
 
     /** The inset box where vanilla shows the player preview (player inventory only). */

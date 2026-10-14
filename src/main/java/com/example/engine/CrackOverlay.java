@@ -76,6 +76,19 @@ public class CrackOverlay {
         return out;
     }
 
+    /**
+     * A supplied crack texture is a set of grey shades (with white highlights) that vanilla draws through a special
+     * "crumbling" blend; drawn with plain alpha blending the highlights read as white scratches. This keeps the shape but
+     * makes the crack black: the darker the source pixel, the more opaque the black, and white highlights vanish.
+     */
+    static int darkenCrackPixel(int argb) {
+        int alpha = argb >>> 24;
+        if (alpha <= 8) return 0;
+        int lum = (((argb >> 16) & 0xFF) + ((argb >> 8) & 0xFF) + (argb & 0xFF)) / 3;
+        int a = Math.min(235, (int) ((255 - lum) * 1.5f));
+        return a <= 0 ? 0 : (a << 24) | 0x141414;
+    }
+
     private static int[] loadOrGenerateStrip() {
         int[] strip = new int[STAGES * TILE * TILE];
         int[][] custom = new int[STAGES][];
@@ -98,7 +111,7 @@ public class CrackOverlay {
             boolean[] procedural = allCustom ? null : generateStage(s);
             for (int y = 0; y < TILE; y++) {
                 for (int x = 0; x < TILE; x++) {
-                    int argb = allCustom ? custom[s][y * TILE + x]
+                    int argb = allCustom ? darkenCrackPixel(custom[s][y * TILE + x])
                             : (procedural[y * TILE + x] ? 0xD0141414 : 0x00000000);
                     strip[y * (STAGES * TILE) + s * TILE + x] = argb;
                 }

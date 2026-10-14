@@ -37,6 +37,15 @@ public final class FuelRegistry {
                 BlockType.OAK_PLANKS}) {
             FURNACE_BURN_TICKS.put(wood, 300);
         }
+        // More wooden things vanilla burns (minecraft.wiki Smelting fuel table, via Perplexity): furniture 300, wooden tools 200
+        // (one item each), saplings 100. Leaves, mud and dried kelp are not fuel.
+        for (BlockType b : new BlockType[]{BlockType.CRAFTING_TABLE, BlockType.CHEST, BlockType.BOOKSHELF, BlockType.MANGROVE_ROOTS}) {
+            FURNACE_BURN_TICKS.put(b, 300);
+        }
+        for (BlockType b : new BlockType[]{BlockType.WOODEN_PICKAXE, BlockType.WOODEN_AXE, BlockType.WOODEN_SHOVEL, BlockType.WOODEN_SWORD}) {
+            FURNACE_BURN_TICKS.put(b, 200);
+        }
+        FURNACE_BURN_TICKS.put(BlockType.OAK_SAPLING_STAGE_0, 100);
     }
 
     public static boolean isFuel(BlockType type) {

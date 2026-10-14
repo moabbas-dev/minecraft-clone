@@ -1799,13 +1799,17 @@ public class Game implements GameAccess {
         if (list.isEmpty()) return;
         if (mobSkins.isEmpty()) {
             mobSkins.put("zombie", com.example.engine.EntityTexture.load("textures/entity/zombie/zombie.png", 64, 64, 0x5E874C));
-            // Minecraft 1.21.5 renamed these to the "temperate" variants (chicken also gained its own folder); older names stay as a fallback.
+            // These skins were renamed twice: 1.21.5 made them the "temperate" variants (temperate_pig.png), 26.x then
+            // swapped the word order (pig_temperate.png, checked in the 26.3 client jar). Newest name first, old names as fallback.
             mobSkins.put("pig", com.example.engine.EntityTexture.loadFirst(
-                    new String[]{"textures/entity/pig/temperate_pig.png", "textures/entity/pig/pig.png"}, 64, 32, 0xECA0A0));
+                    new String[]{"textures/entity/pig/pig_temperate.png", "textures/entity/pig/temperate_pig.png", "textures/entity/pig/pig.png"},
+                    64, 32, 0xECA0A0));
             mobSkins.put("cow", com.example.engine.EntityTexture.loadFirst(
-                    new String[]{"textures/entity/cow/temperate_cow.png", "textures/entity/cow/cow.png"}, 64, 32, 0x694628));
+                    new String[]{"textures/entity/cow/cow_temperate.png", "textures/entity/cow/temperate_cow.png", "textures/entity/cow/cow.png"},
+                    64, 32, 0x694628));
             mobSkins.put("chicken", com.example.engine.EntityTexture.loadFirst(
-                    new String[]{"textures/entity/chicken/temperate_chicken.png", "textures/entity/chicken.png"}, 64, 32, 0xF0F0F0));
+                    new String[]{"textures/entity/chicken/chicken_temperate.png", "textures/entity/chicken/temperate_chicken.png", "textures/entity/chicken.png"},
+                    64, 32, 0xF0F0F0));
             for (String species : new String[]{"pig", "cow", "chicken"}) {
                 MobModelBuilder.setSkinSize(species, mobSkins.get(species).width(), mobSkins.get(species).height());
             }
