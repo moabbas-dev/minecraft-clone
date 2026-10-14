@@ -11,7 +11,7 @@ import com.example.inventory.InventoryMenu;
  * The geometry is vanilla's (docs/vanilla-rules.md section 6): a 176 x 166 GUI-pixel panel drawn at the GUI scale,
  * with 18 px slot pitch and a 16 x 16 item area per slot. The player inventory (grid 2) has the armor column at
  * x=8, the 2x2 crafting grid at (98,18) and its result at (154,28); the crafting table (grid 3) has the 3x3 grid at
- * (30,17) and its result at (124,35). Both put the 27 storage slots at (8,84) and the hotbar at y=142.
+ * (30,17) and its result at (124,35); the player inventory also has the offhand slot at (77,62). Both put the 27 storage slots at (8,84) and the hotbar at y=142.
  */
 public final class InventoryLayout {
     public static final int PANEL_W = 176, PANEL_H = 166;
@@ -93,6 +93,10 @@ public final class InventoryLayout {
 
     /** The rectangle for a menu slot id (player slot, {@link InventoryMenu#GRID_BASE}+i, the result, or armor). */
     public Rect slotRect(int slot) {
+        if (slot == InventoryMenu.OFFHAND_SLOT) {
+            if (!hasArmorSlots()) throw new IllegalArgumentException("the crafting table has no offhand slot");
+            return item(77, 62);
+        }
         if (slot >= InventoryMenu.ARMOR_BASE && slot < InventoryMenu.ARMOR_BASE + 4) {
             if (!hasArmorSlots()) throw new IllegalArgumentException("the crafting table has no armor slots: " + slot);
             return item(8, 8 + (slot - InventoryMenu.ARMOR_BASE) * PITCH);
@@ -120,6 +124,7 @@ public final class InventoryLayout {
             if (slotRect(InventoryMenu.GRID_BASE + i).contains(mx, my)) return InventoryMenu.GRID_BASE + i;
         }
         if (slotRect(InventoryMenu.RESULT_SLOT).contains(mx, my)) return InventoryMenu.RESULT_SLOT;
+        if (hasArmorSlots() && slotRect(InventoryMenu.OFFHAND_SLOT).contains(mx, my)) return InventoryMenu.OFFHAND_SLOT;
         if (hasArmorSlots()) {
             for (int i = 0; i < 4; i++) {
                 if (slotRect(InventoryMenu.ARMOR_BASE + i).contains(mx, my)) return InventoryMenu.ARMOR_BASE + i;

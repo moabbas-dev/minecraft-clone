@@ -43,9 +43,19 @@ public final class BlockPlacer {
 
     private static final Set<BlockType> PLACEABLE = new HashSet<>(Arrays.asList(BlockType.PLACEABLE));
 
+    public static boolean isPlaceable(BlockType type) {
+        return PLACEABLE.contains(type);
+    }
+
     public static Result tryPlace(World world, Inventory inventory, Raycast.Hit hit, PlayerOverlap playerOverlap,
                                   SaplingGrowth saplingGrowth) {
-        ItemStack held = inventory.selected();
+        return tryPlace(world, inventory, false, hit, playerOverlap, saplingGrowth);
+    }
+
+    /** {@code offhand} places the offhand stack instead of the selected hotbar stack. */
+    public static Result tryPlace(World world, Inventory inventory, boolean offhand, Raycast.Hit hit, PlayerOverlap playerOverlap,
+                                  SaplingGrowth saplingGrowth) {
+        ItemStack held = offhand ? inventory.getOffhand() : inventory.selected();
         if (held.isEmpty()) return Result.failed(Outcome.NO_ITEM);
         BlockType block = held.type();
         if (!PLACEABLE.contains(block)) return Result.failed(Outcome.NOT_PLACEABLE);
@@ -65,7 +75,8 @@ public final class BlockPlacer {
 
         world.setBlock(x, y, z, block);
         if (sapling != null) saplingGrowth.registerPlanted(x, y, z, sapling);
-        inventory.removeOne(inventory.getSelectedSlot());
+        if (offhand) inventory.offhandSlot().removeOne(0);
+        else inventory.removeOne(inventory.getSelectedSlot());
         return new Result(Outcome.PLACED, block, x, y, z);
     }
 }

@@ -237,6 +237,10 @@ public class Game implements GameAccess {
             new com.example.fx.SpriteParticles(com.example.fx.SpriteParticles.Kind.DAMAGE_INDICATOR, new java.util.Random());
     private int forcedDropRequests;
     private boolean forcedDropWholeStack;
+    private int forcedSwapRequests;
+    /** The item shown in the left hand (null = nothing) and its equip progress (0 = lowered, 1 = raised). */
+    private BlockType shownOffhand;
+    private float equipRaisedOff;
 
     // 11 floats/vertex everywhere: position(3), uv(2), skyShade(1), blockLight(1), tint(3),
     // windWeight(1) - one shared layout across every mesh that uses chunkShader (chunk terrain,
@@ -680,6 +684,8 @@ public class Game implements GameAccess {
         damageParticles.clear();
         shownHeld = inventory.selected().isEmpty() ? null : inventory.selected().type();
         equipRaised = 0f; // the hand rises when the world opens, like a freshly equipped item
+        shownOffhand = inventory.getOffhand().isEmpty() ? null : inventory.getOffhand().type();
+        equipRaisedOff = 0f;
         mobs.clear();
         xpOrbs.clear();
         fallingBlocks.clear();
@@ -786,6 +792,12 @@ public class Game implements GameAccess {
             forcedDropRequests--;
             dropHeldItem(forcedDropWholeStack);
         }
+        boolean swapKey = pressed(com.example.ui.KeyBindings.Bind.SWAP_OFFHAND);
+        if (forcedSwapRequests > 0) {
+            forcedSwapRequests--;
+            swapKey = true;
+        }
+        if (swapKey) swapSelectedWithOffhand();
 
         float mouseSpeed = options.mouseSpeedMultiplier();
         player.look(input.getMouseDeltaX() * mouseSpeed, input.getMouseDeltaY() * mouseSpeed * (options.invertMouse ? -1f : 1f));
@@ -818,6 +830,22 @@ public class Game implements GameAccess {
             }
         } else {
             equipRaised = Math.min(1f, equipRaised + dt / HeldItemModel.EQUIP_SECONDS);
+        }
+        // Same for the offhand (no attack-strength factor); an empty offhand has nothing to lower, so a new item rises at once.
+        BlockType offNow = inventory.getOffhand().isEmpty() ? null : inventory.getOffhand().type();
+        if (offNow != shownOffhand) {
+            if (shownOffhand == null) {
+                shownOffhand = offNow;
+                equipRaisedOff = 0f;
+            } else {
+                equipRaisedOff -= dt / HeldItemModel.EQUIP_SECONDS;
+                if (equipRaisedOff <= 0f) {
+                    equipRaisedOff = 0f;
+                    shownOffhand = offNow;
+                }
+            }
+        } else {
+            equipRaisedOff = Math.min(1f, equipRaisedOff + dt / HeldItemModel.EQUIP_SECONDS);
         }
 
         dayTime += dt / DAY_LENGTH_SECONDS;
@@ -996,8 +1024,12 @@ public class Game implements GameAccess {
         if (pressed(com.example.ui.KeyBindings.Bind.PICK_ITEM) && hit != null) pickBlock(hit.type());
 
         // Eating: hold use on a food item (vanilla 32 ticks, dried kelp 16); releasing or switching cancels.
-        ItemStack heldForEat = inventory.selected();
-        FoodProperties eatFood = heldForEat.isEmpty() ? null : FoodRegistry.propertiesFor(heldForEat.type());
+        ItemStack mainHeld = inventory.selected(), offHeld = inventory.getOffhand();
+        FoodProperties mainFood = mainHeld.isEmpty() ? null : FoodRegistry.propertiesFor(mainHeld.type());
+        FoodProperties offFood = offHeld.isEmpty() ? null : FoodRegistry.propertiesFor(offHeld.type());
+        boolean eatOff = mainFood == null && offFood != null && !mainHandTakesUse(mainHeld, hit);
+        ItemStack heldForEat = eatOff ? offHeld : mainHeld;
+        FoodProperties eatFood = eatOff ? offFood : mainFood;
         if (eatFood != null && held(com.example.ui.KeyBindings.Bind.USE) && survival.getHunger().canEat(eatFood)) {
             float duration = heldForEat.type() == BlockType.DRIED_KELP ? 0.8f : 1.6f;
             eatTimer += dt;
@@ -1008,7 +1040,7 @@ public class Game implements GameAccess {
             }
             if (eatTimer >= duration) {
                 eatTimer = 0f;
-                tryEat(heldForEat.type());
+                tryEat(eatOff, heldForEat.type());
                 gameAudio.play("burp", null);
             }
         } else {
@@ -1023,37 +1055,65 @@ public class Game implements GameAccess {
             use = true;
             forcedUse = true;
         }
-        if (use) {
-            ItemStack held = inventory.selected();
-            FoodProperties food = held.isEmpty() ? null : FoodRegistry.propertiesFor(held.type());
-            if (com.example.inventory.PlayerArmor.canEquip(held)) {
-                // Right-click equips armor from the hotbar, swapping with whatever is worn in that slot.
-                inventory.set(inventory.getSelectedSlot(), survival.getArmor().equip(held));
-                gameAudio.play("armor.equip." + armorMaterial(held.type()), null);
-            } else if (food != null) {
-                if (forcedUse) tryEat(held.type()); // the test controller eats instantly; real input holds use
-            } else if (hit != null) {
-                // Using a crafting table opens the 3x3 crafting screen instead of placing a block
-                // (sneaking still places, like vanilla).
-                if (hit.type() == BlockType.CRAFTING_TABLE && !player.isSneaking()) {
-                    openInventory(3);
-                    return;
-                }
-                CookingStationType stationType = cookingStationTypeOf(hit.type());
-                if (stationType != null && !player.isSneaking()) {
-                    openCookingScreenAt(hit.x(), hit.y(), hit.z());
-                    return;
-                }
-                BlockPlacer.Result placed = BlockPlacer.tryPlace(world, inventory, hit, this::blockIntersectsPlayer, saplingGrowth);
-                if (placed.placed()) {
-                    fallingBlocks.checkColumn(world, placed.x(), placed.y(), placed.z());
-                    swingTimer = SWING_DURATION;
-                    gameAudio.playPlace(placed.type(), new Vector3f(placed.x() + 0.5f, placed.y() + 0.5f, placed.z() + 0.5f));
-                    CookingStationType placedStation = cookingStationTypeOf(placed.type());
-                    if (placedStation != null) cookingStations.create(placed.x(), placed.y(), placed.z(), placedStation);
-                }
-            }
+        if (use && !useHand(false, hit, forcedUse)) useHand(true, hit, forcedUse);
+    }
+
+    /** Whether the main hand would take a right click (so the offhand is not tried): armor to wear, a block to place or open. */
+    private boolean mainHandTakesUse(ItemStack held, Raycast.Hit hit) {
+        boolean opensScreen = hit != null && !player.isSneaking()
+                && (hit.type() == BlockType.CRAFTING_TABLE || cookingStationTypeOf(hit.type()) != null);
+        if (held.isEmpty()) return opensScreen;
+        return com.example.inventory.PlayerArmor.canEquip(held) || opensScreen || (hit != null && BlockPlacer.isPlaceable(held.type()));
+    }
+
+    /**
+     * One right click offered to a hand (vanilla tries the main hand and then the offhand): armor is worn, food is eaten,
+     * a crafting table or cooking station opens, a block is placed. Returns true when this hand took the click and false
+     * when it had nothing to do with it, so the other hand gets its turn.
+     */
+    private boolean useHand(boolean offhand, Raycast.Hit hit, boolean forcedUse) {
+        ItemStack held = offhand ? inventory.getOffhand() : inventory.selected();
+        FoodProperties food = held.isEmpty() ? null : FoodRegistry.propertiesFor(held.type());
+        if (com.example.inventory.PlayerArmor.canEquip(held)) {
+            // Right-click wears armor from the hand, swapping with whatever is worn in that slot.
+            ItemStack replaced = survival.getArmor().equip(held);
+            if (offhand) inventory.setOffhand(replaced);
+            else inventory.set(inventory.getSelectedSlot(), replaced);
+            gameAudio.play("armor.equip." + armorMaterial(held.type()), null);
+            return true;
         }
+        if (food != null) {
+            if (forcedUse) tryEat(offhand, held.type()); // the test controller eats instantly; real input holds use
+            return true;
+        }
+        if (hit == null) return false;
+        // Using a crafting table opens the 3x3 crafting screen instead of placing a block (sneaking still places, like vanilla).
+        if (hit.type() == BlockType.CRAFTING_TABLE && !player.isSneaking()) {
+            openInventory(3);
+            return true;
+        }
+        CookingStationType stationType = cookingStationTypeOf(hit.type());
+        if (stationType != null && !player.isSneaking()) {
+            openCookingScreenAt(hit.x(), hit.y(), hit.z());
+            return true;
+        }
+        BlockPlacer.Result placed = BlockPlacer.tryPlace(world, inventory, offhand, hit, this::blockIntersectsPlayer, saplingGrowth);
+        if (placed.placed()) {
+            fallingBlocks.checkColumn(world, placed.x(), placed.y(), placed.z());
+            swingTimer = SWING_DURATION;
+            gameAudio.playPlace(placed.type(), new Vector3f(placed.x() + 0.5f, placed.y() + 0.5f, placed.z() + 0.5f));
+            CookingStationType placedStation = cookingStationTypeOf(placed.type());
+            if (placedStation != null) cookingStations.create(placed.x(), placed.y(), placed.z(), placedStation);
+            return true;
+        }
+        return placed.outcome() == BlockPlacer.Outcome.INVALID_TARGET; // a refused placement ends the click; no item means pass
+    }
+
+    /** F: the selected hotbar stack and the offhand stack trade places. */
+    private void swapSelectedWithOffhand() {
+        ItemStack main = inventory.selected(), off = inventory.getOffhand();
+        inventory.set(inventory.getSelectedSlot(), off);
+        inventory.setOffhand(main);
     }
 
     /** One player melee swing: charge, crit/sprint/sweep rules, damage through the shared pipeline,
@@ -1130,9 +1190,10 @@ public class Game implements GameAccess {
      *  consumes it immediately; the existing consumeMousePressed edge-trigger already prevents
      *  eating every frame while the button is merely held). Removes the item only if
      *  {@link PlayerSurvival#eat} actually applied it (blocked at max food for non-overeat food). */
-    private void tryEat(BlockType foodType) {
+    private void tryEat(boolean offhand, BlockType foodType) {
         if (survival.eat(foodType)) {
-            inventory.removeFromSlot(inventory.getSelectedSlot(), 1);
+            if (offhand) inventory.offhandSlot().removeOne(0);
+            else inventory.removeFromSlot(inventory.getSelectedSlot(), 1);
         }
     }
 
@@ -1171,6 +1232,7 @@ public class Game implements GameAccess {
         for (int k = 0; k < Inventory.HOTBAR_SIZE; k++) {
             if (pressed(com.example.ui.KeyBindings.Bind.valueOf("HOTBAR_" + (k + 1))) && hovered >= 0) menu.swapWithHotbar(hovered, k);
         }
+        if (pressed(com.example.ui.KeyBindings.Bind.SWAP_OFFHAND) && hovered >= 0) menu.swapWithOffhand(hovered);
 
         boolean left = input.consumeMousePressed(GLFW_MOUSE_BUTTON_LEFT);
         boolean right = input.consumeMousePressed(GLFW_MOUSE_BUTTON_RIGHT);
@@ -1258,6 +1320,7 @@ public class Game implements GameAccess {
         for (int i = 0; i < menu.getGridSize() * menu.getGridSize(); i++) drawMenuSlot(layout, InventoryMenu.GRID_BASE + i, hovered, frames);
         drawMenuSlot(layout, InventoryMenu.RESULT_SLOT, hovered, frames);
         if (layout.hasArmorSlots()) for (int i = 0; i < 4; i++) drawMenuSlot(layout, InventoryMenu.ARMOR_BASE + i, hovered, frames);
+        if (layout.hasArmorSlots()) drawMenuSlot(layout, InventoryMenu.OFFHAND_SLOT, hovered, frames);
 
         ItemStack held = menu.getCursor();
         if (!held.isEmpty()) {
@@ -2010,6 +2073,9 @@ public class Game implements GameAccess {
             if (!s.isEmpty()) itemEntities.spawn(s.type(), s.count(), s.damage(), at, gameplayRandom);
             inventory.set(i, ItemStack.EMPTY);
         }
+        ItemStack offhandStack = inventory.getOffhand();
+        if (!offhandStack.isEmpty()) itemEntities.spawn(offhandStack.type(), offhandStack.count(), offhandStack.damage(), at, gameplayRandom);
+        inventory.setOffhand(ItemStack.EMPTY);
         for (com.example.combat.EquipmentSlot slot : com.example.combat.EquipmentSlot.values()) {
             ItemStack s = survival.getArmor().get(slot);
             if (!s.isEmpty()) itemEntities.spawn(s.type(), 1, s.damage(), at, gameplayRandom);
@@ -2115,6 +2181,28 @@ public class Game implements GameAccess {
         if (armSkin != null) armSkin.bind(0);
         heldItemMesh.draw();
         if (armSkin != null) atlas.bind(0);
+        renderOffhandItem();
+    }
+
+    /**
+     * The item in the left hand: vanilla draws it with the mirrored right-hand transform (side -1), with its own equip
+     * animation and no swing (attacking is the main hand); an empty offhand shows nothing, not even an arm.
+     */
+    private void renderOffhandItem() {
+        BlockType shown = shownOffhand;
+        if (shown == null) return;
+        float bobPhase = player.getBobPhase();
+        float bobAmount = player.getBobAmplitude();
+        float bobX = (float) Math.sin(bobPhase) * bobAmount * 0.6f;
+        float bobY = (float) Math.abs(Math.sin(bobPhase * 2f)) * bobAmount * 0.5f;
+        float drop = HeldItemModel.equipDrop(equipRaisedOff);
+        boolean flat = ChunkMeshBuilder.isFlatIconItem(shown);
+        float[] verts = heldMeshCache.computeIfAbsent(shown, h -> flat ? buildFlatItemHeldVerts(h) : buildHeldItemVerts(h));
+        Matrix4f model = new Matrix4f().translate(bobX * 0.5f, -bobY * 0.5f, 0f).scale(-1f, 1f, 1f)
+                .mul(flat ? HeldItemModel.flatItem(0f, drop) : HeldItemModel.block(0f, drop));
+        chunkShader.setUniform("uModel", model);
+        heldItemMesh.upload(verts);
+        heldItemMesh.draw();
     }
 
     private float[] armVertsCache;
@@ -2489,6 +2577,15 @@ public class Game implements GameAccess {
             drawBlockIcon(stack.type(), ix, iy, 16 * s);
             if (stack.count() > 1) drawStackCount(stack.count(), ix, iy, 16 * s);
             drawDurabilityBar(stack, ix, iy, 16 * s);
+        }
+        ItemStack off = inventory.getOffhand();
+        if (!off.isEmpty()) { // vanilla draws the offhand slot left of the hotbar only while something is in it
+            HudTextures.Sprite offSlot = guiSprite("textures/gui/sprites/hud/hotbar_offhand_left.png");
+            if (offSlot != null) HudTextures.draw(uiRenderer, offSlot, hx - 29 * s, hy - s, s);
+            float ox = hx - 26 * s, oy = hy + 3 * s;
+            drawBlockIcon(off.type(), ox, oy, 16 * s);
+            if (off.count() > 1) drawStackCount(off.count(), ox, oy, 16 * s);
+            drawDurabilityBar(off, ox, oy, 16 * s);
         }
         HudTextures.draw(uiRenderer, t.hotbarSelection, hx - s + 20 * sel * s, hy - s, s);
         drawHotbarLabel(hx + (3 + 20 * sel) * s, heartsY - 4 * s, 16 * s);
@@ -3006,6 +3103,11 @@ public class Game implements GameAccess {
     }
 
     @Override
+    public void swapOffhand() {
+        forcedSwapRequests++;
+    }
+
+    @Override
     public void dropItem(boolean wholeStack) {
         forcedDropRequests++;
         forcedDropWholeStack = wholeStack;
@@ -3171,6 +3273,8 @@ public class Game implements GameAccess {
         }
         sb.append("inventory.selectedSlot=").append(inventory.getSelectedSlot()).append('\n');
         sb.append("inventory.slots=").append(slots).append('\n');
+        ItemStack offhandNow = inventory.getOffhand();
+        sb.append("inventory.offhand=").append(offhandNow.isEmpty() ? "-" : offhandNow.type().name() + "x" + offhandNow.count()).append('\n');
         sb.append("inventory.open=").append(menu != null).append('\n');
         if (menu != null) {
             sb.append("inventory.cursor=").append(menu.getCursor().isEmpty() ? "" : menu.getCursor().type().name() + "x" + menu.getCursor().count()).append('\n');

@@ -40,6 +40,7 @@ public final class Commands {
             case "giveItem" -> giveItem(params);
             case "holdAttack" -> holdAttack(params);
             case "useItem" -> useItem();
+            case "swapOffhand" -> swapOffhand();
             case "dropItem" -> dropItem(params);
             case "openInventory" -> openInventory(params);
             case "inventoryClick" -> inventoryClick(params);
@@ -252,6 +253,11 @@ public final class Commands {
     private Result useItem() {
         game.useItem();
         return Result.ok("use queued");
+    }
+
+    private Result swapOffhand() {
+        game.swapOffhand();
+        return Result.ok("swap queued");
     }
 
     private Result dropItem(Map<String, String> p) {

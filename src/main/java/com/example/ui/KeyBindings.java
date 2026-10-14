@@ -29,6 +29,7 @@ public final class KeyBindings {
         SPRINT("key.sprint", "Sprint", GLFW_KEY_LEFT_CONTROL),
         DROP("key.drop", "Drop Selected Item", GLFW_KEY_Q),
         INVENTORY("key.inventory", "Open/Close Inventory", GLFW_KEY_E),
+        SWAP_OFFHAND("key.swapOffhand", "Swap Item With Offhand", GLFW_KEY_F),
         PICK_ITEM("key.pickItem", "Pick Block", MOUSE_BASE + GLFW_MOUSE_BUTTON_MIDDLE),
         SCREENSHOT("key.screenshot", "Take Screenshot", GLFW_KEY_F2),
         FULLSCREEN("key.fullscreen", "Toggle Fullscreen", GLFW_KEY_F11),

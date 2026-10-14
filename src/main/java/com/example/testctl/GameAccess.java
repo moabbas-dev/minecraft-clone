@@ -59,6 +59,9 @@ public interface GameAccess {
     /** Queues one use/place click, consumed by the next interaction update. */
     void useItem();
 
+    /** Presses the swap-offhand key (F). */
+    void swapOffhand();
+
     /** Presses the drop key (Q): one item, or the whole stack like Ctrl+Q. */
     void dropItem(boolean wholeStack);
 

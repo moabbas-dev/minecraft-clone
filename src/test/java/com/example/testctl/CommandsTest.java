@@ -36,6 +36,7 @@ class CommandsTest {
         Boolean attackHeld;
         int useCalls;
     int dropCalls;
+    int swapCalls;
     boolean dropWhole;
         Double lookX, lookY, lookZ;
         boolean throwOnLook;
@@ -127,6 +128,11 @@ class CommandsTest {
         @Override
         public void useItem() {
             useCalls++;
+        }
+
+        @Override
+        public void swapOffhand() {
+            swapCalls++;
         }
 
         @Override
@@ -512,6 +518,12 @@ class CommandsTest {
         commands.execute("useItem", params());
         commands.execute("useItem", params());
         assertEquals(2, fake.useCalls);
+    }
+
+    @Test
+    void swapOffhandQueuesOnePress() {
+        commands.execute("swapOffhand", params());
+        assertEquals(1, fake.swapCalls);
     }
 
     @Test

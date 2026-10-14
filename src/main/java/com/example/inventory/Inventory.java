@@ -33,12 +33,19 @@ public class Inventory {
     private final int maxStack;
     @Getter
     private int selectedSlot = 0;
+    /** The offhand: a one-slot inventory of its own (null inside the offhand itself), so the click rules that work on any
+     *  {@link Inventory} slot work on it too. It is not one of the {@link #slotCount()} slots. */
+    private final Inventory offhand;
 
     public Inventory() {
         this(DEFAULT_SLOT_COUNT, HOTBAR_SIZE, DEFAULT_MAX_STACK);
     }
 
     public Inventory(int slotCount, int hotbarSize, int maxStack) {
+        this(slotCount, hotbarSize, maxStack, true);
+    }
+
+    private Inventory(int slotCount, int hotbarSize, int maxStack, boolean withOffhand) {
         if (slotCount <= 0 || hotbarSize <= 0 || hotbarSize > slotCount || maxStack <= 0) {
             throw new IllegalArgumentException("invalid inventory shape: slots=" + slotCount
                     + " hotbar=" + hotbarSize + " maxStack=" + maxStack);
@@ -48,6 +55,20 @@ public class Inventory {
         this.damages = new int[slotCount];
         this.hotbarSize = hotbarSize;
         this.maxStack = maxStack;
+        this.offhand = withOffhand ? new Inventory(1, 1, maxStack, false) : null;
+    }
+
+    public ItemStack getOffhand() {
+        return offhand.get(0);
+    }
+
+    public void setOffhand(ItemStack stack) {
+        offhand.set(0, stack);
+    }
+
+    /** The offhand as a one-slot inventory (slot 0). */
+    public Inventory offhandSlot() {
+        return offhand;
     }
 
     public int slotCount() {
@@ -107,6 +128,11 @@ public class Inventory {
                 remaining -= take;
             }
         }
+        if (offhand != null && remaining > 0 && offhand.types[0] == type && offhand.damages[0] == wear && offhand.counts[0] < max) {
+            int take = Math.min(remaining, max - offhand.counts[0]);
+            offhand.counts[0] += take;
+            remaining -= take;
+        }
         for (int i = 0; i < types.length && remaining > 0; i++) {
             if (types[i] == null) {
                 int take = Math.min(remaining, max);
@@ -128,6 +154,7 @@ public class Inventory {
             if (types[i] == null) space += max;
             else if (types[i] == type && damages[i] == 0) space += max - counts[i];
         }
+        if (offhand != null && offhand.types[0] == type && offhand.damages[0] == 0) space += max - offhand.counts[0];
         return (int) Math.min(space, Integer.MAX_VALUE);
     }
 
@@ -141,6 +168,7 @@ public class Inventory {
         for (int i = 0; i < types.length; i++) {
             if (types[i] == type && type != null) total += counts[i];
         }
+        if (offhand != null && offhand.types[0] == type && type != null) total += offhand.counts[0];
         return (int) Math.min(total, Integer.MAX_VALUE);
     }
 
@@ -166,6 +194,7 @@ public class Inventory {
         for (int i = types.length - 1; i >= 0 && remaining > 0; i--) {
             if (types[i] == type && type != null) remaining -= removeFromSlot(i, remaining);
         }
+        if (offhand != null && remaining > 0 && offhand.types[0] == type && type != null) remaining -= offhand.removeFromSlot(0, remaining);
         return amount - remaining;
     }
 
@@ -194,18 +223,23 @@ public class Inventory {
         java.util.Arrays.fill(types, null);
         java.util.Arrays.fill(counts, 0);
         java.util.Arrays.fill(damages, 0);
+        if (offhand != null) offhand.clear();
         selectedSlot = 0;
     }
 
     // ---- persistence (see WorldIO) - block IDs, not enum ordinals, so reordering BlockType is safe ----
 
     public void write(DataOutput out) throws IOException {
-        out.writeInt(types.length);
+        // The offhand is stored as one extra slot after the others; saves from before it existed simply stop one slot short.
+        out.writeInt(types.length + 1);
         out.writeInt(selectedSlot);
-        for (int i = 0; i < types.length; i++) {
-            out.writeInt(types[i] == null ? 0 : types[i].id);
-            out.writeInt(counts[i] | (damages[i] << 8)); // count <= 64 fits the low byte; old saves have damage 0
-        }
+        for (int i = 0; i < types.length; i++) writeSlot(out, types[i], counts[i], damages[i]);
+        writeSlot(out, offhand.types[0], offhand.counts[0], offhand.damages[0]);
+    }
+
+    private static void writeSlot(DataOutput out, BlockType type, int count, int damage) throws IOException {
+        out.writeInt(type == null ? 0 : type.id);
+        out.writeInt(count | (damage << 8)); // count <= 64 fits the low byte; old saves have damage 0
     }
 
     /**
@@ -224,10 +258,12 @@ public class Inventory {
             int count = packed & 0xFF;
             int damage = packed >>> 8;
             BlockType type = BlockType.byId(id);
-            if (i < inv.types.length && type != BlockType.AIR && count > 0) {
-                inv.types[i] = type;
-                inv.counts[i] = Math.min(count, ItemStack.maxStackFor(type, inv.maxStack));
-                inv.damages[i] = com.example.combat.Durability.isDamageable(type)
+            Inventory target = i < inv.types.length ? inv : i == inv.types.length ? inv.offhand : null;
+            int idx = i < inv.types.length ? i : 0;
+            if (target != null && type != BlockType.AIR && count > 0) {
+                target.types[idx] = type;
+                target.counts[idx] = Math.min(count, ItemStack.maxStackFor(type, inv.maxStack));
+                target.damages[idx] = com.example.combat.Durability.isDamageable(type)
                         ? Math.min(damage, com.example.combat.Durability.max(type) - 1) : 0;
             }
         }

@@ -21,6 +21,8 @@ public class InventoryMenu {
     public static final int RESULT_SLOT = 1000;
     /** Armor slots: ARMOR_BASE + EquipmentSlot ordinal (head, chest, legs, feet). */
     public static final int ARMOR_BASE = 2000;
+    /** The offhand slot (vanilla's menu slot 45 is a different number; this id only has to be unused). */
+    public static final int OFFHAND_SLOT = 3000;
 
     private final Inventory player;
     private final Inventory grid;
@@ -46,6 +48,7 @@ public class InventoryMenu {
 
     public ItemStack stackAt(int slot) {
         if (slot == RESULT_SLOT) return result;
+        if (slot == OFFHAND_SLOT) return player.getOffhand();
         if (slot >= ARMOR_BASE && slot < ARMOR_BASE + 4 && armor != null) return armor.get(com.example.combat.EquipmentSlot.values()[slot - ARMOR_BASE]);
         if (slot >= GRID_BASE && slot < GRID_BASE + grid.slotCount()) return grid.get(slot - GRID_BASE);
         if (slot >= 0 && slot < player.slotCount()) return player.get(slot);
@@ -56,6 +59,11 @@ public class InventoryMenu {
     public void click(int slot, boolean right) {
         if (slot == RESULT_SLOT) {
             takeResult();
+            return;
+        }
+        if (slot == OFFHAND_SLOT) {
+            if (right) rightClick(player.offhandSlot(), 0);
+            else leftClick(player.offhandSlot(), 0);
             return;
         }
         if (slot >= ARMOR_BASE && slot < ARMOR_BASE + 4) {
@@ -258,6 +266,11 @@ public class InventoryMenu {
             craftAll();
             return;
         }
+        if (slot == OFFHAND_SLOT) {
+            ItemStack off = player.getOffhand();
+            if (!off.isEmpty()) player.setOffhand(insertIntoPlayer(off));
+            return;
+        }
         if (slot >= ARMOR_BASE && slot < ARMOR_BASE + 4) {
             if (armor == null) return;
             com.example.combat.EquipmentSlot es = com.example.combat.EquipmentSlot.values()[slot - ARMOR_BASE];
@@ -349,6 +362,21 @@ public class InventoryMenu {
             ItemStack a = grid.get(slot - GRID_BASE), b = player.get(hotbar);
             grid.set(slot - GRID_BASE, b);
             player.set(hotbar, a);
+            recomputeResult();
+        }
+    }
+
+    /** F while hovering a slot (cursor empty): swaps that slot's stack with the offhand stack. */
+    public void swapWithOffhand(int slot) {
+        if (!cursor.isEmpty()) return;
+        if (isPlayerSlot(slot)) {
+            ItemStack a = player.get(slot), b = player.getOffhand();
+            player.set(slot, b);
+            player.setOffhand(a);
+        } else if (isGridSlot(slot)) {
+            ItemStack a = grid.get(slot - GRID_BASE), b = player.getOffhand();
+            grid.set(slot - GRID_BASE, b);
+            player.setOffhand(a);
             recomputeResult();
         }
     }
