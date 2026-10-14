@@ -1212,6 +1212,7 @@ public class Game implements GameAccess {
         if (menu == null) throw new IllegalStateException("inventory is not open");
         for (ItemStack leftover : menu.close()) dropIntoWorld(leftover); // never discard what didn't fit
         menu = null;
+        inventoryDragging = false;
         state = GameState.IN_GAME;
         window.captureMouse();
         input.resyncMousePosition();
@@ -1222,15 +1223,60 @@ public class Game implements GameAccess {
             closeInventory();
             return;
         }
+        float mx = (float) input.getMouseX(), my = (float) input.getMouseY();
+        InventoryLayout layout = new InventoryLayout(window.getWidth(), window.getHeight(), menu.getGridSize(),
+                com.example.ui.GuiScale.compute(window.getWidth(), window.getHeight(), options.guiScale));
+        int hovered = layout.slotAt(mx, my);
+
+        // Number keys swap the hovered slot with that hotbar slot (only while the cursor is empty).
+        for (int k = 0; k < Inventory.HOTBAR_SIZE; k++) {
+            if (pressed(com.example.ui.KeyBindings.Bind.valueOf("HOTBAR_" + (k + 1))) && hovered >= 0) menu.swapWithHotbar(hovered, k);
+        }
+
         boolean left = input.consumeMousePressed(GLFW_MOUSE_BUTTON_LEFT);
         boolean right = input.consumeMousePressed(GLFW_MOUSE_BUTTON_RIGHT);
         if (left || right) {
-            float mx = (float) input.getMouseX(), my = (float) input.getMouseY();
-            InventoryLayout layout = new InventoryLayout(window.getWidth(), window.getHeight(), menu.getGridSize(),
-                    com.example.ui.GuiScale.compute(window.getWidth(), window.getHeight(), options.guiScale));
-            handleInventoryClick(layout.slotAt(mx, my), right, layout.panel().contains(mx, my));
+            long now = System.nanoTime();
+            boolean shift = input.isKeyDown(GLFW_KEY_LEFT_SHIFT) || input.isKeyDown(GLFW_KEY_RIGHT_SHIFT);
+            boolean doubleClick = left && hovered >= 0 && hovered == lastInventoryClickSlot
+                    && now - lastInventoryClickNanos < 250_000_000L && !menu.getCursor().isEmpty();
+            if (shift && hovered >= 0) {
+                menu.quickMove(hovered);
+                lastInventoryClickNanos = 0;
+            } else if (doubleClick) {
+                menu.gatherSame(hovered);
+                lastInventoryClickNanos = 0;
+            } else if (hovered >= 0 && menu.canDragInto(hovered)) {
+                // A press while holding a stack may become a drag across slots; it resolves when the button is released.
+                inventoryDragging = true;
+                inventoryDragRight = right;
+                inventoryDragSlots.clear();
+                inventoryDragSlots.add(hovered);
+                lastInventoryClickSlot = hovered;
+                lastInventoryClickNanos = now;
+            } else {
+                handleInventoryClick(hovered, right, layout.panel().contains(mx, my));
+                lastInventoryClickSlot = hovered;
+                lastInventoryClickNanos = left ? now : 0;
+            }
+        }
+        if (inventoryDragging) {
+            int button = inventoryDragRight ? GLFW_MOUSE_BUTTON_RIGHT : GLFW_MOUSE_BUTTON_LEFT;
+            if (input.isMouseDown(button)) {
+                if (hovered >= 0 && !inventoryDragSlots.contains(hovered) && menu.canDragInto(hovered)) inventoryDragSlots.add(hovered);
+            } else {
+                inventoryDragging = false;
+                if (!menu.distribute(inventoryDragSlots, inventoryDragRight)) {
+                    handleInventoryClick(inventoryDragSlots.get(0), inventoryDragRight, true);
+                }
+            }
         }
     }
+
+    private boolean inventoryDragging, inventoryDragRight;
+    private final java.util.List<Integer> inventoryDragSlots = new java.util.ArrayList<>();
+    private int lastInventoryClickSlot = -1;
+    private long lastInventoryClickNanos;
 
     /** One click on the screen: a slot does its slot action; empty space outside the panel throws
      *  the cursor stack (all on left click, one on right click) into the world. */

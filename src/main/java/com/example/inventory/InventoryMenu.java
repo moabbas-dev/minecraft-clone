@@ -204,6 +204,190 @@ public class InventoryMenu {
         return leftovers;
     }
 
+    // ---- vanilla's extra mouse and keyboard interactions (docs/vanilla-rules.md section 6) ----
+
+    private boolean isPlayerSlot(int slot) {
+        return slot >= 0 && slot < player.slotCount();
+    }
+
+    private boolean isGridSlot(int slot) {
+        return slot >= GRID_BASE && slot < GRID_BASE + grid.slotCount();
+    }
+
+    /**
+     * Puts as much of {@code stack} as fits into slots [from, to) of {@code inv}: first onto matching stacks, then into
+     * empty slots. Returns whatever did not fit.
+     */
+    private static ItemStack insertRange(Inventory inv, ItemStack stack, int from, int to) {
+        if (stack.isEmpty()) return stack;
+        int max = ItemStack.maxStackFor(stack.type(), inv.getMaxStack());
+        ItemStack rest = stack;
+        if (max > 1) {
+            for (int i = from; i < to && !rest.isEmpty(); i++) {
+                ItemStack s = inv.get(i);
+                if (s.sameItem(rest) && s.count() < max) {
+                    int move = Math.min(max - s.count(), rest.count());
+                    inv.set(i, s.withCount(s.count() + move));
+                    rest = rest.withCount(rest.count() - move);
+                }
+            }
+        }
+        for (int i = from; i < to && !rest.isEmpty(); i++) {
+            if (inv.get(i).isEmpty()) {
+                int move = Math.min(max, rest.count());
+                inv.set(i, rest.withCount(move));
+                rest = rest.withCount(rest.count() - move);
+            }
+        }
+        return rest;
+    }
+
+    /** Hotbar slots 0..8 are the first player slots, storage is 9..35. */
+    private ItemStack insertIntoPlayer(ItemStack stack) {
+        ItemStack rest = insertRange(player, stack, Inventory.HOTBAR_SIZE, player.slotCount());
+        return insertRange(player, rest, 0, Inventory.HOTBAR_SIZE);
+    }
+
+    /**
+     * Shift-click: moves the whole stack to the other half of the screen. Crafting-grid and armor stacks go back to the
+     * inventory; an armor piece is worn if its slot is free; hotbar stacks go to storage and storage stacks to the hotbar;
+     * the result slot crafts as many as fit ({@link #craftAll}).
+     */
+    public void quickMove(int slot) {
+        if (slot == RESULT_SLOT) {
+            craftAll();
+            return;
+        }
+        if (slot >= ARMOR_BASE && slot < ARMOR_BASE + 4) {
+            if (armor == null) return;
+            com.example.combat.EquipmentSlot es = com.example.combat.EquipmentSlot.values()[slot - ARMOR_BASE];
+            ItemStack worn = armor.get(es);
+            if (worn.isEmpty()) return;
+            ItemStack rest = insertIntoPlayer(worn);
+            armor.set(es, rest);
+            return;
+        }
+        if (isGridSlot(slot)) {
+            int idx = slot - GRID_BASE;
+            ItemStack s = grid.get(idx);
+            if (s.isEmpty()) return;
+            grid.set(idx, insertIntoPlayer(s));
+            recomputeResult();
+            return;
+        }
+        if (!isPlayerSlot(slot)) return;
+        ItemStack s = player.get(slot);
+        if (s.isEmpty()) return;
+        if (armor != null && PlayerArmor.canEquip(s)) {
+            com.example.combat.EquipmentSlot es = com.example.combat.ArmorStats.of(s.type()).slot();
+            if (armor.get(es).isEmpty()) {
+                armor.set(es, s.withCount(1));
+                player.set(slot, s.count() > 1 ? s.withCount(s.count() - 1) : ItemStack.EMPTY);
+                return;
+            }
+        }
+        ItemStack rest = slot < Inventory.HOTBAR_SIZE
+                ? insertRange(player, s, Inventory.HOTBAR_SIZE, player.slotCount())
+                : insertRange(player, s, 0, Inventory.HOTBAR_SIZE);
+        player.set(slot, rest);
+    }
+
+    /**
+     * Shift-click on the result: crafts repeatedly, sending each result straight to the inventory, until the ingredients
+     * run out or a whole result no longer fits (it never crafts into thin air).
+     */
+    public void craftAll() {
+        for (int guard = 0; guard < 600 && !result.isEmpty(); guard++) {
+            ItemStack made = result;
+            int max = ItemStack.maxStackFor(made.type(), player.getMaxStack());
+            int room = 0;
+            for (int i = 0; i < player.slotCount(); i++) {
+                ItemStack s = player.get(i);
+                if (s.isEmpty()) room += max;
+                else if (s.sameItem(made)) room += Math.max(0, max - s.count());
+            }
+            if (room < made.count()) return;
+            insertIntoPlayer(made);
+            for (int i = 0; i < grid.slotCount(); i++) grid.removeOne(i);
+            recomputeResult();
+        }
+    }
+
+    /**
+     * Double-click while holding a stack: pulls matching items from the whole inventory and crafting grid into the
+     * cursor stack up to a full stack, taking from partly-filled stacks first, then full ones.
+     */
+    public void gatherSame(int clicked) {
+        if (cursor.isEmpty()) return;
+        int max = ItemStack.maxStackFor(cursor.type(), player.getMaxStack());
+        if (max <= 1) return;
+        for (int pass = 0; pass < 2 && cursor.count() < max; pass++) {
+            for (int i = 0; i < player.slotCount() + grid.slotCount() && cursor.count() < max; i++) {
+                boolean isGrid = i >= player.slotCount();
+                Inventory inv = isGrid ? grid : player;
+                int idx = isGrid ? i - player.slotCount() : i;
+                ItemStack s = inv.get(idx);
+                if (!s.sameItem(cursor)) continue;
+                boolean full = s.count() >= max;
+                if ((pass == 0) == full) continue;
+                int take = Math.min(max - cursor.count(), s.count());
+                inv.set(idx, s.count() == take ? ItemStack.EMPTY : s.withCount(s.count() - take));
+                cursor = cursor.withCount(cursor.count() + take);
+            }
+        }
+        recomputeResult();
+    }
+
+    /** Number key while hovering a slot (cursor empty): swaps that slot's stack with hotbar slot {@code hotbar} (0..8). */
+    public void swapWithHotbar(int slot, int hotbar) {
+        if (!cursor.isEmpty() || hotbar < 0 || hotbar >= Inventory.HOTBAR_SIZE) return;
+        if (isPlayerSlot(slot)) {
+            ItemStack a = player.get(slot), b = player.get(hotbar);
+            player.set(slot, b);
+            player.set(hotbar, a);
+        } else if (isGridSlot(slot)) {
+            ItemStack a = grid.get(slot - GRID_BASE), b = player.get(hotbar);
+            grid.set(slot - GRID_BASE, b);
+            player.set(hotbar, a);
+            recomputeResult();
+        }
+    }
+
+    /** Whether a slot can take part in a drag-distribute with the current cursor stack. */
+    public boolean canDragInto(int slot) {
+        if (cursor.isEmpty() || !(isPlayerSlot(slot) || isGridSlot(slot))) return false;
+        ItemStack s = stackAt(slot);
+        int max = ItemStack.maxStackFor(cursor.type(), player.getMaxStack());
+        return s.isEmpty() || (s.sameItem(cursor) && s.count() < max);
+    }
+
+    /**
+     * Drag-distribute: the cursor stack is spread over the dragged slots (empty or same-item, in drag order): a left drag
+     * gives each slot an equal share (rounded down, at least 1), a right drag gives each exactly one. What is left stays
+     * on the cursor. Returns false (nothing done) when fewer than two usable slots were dragged, so the caller can treat
+     * it as an ordinary click.
+     */
+    public boolean distribute(List<Integer> dragged, boolean right) {
+        List<Integer> slots = new ArrayList<>();
+        for (int s : dragged) if (!slots.contains(s) && canDragInto(s)) slots.add(s);
+        if (slots.size() < 2) return false;
+        int max = ItemStack.maxStackFor(cursor.type(), player.getMaxStack());
+        int share = right ? 1 : Math.max(1, cursor.count() / slots.size());
+        for (int slot : slots) {
+            if (cursor.isEmpty()) break;
+            ItemStack s = stackAt(slot);
+            int room = max - s.count();
+            int put = Math.min(Math.min(share, room), cursor.count());
+            if (put <= 0) continue;
+            ItemStack placed = s.isEmpty() ? cursor.withCount(put) : s.withCount(s.count() + put);
+            if (isGridSlot(slot)) grid.set(slot - GRID_BASE, placed);
+            else player.set(slot, placed);
+            cursor = cursor.withCount(cursor.count() - put);
+        }
+        recomputeResult();
+        return true;
+    }
+
     /** Debug summary of the grid, e.g. "OAK_LOGx1" per non-empty cell. */
     public String gridSummary() {
         StringBuilder sb = new StringBuilder();

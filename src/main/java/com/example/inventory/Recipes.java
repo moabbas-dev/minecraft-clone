@@ -128,8 +128,39 @@ public final class Recipes {
             // the request's own exact vanilla shape, generalized to every log this project has.
             new Recipe(new String[]{".L.", "LFL", ".L."},
                     Map.of('L', Recipes::isLog, 'F', only(BlockType.FURNACE)),
-                    new ItemStack(BlockType.SMOKER, 1))
+                    new ItemStack(BlockType.SMOKER, 1)),
+
+            // Storage blocks: nine items in a full 3x3 make a block, and one block unpacks to nine (docs/vanilla-rules.md 2).
+            storageBlock(BlockType.IRON_INGOT, BlockType.IRON_BLOCK),
+            storageBlock(BlockType.GOLD_INGOT, BlockType.GOLD_BLOCK),
+            storageBlock(BlockType.DIAMOND, BlockType.DIAMOND_BLOCK),
+            unpack(BlockType.IRON_BLOCK, BlockType.IRON_INGOT),
+            unpack(BlockType.GOLD_BLOCK, BlockType.GOLD_INGOT),
+            unpack(BlockType.DIAMOND_BLOCK, BlockType.DIAMOND),
+
+            // Four of a material in a 2x2 make its block: bricks, snow, clay, glowstone.
+            square(BlockType.BRICK, BlockType.BRICKS),
+            square(BlockType.SNOWBALL, BlockType.SNOW_BLOCK),
+            square(BlockType.CLAY_BALL, BlockType.CLAY),
+            square(BlockType.GLOWSTONE_DUST, BlockType.GLOWSTONE),
+
+            // TNT: gunpowder and sand (or red sand) alternating in a 3x3, gunpowder on the corners and the centre.
+            new Recipe(new String[]{"GSG", "SGS", "GSG"},
+                    Map.of('G', only(BlockType.GUNPOWDER), 'S', t -> t == BlockType.SAND || t == BlockType.RED_SAND),
+                    new ItemStack(BlockType.TNT, 1))
     );
+
+    private static Recipe storageBlock(BlockType item, BlockType block) {
+        return new Recipe(new String[]{"III", "III", "III"}, Map.of('I', only(item)), new ItemStack(block, 1));
+    }
+
+    private static Recipe unpack(BlockType block, BlockType item) {
+        return new Recipe(new String[]{"B"}, Map.of('B', only(block)), new ItemStack(item, 9));
+    }
+
+    private static Recipe square(BlockType item, BlockType block) {
+        return new Recipe(new String[]{"II", "II"}, Map.of('I', only(item)), new ItemStack(block, 1));
+    }
 
     /** Number of registered recipes (for tests / debug output). */
     public static int count() {

@@ -21,7 +21,7 @@ Verification in the notes column: `unit` = a unit test, `live` = checked in the 
 | M10 | Stack sizes | 16: egg, snowball, ender pearl, bucket, sign; 1: tools, armor (1.7) | tools/armor 1, egg and snowball 16, everything else 64 | [x] | G1 unit + live: 40 eggs became 16/16/8 |
 | M11 | Armor defense/toughness | 1.6 | ArmorStats leather 1/3/2/1, iron 2/6/5/2, gold 2/5/3/1, diamond 3/8/6/3 tough 2 | [x] | unit CombatSystemTest |
 | M12 | Crafting recipes (existing) | 2 | planks, sticks, table, furnace, chest, sandstone, tools, swords, armor, blast furnace, smoker all match | [x] | Recipes |
-| M13 | Crafting recipes (missing) | 2 | no torch, bread, ladder, bucket, shears, bow, arrow, TNT, bricks, bookshelf, bottle, ingot/ore storage blocks | [ ] | tracked per item below |
+| M13 | Crafting recipes (missing) | 2 | partly fixed | [~] | G6 unit RecipesVanillaTest + live: iron block from 9 ingots. Added storage blocks (+unpack), bricks, snow, clay, glowstone, TNT. Still missing: torch, bread/wheat, ladder, bucket, shears, bow, book/bookshelf (needs paper), glass bottle - their ingredient items do not exist yet |
 | M14 | Smelting time | furnace 200 t, blast/smoker 100 t (2.1) | CookingStationType | [x] | unit |
 | M15 | Fuel burn times | coal/charcoal 1600, planks/logs 300, stick 100 (2.1) | FuelRegistry; lava/blaze/coal block missing (no items) | [x] |  |
 | M16 | Smelting XP | iron 0.7, gold 1.0, glass 0.1, meat 0.35 (2.1) | CookingRecipeRegistry; coal ore and diamond ore recipes absent | [x] | missing recipes are non-vanilla-critical |
@@ -38,11 +38,12 @@ Verification in the notes column: `unit` = a unit test, `live` = checked in the 
 | M27 | Weather durations | rain 12000-24000 t (4) | MIN_RAIN_SECONDS 600 (= 12000 t); others not audited | [x] |  |
 | M28 | Dropped item rules | pickup 10 t / 40 t thrown, despawn 6000 t, merge 0.5 x 0.25 x 0.5 (6) | 0.5 s / 2 s, 300 s ok; merge centre distance 0.75 = 0.25-wide boxes inflated by the wiki's 0.5 | [x] | not wrong: 0.5 is the inflate amount, not the centre distance |
 | M29 | Inventory: pick up / place / swap / half / one | 6 | InventoryMenu left/right click | [x] | unit InventoryTest |
-| M30 | Inventory: shift-click quick move | 6 | not implemented | [ ] |  |
-| M31 | Inventory: double-click gather | 6 | not implemented | [ ] |  |
-| M32 | Inventory: drag to distribute | 6 | not implemented | [ ] |  |
-| M33 | Inventory: number key swap | 6 | not implemented | [ ] |  |
-| M34 | Crafting result shift-click | crafts as many as possible | not implemented | [ ] |  |
+| M30 | Inventory: shift-click quick move | 6 | InventoryMenu.quickMove, shift held in Game.updateInventoryScreen | [x] | G6 unit InventoryMenuVanillaTest (hotbar<->storage, merge first, wear armor, grid/armor back to inventory) |
+| M31 | Inventory: double-click gather | 6 | InventoryMenu.gatherSame | [x] | G6 unit: partial stacks drained first, other items untouched; 250 ms same-slot double click in Game |
+| M32 | Inventory: drag to distribute | 6 | InventoryMenu.distribute | [x] | G6 unit: left drag even split with remainder, right drag one each, skips other items, respects the limit; resolves on button release in Game |
+| M33 | Inventory: number key swap | 6 | InventoryMenu.swapWithHotbar | [x] | G6 unit: swaps with hotbar slot only while the cursor is empty; uses the rebindable hotbar keys |
+| M34 | Crafting result shift-click | crafts as many as possible | InventoryMenu.craftAll via shift-click | [x] | G6 unit: crafts as many as fit, never into a full inventory |
+| M35 | Block display names | 1.21 names (Oak Planks, Oak Log, ...) | renamed 9 wood blocks from the pre-1.13 names ("Oak Wood", "Oak Wood Planks") | [x] | G6 live: tooltip shows the vanilla name |
 
 ## 2. HUD
 
