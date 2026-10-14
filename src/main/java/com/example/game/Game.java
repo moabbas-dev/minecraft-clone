@@ -77,12 +77,8 @@ public class Game implements GameAccess {
     private static final float DAY_LENGTH_SECONDS = 1200f; // vanilla: 24000 ticks = 20 minutes
     private static final float CELESTIAL_DISTANCE = 180f;
     private static final float CELESTIAL_SIZE = 28f;
-    private static final int RAIN_PARTICLE_COUNT = 1000;
-    private static final int NIGHT_MOTE_COUNT = 70;
-    private static final float NIGHT_MOTE_RADIUS = 14f;
-    private static final float RAIN_RADIUS = 20f;
-    private static final float RAIN_SPAWN_HEIGHT = 15f;
-    private static final float RAIN_FALL_SPEED = 12f;
+    /** Vanilla draws rain in the (2 x radius + 1)^2 block columns around the camera: 10 on Fancy graphics. */
+    private static final int RAIN_COLUMN_RADIUS = 10;
     private static final float SPRINT_FOV_BOOST = 5f;
     private static final float FOV_LERP_RATE = 9f;
     private static final float SWING_DURATION = 0.3f; // vanilla: 6 ticks
@@ -228,17 +224,19 @@ public class Game implements GameAccess {
     private TestController testController;
 
     private Mesh rainMesh;
-    private final java.util.Random rainRandom = new java.util.Random();
-    private final float[] rainX = new float[RAIN_PARTICLE_COUNT];
-    private final float[] rainY = new float[RAIN_PARTICLE_COUNT];
-    private final float[] rainZ = new float[RAIN_PARTICLE_COUNT];
-    private final float[] moteX = new float[NIGHT_MOTE_COUNT];
-    private final float[] moteY = new float[NIGHT_MOTE_COUNT];
-    private final float[] moteZ = new float[NIGHT_MOTE_COUNT];
-    private final float[] motePhase = new float[NIGHT_MOTE_COUNT];
-    private float moteTime = 0f;
-    private boolean motesInitialized = false;
-    private Mesh moteMesh;
+    /** Seconds of rain animation (vanilla counts ticks: 20 per second). */
+    private float rainTime = 0f;
+    /** The item shown in the first-person hand (null = bare hand); it lags the selection while the hand lowers and raises. */
+    private BlockType shownHeld;
+    /** 0 = hand fully lowered, 1 = fully raised; drives the equip animation. */
+    private float equipRaised;
+    private final java.util.Set<String> missingTextures = new java.util.HashSet<>();
+    private final com.example.fx.SpriteParticles critParticles =
+            new com.example.fx.SpriteParticles(com.example.fx.SpriteParticles.Kind.CRIT, new java.util.Random());
+    private final com.example.fx.SpriteParticles damageParticles =
+            new com.example.fx.SpriteParticles(com.example.fx.SpriteParticles.Kind.DAMAGE_INDICATOR, new java.util.Random());
+    private int forcedDropRequests;
+    private boolean forcedDropWholeStack;
 
     // 11 floats/vertex everywhere: position(3), uv(2), skyShade(1), blockLight(1), tint(3),
     // windWeight(1) - one shared layout across every mesh that uses chunkShader (chunk terrain,
@@ -283,7 +281,6 @@ public class Game implements GameAccess {
         hudTextures = HudTextures.loadOrNull();
         sunMoonMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
         rainMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
-        moteMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
         heldItemMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
         itemMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
         mobMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
@@ -450,7 +447,6 @@ public class Game implements GameAccess {
 
         resetGameplayState(new Inventory(), settings.difficulty());
         weather = new Weather(seed);
-        initRainParticles();
 
         window.setTitle("Minecraft 1.8 Clone - " + settings.name());
         window.captureMouse();
@@ -513,7 +509,6 @@ public class Game implements GameAccess {
             mobs.spawn(m);
         }
         weather = new Weather(meta.seed());
-        initRainParticles();
 
         window.setTitle("Minecraft 1.8 Clone - " + meta.settings().name());
         window.captureMouse();
@@ -681,6 +676,10 @@ public class Game implements GameAccess {
         mining.reset();
         itemEntities.clear();
         particles.clear();
+        critParticles.clear();
+        damageParticles.clear();
+        shownHeld = inventory.selected().isEmpty() ? null : inventory.selected().type();
+        equipRaised = 0f; // the hand rises when the world opens, like a freshly equipped item
         mobs.clear();
         xpOrbs.clear();
         fallingBlocks.clear();
@@ -783,6 +782,10 @@ public class Game implements GameAccess {
         if (pressed(com.example.ui.KeyBindings.Bind.DROP)) {
             dropHeldItem(input.isKeyDown(GLFW_KEY_LEFT_CONTROL) || input.isKeyDown(GLFW_KEY_RIGHT_CONTROL));
         }
+        if (forcedDropRequests > 0) {
+            forcedDropRequests--;
+            dropHeldItem(forcedDropWholeStack);
+        }
 
         float mouseSpeed = options.mouseSpeedMultiplier();
         player.look(input.getMouseDeltaX() * mouseSpeed, input.getMouseDeltaY() * mouseSpeed * (options.invertMouse ? -1f : 1f));
@@ -806,12 +809,21 @@ public class Game implements GameAccess {
             lastHeldType = heldNow;
             attackTimer = 0f; // switching items restarts the attack cooldown, as in vanilla
         }
+        // Equip animation: the old item is lowered, then the new one is raised (vanilla's reequip bob).
+        if (heldNow != shownHeld) {
+            equipRaised -= dt / HeldItemModel.EQUIP_SECONDS;
+            if (equipRaised <= 0f) {
+                equipRaised = 0f;
+                shownHeld = heldNow;
+            }
+        } else {
+            equipRaised = Math.min(1f, equipRaised + dt / HeldItemModel.EQUIP_SECONDS);
+        }
 
         dayTime += dt / DAY_LENGTH_SECONDS;
         dayTime -= (float) Math.floor(dayTime);
         weather.update(dt);
-        updateRainParticles(dt);
-        updateNightMotes(dt);
+        rainTime += dt;
         saplingGrowth.update(world, dt);
         tickCookingStations(dt);
         windTime += dt;
@@ -918,97 +930,6 @@ public class Game implements GameAccess {
             long tookMicros = (System.nanoTime() - (deadline - STREAMING_TIME_BUDGET_NANOS)) / 1000;
             log.debug("Streaming: generated={}, unloaded={}, remeshed={}, took={}us", generated, unloaded, meshed, tookMicros);
         }
-    }
-
-    private void initRainParticles() {
-        for (int i = 0; i < RAIN_PARTICLE_COUNT; i++) {
-            respawnRainParticle(i, true);
-        }
-    }
-
-    private void updateRainParticles(float dt) {
-        if (!weather.isRaining()) return;
-        for (int i = 0; i < RAIN_PARTICLE_COUNT; i++) {
-            rainY[i] -= RAIN_FALL_SPEED * dt;
-            int groundY = world.getColumnHeightAt((int) Math.floor(rainX[i]), (int) Math.floor(rainZ[i]));
-            if (rainY[i] < groundY + 1f || rainY[i] < player.position.y - 30f) {
-                respawnRainParticle(i, false);
-            }
-        }
-    }
-
-    /** randomHeight=true scatters the initial Y too, so particles don't all start at once mid-air in a flat sheet. */
-    private void respawnRainParticle(int i, boolean randomHeight) {
-        double angle = rainRandom.nextDouble() * Math.PI * 2;
-        double radius = rainRandom.nextDouble() * RAIN_RADIUS;
-        rainX[i] = player.position.x + (float) (Math.cos(angle) * radius);
-        rainZ[i] = player.position.z + (float) (Math.sin(angle) * radius);
-        rainY[i] = player.position.y + RAIN_SPAWN_HEIGHT * (randomHeight ? rainRandom.nextFloat() : 1f);
-    }
-
-    /** Night = well past sunset; motes only exist while it is NOT raining. */
-    private boolean nightMotesActive() {
-        return !weather.isRaining() && computeDaylightFactor(sunDirection(dayTime)) < 0.3f;
-    }
-
-    private void updateNightMotes(float dt) {
-        if (!nightMotesActive()) {
-            motesInitialized = false;
-            return;
-        }
-        if (!motesInitialized) {
-            for (int i = 0; i < NIGHT_MOTE_COUNT; i++) respawnMote(i);
-            motesInitialized = true;
-        }
-        moteTime += dt;
-        for (int i = 0; i < NIGHT_MOTE_COUNT; i++) {
-            float t = moteTime * 0.6f + motePhase[i];
-            moteX[i] += (float) Math.sin(t * 1.3f) * 0.35f * dt;
-            moteZ[i] += (float) Math.cos(t * 0.9f) * 0.35f * dt;
-            moteY[i] += (float) Math.sin(t * 0.7f) * 0.25f * dt;
-            float dx = moteX[i] - player.position.x, dz = moteZ[i] - player.position.z;
-            if (dx * dx + dz * dz > NIGHT_MOTE_RADIUS * NIGHT_MOTE_RADIUS) respawnMote(i);
-        }
-    }
-
-    private void respawnMote(int i) {
-        double angle = rainRandom.nextDouble() * Math.PI * 2;
-        double radius = Math.sqrt(rainRandom.nextDouble()) * NIGHT_MOTE_RADIUS;
-        moteX[i] = player.position.x + (float) (Math.cos(angle) * radius);
-        moteZ[i] = player.position.z + (float) (Math.sin(angle) * radius);
-        int ground = world.getColumnHeightAt((int) Math.floor(moteX[i]), (int) Math.floor(moteZ[i]));
-        moteY[i] = Math.max(ground + 1f, player.position.y - 3f) + rainRandom.nextFloat() * 3f;
-        motePhase[i] = rainRandom.nextFloat() * 6.28f;
-    }
-
-    private void renderNightMotes() {
-        if (!nightMotesActive() || !motesInitialized) return;
-        Vector3f front = player.frontVector();
-        Vector3f right = new Vector3f(-front.z, 0, front.x);
-        if (right.lengthSquared() < 1e-6f) right.set(1, 0, 0);
-        right.normalize();
-        Vector3f up = new Vector3f(right).cross(front).normalize();
-        float[] uv = atlas.getUv(Tile.NIGHT_MOTE);
-        float half = 0.07f;
-        float[] verts = new float[NIGHT_MOTE_COUNT * 6 * 11];
-        int idx = 0;
-        for (int i = 0; i < NIGHT_MOTE_COUNT; i++) {
-            float pulse = 0.65f + 0.35f * (float) Math.sin(moteTime * 2.2f + motePhase[i] * 3f);
-            float h = half * pulse;
-            float cx = moteX[i], cy = moteY[i], cz = moteZ[i];
-            float rx = right.x * h, ry = right.y * h, rz = right.z * h;
-            float ux = up.x * h, uy = up.y * h, uz = up.z * h;
-            idx = putVertex(verts, idx, cx - rx - ux, cy - ry - uy, cz - rz - uz, uv[0], uv[3]);
-            idx = putVertex(verts, idx, cx + rx - ux, cy + ry - uy, cz + rz - uz, uv[2], uv[3]);
-            idx = putVertex(verts, idx, cx + rx + ux, cy + ry + uy, cz + rz + uz, uv[2], uv[1]);
-            idx = putVertex(verts, idx, cx - rx - ux, cy - ry - uy, cz - rz - uz, uv[0], uv[3]);
-            idx = putVertex(verts, idx, cx + rx + ux, cy + ry + uy, cz + rz + uz, uv[2], uv[1]);
-            idx = putVertex(verts, idx, cx - rx + ux, cy - ry + uy, cz - rz + uz, uv[0], uv[1]);
-        }
-        chunkShader.setUniform("uModel", IDENTITY);
-        chunkShader.setUniform("uAlpha", 1f);
-        moteMesh.upload(verts);
-        moteMesh.draw();
     }
 
     private void rebuildMesh(Chunk chunk) {
@@ -1151,9 +1072,16 @@ public class Game implements GameAccess {
         Vector3f front = player.frontVector();
         // Vanilla pushes the victim along the attacker's facing, i.e. away from a point behind the target.
         Vector3f pushFrom = new Vector3f(target.position.x - front.x, 0f, target.position.z - front.z);
+        float healthBefore = target.getHealth().getCurrentHealth();
         boolean applied = target.hurtBy(damage, com.example.survival.DamageSource.PLAYER, pushFrom,
                 com.example.combat.CombatMath.knockbackStrength(sprintHit));
         if (!applied) return; // a hit swallowed by the hurt window spends no durability
+        if (crit) critParticles.track(trackedBox(target));
+        float dealt = healthBefore - target.getHealth().getCurrentHealth();
+        if (dealt > 2f) { // vanilla: damage indicator hearts when more than one heart was taken, (int)(damage / 2) of them
+            damageParticles.spawnGaussian(target.position.x, target.position.y + target.getHeight() * 0.5f, target.position.z,
+                    0.1f, 0f, 0.1f, 0.2f, (int) (dealt * 0.5f));
+        }
         damageSelectedItem(com.example.combat.Durability.attackCost(heldType));
         gameAudio.play(crit ? "attack.crit" : charge >= 0.9f ? "attack.strong" : "attack.weak", null);
         if (sprintHit) gameAudio.play("attack.knockback", null);
@@ -1164,6 +1092,17 @@ public class Game implements GameAccess {
                         com.example.combat.CombatMath.BASE_KNOCKBACK * com.example.combat.CombatMath.SWEEP_KNOCKBACK_FACTOR);
             }
         }
+    }
+
+    /** A live view of a mob's bounding box for the critical-hit particle emitter. */
+    private static com.example.fx.SpriteParticles.Tracked trackedBox(Mob m) {
+        return new com.example.fx.SpriteParticles.Tracked() {
+            public float x() { return m.position.x; }
+            public float y() { return m.position.y; }
+            public float z() { return m.position.z; }
+            public float width() { return m.getWidth(); }
+            public float height() { return m.getHeight(); }
+        };
     }
 
     /** Spends durability on the selected hotbar item; a broken item disappears. */
@@ -1305,21 +1244,20 @@ public class Game implements GameAccess {
 
         GuiPainter.dim(uiRenderer, w, h);
         InventoryLayout.Rect p = layout.panel();
-        GuiPainter.panel(uiRenderer, p.x(), p.y(), p.w(), p.h(), s);
+        com.example.engine.HudTextures.Sprite bg = guiSprite(layout.hasArmorSlots()
+                ? "textures/gui/container/inventory.png" : "textures/gui/container/crafting_table.png");
+        if (bg != null) GuiPainter.background(uiRenderer, bg, p);
+        else GuiPainter.panel(uiRenderer, p.x(), p.y(), p.w(), p.h(), s);
         font.draw(uiRenderer, "Crafting", layout.titleX(), layout.titleY(), s, 0x404040, false);
         if (!layout.hasArmorSlots()) { // vanilla's player inventory has no "Inventory" caption, the crafting table does
             font.draw(uiRenderer, "Inventory", layout.inventoryLabelX(), layout.inventoryLabelY(), s, 0x404040, false);
         }
-        if (layout.hasArmorSlots()) {
-            InventoryLayout.Rect pv = layout.previewBox();
-            GuiPainter.inset(uiRenderer, pv.x(), pv.y(), pv.w(), pv.h(), s);
-        }
-        GuiPainter.arrow(uiRenderer, layout.arrow(), s, 0f);
 
-        for (int slot = 0; slot < Inventory.DEFAULT_SLOT_COUNT; slot++) drawMenuSlot(layout, slot, hovered);
-        for (int i = 0; i < menu.getGridSize() * menu.getGridSize(); i++) drawMenuSlot(layout, InventoryMenu.GRID_BASE + i, hovered);
-        drawMenuSlot(layout, InventoryMenu.RESULT_SLOT, hovered);
-        if (layout.hasArmorSlots()) for (int i = 0; i < 4; i++) drawMenuSlot(layout, InventoryMenu.ARMOR_BASE + i, hovered);
+        boolean frames = bg == null; // the real texture already has the slot frames, the grid arrow and the preview box
+        for (int slot = 0; slot < Inventory.DEFAULT_SLOT_COUNT; slot++) drawMenuSlot(layout, slot, hovered, frames);
+        for (int i = 0; i < menu.getGridSize() * menu.getGridSize(); i++) drawMenuSlot(layout, InventoryMenu.GRID_BASE + i, hovered, frames);
+        drawMenuSlot(layout, InventoryMenu.RESULT_SLOT, hovered, frames);
+        if (layout.hasArmorSlots()) for (int i = 0; i < 4; i++) drawMenuSlot(layout, InventoryMenu.ARMOR_BASE + i, hovered, frames);
 
         ItemStack held = menu.getCursor();
         if (!held.isEmpty()) {
@@ -1331,10 +1269,28 @@ public class Game implements GameAccess {
         }
     }
 
-    private void drawMenuSlot(InventoryLayout layout, int slot, int hovered) {
+    /** The real container texture file as a sprite, loaded once; null (and remembered) when it is not there. */
+    private com.example.engine.HudTextures.Sprite guiSprite(String path) {
+        if (missingGuiSprites.contains(path)) return null;
+        com.example.engine.HudTextures.Sprite s = guiSprites.get(path);
+        if (s == null) {
+            s = com.example.engine.HudTextures.loadFile(path);
+            if (s == null) {
+                missingGuiSprites.add(path);
+                return null;
+            }
+            guiSprites.put(path, s);
+        }
+        return s;
+    }
+
+    private final java.util.Map<String, com.example.engine.HudTextures.Sprite> guiSprites = new java.util.HashMap<>();
+    private final java.util.Set<String> missingGuiSprites = new java.util.HashSet<>();
+
+    private void drawMenuSlot(InventoryLayout layout, int slot, int hovered, boolean frame) {
         InventoryLayout.Rect r = layout.slotRect(slot);
         ItemStack stack = menu.stackAt(slot);
-        GuiPainter.slot(uiRenderer, r.x(), r.y(), layout.scale());
+        if (frame) GuiPainter.slot(uiRenderer, r.x(), r.y(), layout.scale());
         if (!stack.isEmpty()) {
             drawBlockIcon(stack.type(), r.x(), r.y(), r.w());
             if (stack.count() > 1) drawStackCount(stack.count(), r.x(), r.y(), r.w());
@@ -1429,20 +1385,34 @@ public class Game implements GameAccess {
 
         GuiPainter.dim(uiRenderer, w, h);
         InventoryLayout.Rect p = layout.panel();
-        GuiPainter.panel(uiRenderer, p.x(), p.y(), p.w(), p.h(), s);
+        String dir = station.getType().name().toLowerCase(java.util.Locale.ROOT);
+        com.example.engine.HudTextures.Sprite bg = guiSprite("textures/gui/container/" + dir + ".png");
+        if (bg != null) GuiPainter.background(uiRenderer, bg, p);
+        else GuiPainter.panel(uiRenderer, p.x(), p.y(), p.w(), p.h(), s);
 
         String title = station.getType().displayName;
         font.draw(uiRenderer, title, layout.titleX(font.width(title, 1f)), layout.titleY(), s, 0x404040, false);
         font.draw(uiRenderer, "Inventory", layout.inventoryLabelX(), layout.inventoryLabelY(), s, 0x404040, false);
 
-        for (int slot = 0; slot < Inventory.DEFAULT_SLOT_COUNT; slot++) drawCookingSlot(layout, cookingMenu, slot, hovered);
-        drawCookingSlot(layout, cookingMenu, CookingMenu.INPUT_SLOT, hovered);
-        drawCookingSlot(layout, cookingMenu, CookingMenu.FUEL_SLOT, hovered);
-        drawCookingSlot(layout, cookingMenu, CookingMenu.OUTPUT_SLOT, hovered);
+        boolean frames = bg == null;
+        for (int slot = 0; slot < Inventory.DEFAULT_SLOT_COUNT; slot++) drawCookingSlot(layout, cookingMenu, slot, hovered, frames);
+        drawCookingSlot(layout, cookingMenu, CookingMenu.INPUT_SLOT, hovered, frames);
+        drawCookingSlot(layout, cookingMenu, CookingMenu.FUEL_SLOT, hovered, frames);
+        drawCookingSlot(layout, cookingMenu, CookingMenu.OUTPUT_SLOT, hovered, frames);
 
-        // The flame between input and fuel burns down as the fuel does; the arrow fills as the item cooks.
-        GuiPainter.flame(uiRenderer, layout.flame(), s, station.isBurning() ? station.burnFraction() : 0f);
-        GuiPainter.arrow(uiRenderer, layout.arrow(), s, station.cookFraction());
+        // The lit flame between input and fuel drains as the fuel burns; the arrow fills as the item cooks (vanilla's sprites).
+        com.example.engine.HudTextures.Sprite lit = guiSprite("textures/gui/sprites/container/" + dir + "/lit_progress.png");
+        if (lit != null && station.isBurning()) {
+            int k = Math.min(14, (int) Math.ceil(station.burnFraction() * 13.0) + 1);
+            com.example.engine.HudTextures.drawRegion(uiRenderer, lit, p.x() + 56 * s, p.y() + (36 + 14 - k) * s, 14 * s, k * s,
+                    0f, (14f - k) / 14f, 1f, 1f);
+        }
+        com.example.engine.HudTextures.Sprite burn = guiSprite("textures/gui/sprites/container/" + dir + "/burn_progress.png");
+        int filled = (int) Math.ceil(station.cookFraction() * 24.0);
+        if (burn != null && filled > 0) {
+            com.example.engine.HudTextures.drawRegion(uiRenderer, burn, p.x() + 79 * s, p.y() + 34 * s, filled * s, 16 * s,
+                    0f, 0f, filled / 24f, 1f);
+        }
 
         ItemStack held = cookingMenu.getCursor();
         if (!held.isEmpty()) {
@@ -1454,10 +1424,10 @@ public class Game implements GameAccess {
         }
     }
 
-    private void drawCookingSlot(CookingLayout layout, CookingMenu menu, int slot, int hovered) {
+    private void drawCookingSlot(CookingLayout layout, CookingMenu menu, int slot, int hovered, boolean frame) {
         InventoryLayout.Rect r = layout.slotRect(slot);
         ItemStack stack = menu.stackAt(slot);
-        GuiPainter.slot(uiRenderer, r.x(), r.y(), layout.scale());
+        if (frame) GuiPainter.slot(uiRenderer, r.x(), r.y(), layout.scale());
         if (!stack.isEmpty()) {
             drawBlockIcon(stack.type(), r.x(), r.y(), r.w());
             if (stack.count() > 1) drawStackCount(stack.count(), r.x(), r.y(), r.w());
@@ -1524,6 +1494,8 @@ public class Game implements GameAccess {
         itemEntities.update(world, dt);
         if (itemEntities.collect(player.position, inventory) > 0) gameAudio.playPickup();
         particles.update(dt);
+        critParticles.update(dt);
+        damageParticles.update(dt);
     }
 
     /** Cached per-block-type UVs/tints for dropped items and particles (built once, on first use). */
@@ -1701,10 +1673,10 @@ public class Game implements GameAccess {
         renderXpOrbs();
         renderFallingBlocks();
         renderParticles();
+        renderSpriteParticles();
 
         renderSunAndMoon(eye, sunDir, stormFactor, weather.isThundering());
         renderRain();
-        renderNightMotes();
         renderHeldItem();
 
         chunkShader.unbind();
@@ -1732,7 +1704,11 @@ public class Game implements GameAccess {
         atlas.bind(0);
     }
 
-    /** All dropped items in one batched draw through the existing chunk shader/atlas. */
+    /**
+     * All dropped items, batched through the chunk shader and atlas. Blocks are small spinning cubes (display scale 0.25);
+     * everything else (food, tools, ingots, saplings) is its flat sprite extruded 1/16 thick at vanilla's ground display
+     * scale of 0.5, so a dropped steak looks like the steak icon rather than a crate.
+     */
     private void renderDroppedItems() {
         java.util.List<ItemEntity> list = itemEntities.entities();
         int n = 0;
@@ -1741,18 +1717,33 @@ public class Game implements GameAccess {
             ItemModelBuilder.Model m = itemModelFor(e.getType());
             float t = e.getAge();
             float cos = (float) Math.cos(t * 1.6f), sin = (float) Math.sin(t * 1.6f);
-            float half = m.cross() ? 0.17f : 0.125f;
+            float half = m.cross() ? 0.25f : 0.125f;
             float bob = e.isOnGround() ? 0.05f + (float) Math.sin(t * 2.6f) * 0.03f : 0f;
             float cy = e.position.y + half + bob;
             int bx = (int) Math.floor(e.position.x), by = (int) Math.floor(cy), bz = (int) Math.floor(e.position.z);
             float sky = world.getSkyLight(bx, by, bz) / 15f;
             float blk = world.getBlockLight(bx, by, bz) / 15f;
-            n = m.cross()
-                    ? ItemModelBuilder.emitCross(itemScratch, n, e.position.x, cy, e.position.z, half, cos, sin, m, sky, blk)
-                    : ItemModelBuilder.emitCube(itemScratch, n, e.position.x, cy, e.position.z, half, cos, sin, m, sky, blk);
+            if (m.cross()) {
+                float[] sprite = heldMeshCache.computeIfAbsent(e.getType(), this::buildFlatItemHeldVerts);
+                if (n + sprite.length > itemScratch.length) {
+                    flushItems(n);
+                    n = 0;
+                }
+                n = ItemModelBuilder.emitSprite(itemScratch, n, sprite, e.position.x, cy, e.position.z, 0.5f, cos, sin, sky, blk);
+            } else {
+                if (n + ItemModelBuilder.MAX_FLOATS_PER_ITEM > itemScratch.length) {
+                    flushItems(n);
+                    n = 0;
+                }
+                n = ItemModelBuilder.emitCube(itemScratch, n, e.position.x, cy, e.position.z, half, cos, sin, m, sky, blk);
+            }
         }
-        if (n == 0) return;
-        itemMesh.upload(itemScratch, n);
+        flushItems(n);
+    }
+
+    private void flushItems(int floats) {
+        if (floats == 0) return;
+        itemMesh.upload(itemScratch, floats);
         chunkShader.setUniform("uModel", IDENTITY);
         itemMesh.draw();
     }
@@ -2040,8 +2031,48 @@ public class Game implements GameAccess {
         particleMesh.draw();
     }
 
+    /** The real texture file under {@code key}, loaded once; null (and remembered) when the file is not there. */
+    private com.example.engine.EntityTexture realTexture(String key, String path, boolean repeat) {
+        if (missingTextures.contains(key)) return null;
+        com.example.engine.EntityTexture tex = mobSkins.get(key);
+        if (tex == null) {
+            tex = com.example.engine.EntityTexture.loadReal(path, repeat);
+            if (tex == null) {
+                missingTextures.add(key);
+                return null;
+            }
+            mobSkins.put(key, tex);
+        }
+        return tex;
+    }
+
+    /** Critical-hit stars and damage-indicator hearts: camera-facing sprites over the real particle textures. */
+    private void renderSpriteParticles() {
+        drawSpriteParticles(critParticles, "particle.critical_hit", "textures/particle/critical_hit.png");
+        drawSpriteParticles(damageParticles, "particle.damage", "textures/particle/damage.png");
+    }
+
+    private void drawSpriteParticles(com.example.fx.SpriteParticles ps, String key, String path) {
+        if (ps.count() == 0) return;
+        com.example.engine.EntityTexture tex = realTexture(key, path, false);
+        if (tex == null) return;
+        Vector3f front = player.frontVector();
+        Vector3f right = new Vector3f(-front.z, 0, front.x);
+        if (right.lengthSquared() < 1e-6f) right.set(1, 0, 0);
+        right.normalize();
+        Vector3f up = new Vector3f(right).cross(front).normalize();
+        Vector3f at = player.position;
+        int bx = (int) Math.floor(at.x), by = (int) Math.floor(at.y + 1f), bz = (int) Math.floor(at.z);
+        int floats = ps.buildVertices(particleScratch, right, up, world.getSkyLight(bx, by, bz) / 15f, world.getBlockLight(bx, by, bz) / 15f);
+        particleMesh.upload(particleScratch, floats);
+        chunkShader.setUniform("uModel", IDENTITY);
+        tex.bind(0);
+        particleMesh.draw();
+        atlas.bind(0);
+    }
+
     private void renderHeldItem() {
-        ItemStack heldStack = inventory.selected();
+        BlockType shown = shownHeld;
         glClear(GL_DEPTH_BUFFER_BIT);
 
         // Vanilla draws the hand with the player's field of view; the transforms below are vanilla's ItemInHandRenderer ones.
@@ -2056,17 +2087,20 @@ public class Game implements GameAccess {
         // 0..1 progress through the swing (vanilla's attackAnim); 0 when idle
         float swing = swingTimer > 0f ? 1f - swingTimer / SWING_DURATION : 0f;
 
+        float drop = HeldItemModel.equipDrop(equipRaised);
         float[] verts;
         Matrix4f model;
-        if (heldStack.isEmpty()) {
-            // Nothing in the hand: the bare 4x12x4 px arm, the only time vanilla draws the arm.
+        com.example.engine.EntityTexture armSkin = null;
+        if (shown == null) {
+            // Nothing in the hand: the bare 4x12x4 px arm of the real player skin, the only time vanilla draws the arm.
+            armSkin = realTexture("player.steve", "textures/entity/player/wide/steve.png", false);
+            if (armSkin == null) return;
             verts = armVerts();
-            model = HeldItemModel.emptyArm(swing);
+            model = HeldItemModel.emptyArm(swing, drop);
         } else {
-            BlockType held = heldStack.type();
-            boolean flat = ChunkMeshBuilder.isFlatIconItem(held);
-            verts = heldMeshCache.computeIfAbsent(held, h -> flat ? buildFlatItemHeldVerts(h) : buildHeldItemVerts(h));
-            model = flat ? HeldItemModel.flatItem(swing) : HeldItemModel.block(swing);
+            boolean flat = ChunkMeshBuilder.isFlatIconItem(shown);
+            verts = heldMeshCache.computeIfAbsent(shown, h -> flat ? buildFlatItemHeldVerts(h) : buildHeldItemVerts(h));
+            model = flat ? HeldItemModel.flatItem(swing, drop) : HeldItemModel.block(swing, drop);
         }
         model = new Matrix4f().translate(bobX * 0.5f, -bobY * 0.5f, 0f).mul(model);
 
@@ -2078,16 +2112,18 @@ public class Game implements GameAccess {
         chunkShader.setUniform("uFogEnd", 2_000_000f);
 
         heldItemMesh.upload(verts);
+        if (armSkin != null) armSkin.bind(0);
         heldItemMesh.draw();
+        if (armSkin != null) atlas.bind(0);
     }
 
     private float[] armVertsCache;
 
     private final java.util.Map<BlockType, float[]> heldMeshCache = new java.util.EnumMap<>(BlockType.class);
 
-    /** The bare-hand arm: the 4x12x4 px player arm in skin tone, built once (its motion comes from the model matrix). */
+    /** The bare-hand arm: the 4x12x4 px player arm UV-mapped onto the real skin, built once (its motion comes from the model matrix). */
     private float[] armVerts() {
-        if (armVertsCache == null) armVertsCache = HeldItemModel.armBox(atlas.getUv(Tile.SKIN));
+        if (armVertsCache == null) armVertsCache = HeldItemModel.armBox();
         return armVertsCache;
     }
 
@@ -2161,57 +2197,73 @@ public class Game implements GameAccess {
         return idx;
     }
 
+    /**
+     * Vanilla's rain: for every block column within {@link #RAIN_COLUMN_RADIUS} of the camera, one vertical quad (turned to
+     * face the camera) from the column's rain-proof surface up to the camera's height plus the radius, textured with the real
+     * {@code environment/rain.png}, one block wide with four blocks per texture height, and scrolled downwards at a rate that
+     * is randomised per column. Columns under a roof draw nothing because their quad would be empty.
+     */
     private void renderRain() {
         if (!weather.isRaining()) return;
+        com.example.engine.EntityTexture rain = realTexture("environment.rain", "textures/environment/rain.png", true);
+        if (rain == null) return;
 
-        Vector3f front = player.frontVector();
-        Vector3f right = new Vector3f(-front.z, 0, front.x);
-        if (right.lengthSquared() < 1e-6f) right.set(1, 0, 0);
-        right.normalize();
-        Vector3f up = new Vector3f(0, 1, 0);
+        Vector3f cam = player.renderEyePosition();
+        int cx = (int) Math.floor(cam.x), cy = (int) Math.floor(cam.y), cz = (int) Math.floor(cam.z);
+        int ticks = (int) Math.floor(rainTime * 20f);
+        float partial = rainTime * 20f - ticks;
+        int r = RAIN_COLUMN_RADIUS;
 
-        float[] uv = atlas.getUv(Tile.RAIN);
-        float u0 = uv[0], v0 = uv[1], u1 = uv[2], v1 = uv[3];
-        float halfW = 0.02f, halfH = 0.26f; // thin short streaks; twice as many of them as before
-
-        chunkShader.setUniform("uModel", new Matrix4f());
-        chunkShader.setUniform("uAlpha", 1f);
+        float[] verts = new float[(2 * r + 1) * (2 * r + 1) * 6 * 11];
+        int idx = 0;
+        for (int z = cz - r; z <= cz + r; z++) {
+            for (int x = cx - r; x <= cx + r; x++) {
+                int surface = world.getColumnHeightAt(x, z) + 1;
+                int bottom = Math.max(cy - r, surface), top = Math.max(cy + r, surface);
+                if (bottom == top) continue;
+                float dx = x - cx, dz = z - cz;
+                float len = (float) Math.sqrt(dx * dx + dz * dz);
+                if (len < 1e-4f) { dx = 0f; dz = 1f; len = 1f; }
+                float sx = -dz / len * 0.5f, sz = dx / len * 0.5f; // half the quad's width, sideways to the line of sight
+                int seed = x * x * 3121 + x * 45238971 + z * z * 418711 + z * 13761;
+                float jitter = new java.util.Random(seed).nextFloat();
+                float scroll = -(((ticks + seed) & 31) + partial) / 32f * (3f + jitter);
+                int lightY = Math.max(surface, cy);
+                float sky = world.getSkyLight(x, lightY, z) / 15f, blk = world.getBlockLight(x, lightY, z) / 15f;
+                float x0 = x - cam.x + 0.5f - sx, x1 = x - cam.x + 0.5f + sx;
+                float z0 = z - cam.z + 0.5f - sz, z1 = z - cam.z + 0.5f + sz;
+                float yTop = top - cam.y, yBot = bottom - cam.y;
+                float vTop = bottom * 0.25f + scroll, vBot = top * 0.25f + scroll;
+                idx = rainVertex(verts, idx, x0, yTop, z0, 0f, vTop, sky, blk);
+                idx = rainVertex(verts, idx, x1, yTop, z1, 1f, vTop, sky, blk);
+                idx = rainVertex(verts, idx, x1, yBot, z1, 1f, vBot, sky, blk);
+                idx = rainVertex(verts, idx, x0, yTop, z0, 0f, vTop, sky, blk);
+                idx = rainVertex(verts, idx, x1, yBot, z1, 1f, vBot, sky, blk);
+                idx = rainVertex(verts, idx, x0, yBot, z0, 0f, vBot, sky, blk);
+            }
+        }
+        if (idx == 0) return;
+        chunkShader.setUniform("uModel", new Matrix4f().translation(cam.x, cam.y, cam.z));
+        chunkShader.setUniform("uAlpha", 0.8f);
         chunkShader.setUniform("uFogStart", 1_000_000f);
         chunkShader.setUniform("uFogEnd", 2_000_000f);
-
-        float[] verts = new float[RAIN_PARTICLE_COUNT * 6 * 11];
-        int idx = 0;
-        for (int i = 0; i < RAIN_PARTICLE_COUNT; i++) {
-            float cx = rainX[i], cy = rainY[i], cz = rainZ[i];
-            float ddx = cx - player.position.x, ddz = cz - player.position.z;
-            if (ddx * ddx + ddz * ddz < 1.2f * 1.2f) continue; // a streak right at the lens would fill the screen
-            float rx = right.x * halfW, ry = right.y * halfW, rz = right.z * halfW;
-            float ux = up.x * halfH, uy = up.y * halfH, uz = up.z * halfH;
-
-            float p0x = cx - rx - ux, p0y = cy - ry - uy, p0z = cz - rz - uz;
-            float p1x = cx + rx - ux, p1y = cy + ry - uy, p1z = cz + rz - uz;
-            float p2x = cx + rx + ux, p2y = cy + ry + uy, p2z = cz + rz + uz;
-            float p3x = cx - rx + ux, p3y = cy - ry + uy, p3z = cz - rz + uz;
-
-            idx = putVertex(verts, idx, p0x, p0y, p0z, u0, v1);
-            idx = putVertex(verts, idx, p1x, p1y, p1z, u1, v1);
-            idx = putVertex(verts, idx, p2x, p2y, p2z, u1, v0);
-            idx = putVertex(verts, idx, p0x, p0y, p0z, u0, v1);
-            idx = putVertex(verts, idx, p2x, p2y, p2z, u1, v0);
-            idx = putVertex(verts, idx, p3x, p3y, p3z, u0, v0);
-        }
+        rain.bind(0);
+        glDisable(GL_CULL_FACE);
+        glDepthMask(false);
         rainMesh.upload(verts, idx);
         rainMesh.draw();
+        glDepthMask(true);
+        atlas.bind(0);
     }
 
-    private int putVertex(float[] arr, int idx, float x, float y, float z, float u, float v) {
+    private int rainVertex(float[] arr, int idx, float x, float y, float z, float u, float v, float sky, float blk) {
         arr[idx++] = x;
         arr[idx++] = y;
         arr[idx++] = z;
         arr[idx++] = u;
         arr[idx++] = v;
-        arr[idx++] = 1f; // sky shade - rain is drawn fully bright regardless of local block lighting
-        arr[idx++] = 1f; // block light
+        arr[idx++] = sky;
+        arr[idx++] = blk;
         arr[idx++] = 1f; // tint r
         arr[idx++] = 1f; // tint g
         arr[idx++] = 1f; // tint b
@@ -2252,11 +2304,11 @@ public class Game implements GameAccess {
         chunkShader.setUniform("uAlpha", celestialAlpha);
 
         Vector3f sunCenter = new Vector3f(eye).add(new Vector3f(sunDir).mul(CELESTIAL_DISTANCE));
-        renderCelestialBody(Tile.SUN, sunCenter, right, up);
+        renderCelestialBody("environment.sun", "textures/environment/celestial/sun.png", sunCenter, right, up);
 
         Vector3f moonDir = new Vector3f(sunDir).negate();
         Vector3f moonCenter = new Vector3f(eye).add(new Vector3f(moonDir).mul(CELESTIAL_DISTANCE));
-        renderCelestialBody(Tile.MOON, moonCenter, right, up);
+        renderCelestialBody("environment.moon", "textures/environment/celestial/moon/full_moon.png", moonCenter, right, up);
     }
 
     /**
@@ -2272,9 +2324,10 @@ public class Game implements GameAccess {
         return 1f + (target - 1f) * clamped;
     }
 
-    private void renderCelestialBody(Tile tile, Vector3f center, Vector3f right, Vector3f up) {
-        float[] uv = atlas.getUv(tile);
-        float u0 = uv[0], v0 = uv[1], u1 = uv[2], v1 = uv[3];
+    private void renderCelestialBody(String key, String path, Vector3f center, Vector3f right, Vector3f up) {
+        com.example.engine.EntityTexture tex = realTexture(key, path, false);
+        if (tex == null) return;
+        float u0 = 0f, v0 = 0f, u1 = 1f, v1 = 1f;
         float half = CELESTIAL_SIZE / 2f;
 
         Vector3f rHalf = new Vector3f(right).mul(half);
@@ -2294,7 +2347,12 @@ public class Game implements GameAccess {
                 p3.x, p3.y, p3.z, u0, v0, sky, block, t, t, t, wind,
         };
         sunMoonMesh.upload(verts);
+        tex.bind(0);
+        // Vanilla draws the sun and moon additively, so the textures' black surround vanishes into the sky.
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE);
         sunMoonMesh.draw();
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        atlas.bind(0);
     }
 
     // Package-private (not private): pure functions of primitives/Vector3f with no GL/GLFW
@@ -2948,6 +3006,12 @@ public class Game implements GameAccess {
     }
 
     @Override
+    public void dropItem(boolean wholeStack) {
+        forcedDropRequests++;
+        forcedDropWholeStack = wholeStack;
+    }
+
+    @Override
     public void lookAt(double x, double y, double z) {
         if (player == null) throw new IllegalStateException("no active world");
         Vector3f eye = player.eyePosition();
@@ -3158,6 +3222,7 @@ public class Game implements GameAccess {
         }
         sb.append("items.list=").append(itemList).append('\n');
         sb.append("particles.active=").append(particles.count()).append('\n');
+        sb.append("particles.crit=").append(critParticles.count()).append(' ').append("damageIndicators=").append(damageParticles.count()).append('\n');
         sb.append("mining.crackStage=").append(mining.crackStage()).append('\n');
         sb.append("chunks.loaded=").append(world.chunkMap().size()).append('\n');
         sb.append("chunks.meshDirty=").append(dirtyChunks).append('\n');
@@ -3185,7 +3250,6 @@ public class Game implements GameAccess {
         if (hudTextures != null) hudTextures.destroy();
         sunMoonMesh.destroy();
         rainMesh.destroy();
-        moteMesh.destroy();
         heldItemMesh.destroy();
         itemMesh.destroy();
         mobMesh.destroy();

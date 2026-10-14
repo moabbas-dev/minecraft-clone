@@ -40,6 +40,7 @@ public final class Commands {
             case "giveItem" -> giveItem(params);
             case "holdAttack" -> holdAttack(params);
             case "useItem" -> useItem();
+            case "dropItem" -> dropItem(params);
             case "openInventory" -> openInventory(params);
             case "inventoryClick" -> inventoryClick(params);
             case "closeInventory" -> closeInventory();
@@ -251,6 +252,12 @@ public final class Commands {
     private Result useItem() {
         game.useItem();
         return Result.ok("use queued");
+    }
+
+    private Result dropItem(Map<String, String> p) {
+        boolean whole = Boolean.parseBoolean(p.getOrDefault("whole", "false"));
+        game.dropItem(whole);
+        return Result.ok("drop queued" + (whole ? " (whole stack)" : ""));
     }
 
     private Result openInventory(Map<String, String> p) {

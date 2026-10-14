@@ -6,7 +6,6 @@ import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.nio.ByteBuffer;
-import java.util.Random;
 
 import static org.lwjgl.opengl.GL33.*;
 import static org.lwjgl.system.MemoryUtil.memAlloc;
@@ -18,9 +17,8 @@ import static org.lwjgl.system.MemoryUtil.memFree;
  * visible). One reusable {@link Mesh}, one texture, created once - geometry is rebuilt only when
  * the target or stage actually changes, never per frame.
  *
- * Texture source: if all ten {@code textures/block/destroy_stage_0..9.png} exist (16x16, the
- * user's own local assets, gitignored like every other file in textures/) they're used;
- * otherwise a procedurally generated, project-owned set is used (see {@link #generateStage}).
+ * Texture source: the ten real {@code textures/block/destroy_stage_0..9.png} files (16x16, restored by
+ * {@code scripts/restore-assets.py}). If any is missing no crack is drawn (nothing is invented).
  * The stages are laid out left-to-right in one strip texture.
  */
 @Slf4j
@@ -40,40 +38,7 @@ public class CrackOverlay {
 
     public CrackOverlay(int[] vertexLayout) {
         this.mesh = new Mesh(vertexLayout);
-        this.textureId = uploadStrip(loadOrGenerateStrip());
-    }
-
-    /**
-     * Pixel coverage of a stage as a 16x16 boolean grid. Stages are strictly cumulative - every
-     * pixel cracked at stage n is also cracked at stage n+1 - so damage only ever grows.
-     * Package-private so the monotonic/growing property is unit-testable without GL.
-     */
-    static boolean[] generateStage(int stage) {
-        // One fixed pseudo-random sequence of crack pixels (several short random walks radiating
-        // from near the center); stage n simply shows a longer prefix of it.
-        Random rnd = new Random(0xC4ACL);
-        int[] order = new int[TILE * TILE];
-        boolean[] used = new boolean[TILE * TILE];
-        int n = 0;
-        while (n < 120) {
-            int x = 5 + rnd.nextInt(6), y = 5 + rnd.nextInt(6);
-            double angle = rnd.nextDouble() * Math.PI * 2;
-            for (int step = 0; step < 14 && n < 120; step++) {
-                angle += (rnd.nextDouble() - 0.5) * 1.1;
-                x += (int) Math.round(Math.cos(angle));
-                y += (int) Math.round(Math.sin(angle));
-                if (x < 0 || y < 0 || x >= TILE || y >= TILE) break;
-                int idx = y * TILE + x;
-                if (!used[idx]) {
-                    used[idx] = true;
-                    order[n++] = idx;
-                }
-            }
-        }
-        int visible = 6 + stage * 11; // stage 0: a few pixels ... stage 9: roughly 40% of the tile
-        boolean[] out = new boolean[TILE * TILE];
-        for (int i = 0; i < Math.min(visible, n); i++) out[order[i]] = true;
-        return out;
+        this.textureId = uploadStrip(loadStrip());
     }
 
     /**
@@ -89,7 +54,7 @@ public class CrackOverlay {
         return a <= 0 ? 0 : (a << 24) | 0x141414;
     }
 
-    private static int[] loadOrGenerateStrip() {
+    private static int[] loadStrip() {
         int[] strip = new int[STAGES * TILE * TILE];
         int[][] custom = new int[STAGES][];
         boolean allCustom = true;
@@ -106,14 +71,11 @@ public class CrackOverlay {
                 allCustom = false;
             }
         }
-        if (allCustom) log.info("Using textures/block/destroy_stage_*.png for block-breaking cracks");
-        for (int s = 0; s < STAGES; s++) {
-            boolean[] procedural = allCustom ? null : generateStage(s);
+        if (!allCustom) log.warn("textures/block/destroy_stage_0..9.png not all present - no block-breaking cracks will be drawn");
+        for (int s = 0; s < STAGES && allCustom; s++) {
             for (int y = 0; y < TILE; y++) {
                 for (int x = 0; x < TILE; x++) {
-                    int argb = allCustom ? darkenCrackPixel(custom[s][y * TILE + x])
-                            : (procedural[y * TILE + x] ? 0xD0141414 : 0x00000000);
-                    strip[y * (STAGES * TILE) + s * TILE + x] = argb;
+                    strip[y * (STAGES * TILE) + s * TILE + x] = darkenCrackPixel(custom[s][y * TILE + x]);
                 }
             }
         }

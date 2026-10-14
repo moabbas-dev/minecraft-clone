@@ -13,9 +13,9 @@ import static org.lwjgl.system.MemoryUtil.memAlloc;
 import static org.lwjgl.system.MemoryUtil.memFree;
 
 /**
- * HUD sprites (hearts, hunger icons, armor, air, XP bar, hotbar and its selection frame). Each sprite comes from a
- * texture file in {@code textures/gui/sprites/hud/} when the player supplied one (gitignored), and otherwise from the
- * built-in original art in {@link HudSprites}, so the HUD looks right on a fresh clone with no assets.
+ * HUD sprites (hearts, hunger icons, armor, air, XP bar, hotbar and its selection frame), read from the real texture
+ * files in {@code textures/gui/sprites/hud/} (restored by {@code scripts/restore-assets.py}). When the required ones are
+ * missing, {@link #loadOrNull} returns null and the game draws its plain HUD instead.
  */
 @Slf4j
 public final class HudTextures {
@@ -87,10 +87,8 @@ public final class HudTextures {
         }
     }
 
-    /** A texture file in {@link #DIR} if the player supplied one, otherwise the built-in original art. */
     private static Sprite load(String name) throws IOException {
         BufferedImage img = readFile(name);
-        if (img == null) img = HudSprites.image(name);
         if (img == null) throw new IOException("no sprite named " + name);
         return upload(img);
     }
@@ -98,7 +96,7 @@ public final class HudTextures {
     private static BufferedImage readFile(String name) {
         try {
             File f = new File(DIR + name);
-            return f.isFile() ? ImageIO.read(f) : null;
+            return f.isFile() ? TextureIo.read(f) : null;
         } catch (IOException | RuntimeException e) {
             return null;
         }
@@ -124,6 +122,22 @@ public final class HudTextures {
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, buf);
         memFree(buf);
         return new Sprite(id, w, h);
+    }
+
+    /** A texture file of any size (container backgrounds, progress sprites); null when it is absent or unreadable. */
+    public static Sprite loadFile(String path) {
+        try {
+            File f = new File(path);
+            BufferedImage img = f.isFile() ? TextureIo.read(f) : null;
+            return img == null ? null : upload(img);
+        } catch (IOException | RuntimeException e) {
+            return null;
+        }
+    }
+
+    /** Draws the rectangle {@code u0,v0..u1,v1} (0..1) of a sprite into the screen rectangle {@code x,y,w,h}. */
+    public static void drawRegion(UiRenderer ui, Sprite s, float x, float y, float w, float h, float u0, float v0, float u1, float v1) {
+        ui.drawTexturedQuad(x, y, w, h, new float[]{u0, v0, u1, v1}, s.id(), 1f, 1f, 1f, 1f);
     }
 
     /** Draws a whole sprite with its top-left at (x, y), each sprite pixel {@code scale} screen pixels. */

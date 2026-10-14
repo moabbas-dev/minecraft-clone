@@ -1,14 +1,14 @@
 package com.example.engine;
 
-/** Every distinct texture tile drawn into the procedural atlas. Ordinal = atlas slot index. */
+/** Every distinct texture tile in the block/item atlas; each one is a real Minecraft texture. Ordinal = atlas slot index. */
 public enum Tile {
     STONE, DIRT, GRASS_TOP, GRASS_SIDE, COBBLESTONE, PLANKS, BEDROCK, WATER,
     SAND, GRAVEL, GOLD_ORE, IRON_ORE, COAL_ORE, LOG_SIDE, LOG_TOP, LEAVES,
     GLASS, SANDSTONE_TOP, SANDSTONE_SIDE, SANDSTONE_BOTTOM, GOLD_BLOCK, IRON_BLOCK,
     BRICKS, TNT_SIDE, TNT_TOP, TNT_BOTTOM, BOOKSHELF, MOSSY_COBBLESTONE, OBSIDIAN,
-    CHEST, DIAMOND_ORE, DIAMOND_BLOCK, CRAFTING_TABLE_TOP, CRAFTING_TABLE_SIDE,
+    CHEST_TOP, CHEST_SIDE, DIAMOND_ORE, DIAMOND_BLOCK, CRAFTING_TABLE_TOP, CRAFTING_TABLE_SIDE,
     FURNACE_SIDE, FURNACE_TOP, ICE, SNOW_BLOCK, CLAY, PUMPKIN_SIDE, PUMPKIN_TOP,
-    NETHERRACK, GLOWSTONE, SUN, MOON, TERRACOTTA, RED_SAND, RAIN,
+    NETHERRACK, GLOWSTONE, TERRACOTTA, RED_SAND,
     BIRCH_LOG_SIDE, BIRCH_LOG_TOP, BIRCH_LEAVES, SPRUCE_LOG_SIDE, SPRUCE_LOG_TOP, SPRUCE_LEAVES,
     JUNGLE_LOG_SIDE, JUNGLE_LOG_TOP, JUNGLE_LEAVES, ACACIA_LOG_SIDE, ACACIA_LOG_TOP, ACACIA_LEAVES,
     MANGROVE_LOG_SIDE, MANGROVE_LOG_TOP, MANGROVE_LEAVES,
@@ -18,8 +18,6 @@ public enum Tile {
     OAK_SAPLING,
     /** Tintable grayscale grass fringe split off GRASS_SIDE at atlas build time - see GrassSideSplit. */
     GRASS_SIDE_OVERLAY,
-    /** Plain skin tone for the first-person hand shown when nothing is held. */
-    SKIN,
     STICK, WOODEN_PICKAXE, STONE_PICKAXE, IRON_PICKAXE,
     WOODEN_AXE, STONE_AXE, IRON_AXE, WOODEN_SHOVEL, STONE_SHOVEL, IRON_SHOVEL,
     APPLE, BREAD, COOKED_BEEF,
@@ -37,12 +35,6 @@ public enum Tile {
 
     // Mob-system milestone.
     ROTTEN_FLESH,
-    /** Soft round glow used for the ambient night motes (see Game.renderNightMotes). */
-    NIGHT_MOTE,
-    /** Sickly green mob "skin" tile - no real Mojang mob textures exist in this project (see
-     *  the tools/food tiles above for the same situation), so every zombie body box is this one
-     *  flat procedural color. */
-    ZOMBIE_SKIN,
 
     // Combat milestone item icons.
     WOODEN_SWORD, STONE_SWORD, IRON_SWORD, LEATHER, FEATHER, EGG, LEATHER_HELMET, LEATHER_CHESTPLATE, LEATHER_LEGGINGS, LEATHER_BOOTS, IRON_HELMET, IRON_CHESTPLATE, IRON_LEGGINGS, IRON_BOOTS, GOLD_HELMET, GOLD_CHESTPLATE, GOLD_LEGGINGS, GOLD_BOOTS,
@@ -51,7 +43,5 @@ public enum Tile {
     // Block drop items.
     FLINT, CLAY_BALL, SNOWBALL, GLOWSTONE_DUST, BOOK,
     // Hostile mob drops.
-    GUNPOWDER, BONE, ARROW, STRING, SPIDER_EYE,
-    /** Procedural flat mob skins (no real mob textures are bundled). */
-    PIG_SKIN, COW_SKIN, CHICKEN_SKIN, CHICKEN_BEAK
+    GUNPOWDER, BONE, ARROW, STRING, SPIDER_EYE
 }

@@ -1,13 +1,14 @@
 package com.example.ui;
 
 import com.example.engine.Font;
+import com.example.engine.HudTextures;
 import com.example.engine.UiRenderer;
 
 /**
- * Draws the container-screen furniture (panel, slot frames, hover highlight, arrow, flame, tooltip) as flat coloured
- * quads at a GUI scale, in the classic look: a light-grey bevelled panel, inset slots, a white 50% hover square and a
- * dark-purple tooltip. Original art - there is no texture involved. All positions and sizes are framebuffer pixels;
- * {@code s} is the GUI scale (framebuffer pixels per GUI pixel).
+ * Container-screen drawing helpers at a GUI scale: the real container background texture, the hover square (vanilla
+ * fills the slot with 50% white) and the dark-purple tooltip. Panels, slot frames, arrows and flames all come from the
+ * real textures; the only drawn fallbacks are a plain panel and plain slots when those files are missing. All positions
+ * and sizes are framebuffer pixels; {@code s} is the GUI scale (framebuffer pixels per GUI pixel).
  */
 public final class GuiPainter {
     private GuiPainter() {
@@ -22,113 +23,25 @@ public final class GuiPainter {
         quad(ui, 0, 0, w, h, 0x101010, 0.72f);
     }
 
-    /** The grey container background: black edge, white top/left bevel, dark-grey bottom/right bevel. */
+    /** The real container texture (176 x 166 GUI pixels in the top-left of a 256 x 256 file) drawn over the panel rectangle. */
+    public static void background(UiRenderer ui, HudTextures.Sprite texture, InventoryLayout.Rect panel) {
+        HudTextures.drawRegion(ui, texture, panel.x(), panel.y(), panel.w(), panel.h(), 0f, 0f,
+                InventoryLayout.PANEL_W / (float) texture.w(), InventoryLayout.PANEL_H / (float) texture.h());
+    }
+
+    /** Plain stand-in panel used only when the container texture file is missing. */
     public static void panel(UiRenderer ui, float x, float y, float w, float h, float s) {
-        quad(ui, x, y, w, h, 0x000000, 1f);
-        quad(ui, x + s, y + s, w - 2 * s, h - 2 * s, 0xC6C6C6, 1f);
-        quad(ui, x + s, y + s, w - 3 * s, 2 * s, 0xFFFFFF, 1f);
-        quad(ui, x + s, y + s, 2 * s, h - 3 * s, 0xFFFFFF, 1f);
-        quad(ui, x + 3 * s, y + h - 3 * s, w - 4 * s, 2 * s, 0x555555, 1f);
-        quad(ui, x + w - 3 * s, y + 3 * s, 2 * s, h - 4 * s, 0x555555, 1f);
-        // the two corners where the bevels meet read as a single mid-grey pixel
-        quad(ui, x + w - 3 * s, y + s, 2 * s, 2 * s, 0xC6C6C6, 1f);
-        quad(ui, x + s, y + h - 3 * s, 2 * s, 2 * s, 0xC6C6C6, 1f);
+        quad(ui, x, y, w, h, 0xC6C6C6, 1f);
     }
 
-    /** An inset 18 x 18 slot frame around the 16 x 16 item area whose top-left is (itemX, itemY). */
+    /** Plain stand-in slot square used only when the container texture file is missing. */
     public static void slot(UiRenderer ui, float itemX, float itemY, float s) {
-        float x = itemX - s, y = itemY - s;
-        quad(ui, x, y, 18 * s, 18 * s, 0x8B8B8B, 1f);
-        quad(ui, x, y, 18 * s, s, 0x373737, 1f);
-        quad(ui, x, y, s, 18 * s, 0x373737, 1f);
-        quad(ui, x + s, y + 17 * s, 17 * s, s, 0xFFFFFF, 1f);
-        quad(ui, x + 17 * s, y + s, s, 17 * s, 0xFFFFFF, 1f);
-    }
-
-    /** A larger inset box (the player-preview area). */
-    public static void inset(UiRenderer ui, float x, float y, float w, float h, float s) {
-        quad(ui, x, y, w, h, 0x8B8B8B, 1f);
-        quad(ui, x, y, w, s, 0x373737, 1f);
-        quad(ui, x, y, s, h, 0x373737, 1f);
-        quad(ui, x + s, y + h - s, w - s, s, 0xFFFFFF, 1f);
-        quad(ui, x + w - s, y + s, s, h - s, 0xFFFFFF, 1f);
+        quad(ui, itemX - s, itemY - s, 18 * s, 18 * s, 0x8B8B8B, 1f);
     }
 
     /** The white half-transparent square drawn over the hovered slot's item area. */
     public static void highlight(UiRenderer ui, InventoryLayout.Rect itemArea) {
         quad(ui, itemArea.x(), itemArea.y(), itemArea.w(), itemArea.h(), 0xFFFFFF, 0.5f);
-    }
-
-    /**
-     * Pixel extent of row {@code row} of the arrow, as {x start, x end exclusive}: a 3-px shaft in the middle and a
-     * triangular head whose base is a full column {@code h} tall and which narrows by 1 px per row to a tip
-     * {@code (h+1)/2} px long. Measured from the real furnace / crafting-table / inventory screens: 22x15 (shaft 14),
-     * 22x15, and 16x13 (shaft 9).
-     */
-    static int[] arrowRow(int w, int h, int row) {
-        int headW = (h + 1) / 2;
-        int shaftLen = w - headW;
-        int mid = (h - 1) / 2;
-        int dy = Math.abs(row - mid);
-        int end = shaftLen + headW - dy;
-        int start = dy <= 1 ? 0 : shaftLen;
-        return new int[]{start, end};
-    }
-
-    /**
-     * A right-pointing arrow filling the rect (see {@link #arrowRow}), grey, with the left {@code progress} fraction white.
-     */
-    public static void arrow(UiRenderer ui, InventoryLayout.Rect r, float s, float progress) {
-        int w = Math.round(r.w() / s), h = Math.round(r.h() / s);
-        float filledUntil = Math.max(0f, Math.min(1f, progress)) * w;
-        for (int row = 0; row < h; row++) {
-            int[] ext = arrowRow(w, h, row);
-            int x0 = ext[0];
-            while (x0 < ext[1]) {
-                boolean filled = x0 + 0.5f < filledUntil;
-                int x1 = x0;
-                while (x1 < ext[1] && ((x1 + 0.5f < filledUntil) == filled)) x1++;
-                quad(ui, r.x() + x0 * s, r.y() + row * s, (x1 - x0) * s, s, filled ? 0xFFFFFF : 0x8B8B8B, 1f);
-                x0 = x1;
-            }
-        }
-    }
-
-    private static final String[] FLAME = {
-            "......##......",
-            ".....#yy#.....",
-            ".....#yy#.#...",
-            "....#yyyy##...",
-            "...#yyooyyy#..",
-            "...#yooooyy#..",
-            "..#yyooooooy#.",
-            "..#yooorroooy#",
-            "..#yoorrrroo#.",
-            "..#yoorrrroo#.",
-            "..#yooorrroo#.",
-            "...#yooooooy#.",
-            "....#yooooy#..",
-            ".....######...",
-    };
-
-    /** The furnace flame; only the bottom {@code fraction} of it is lit. */
-    public static void flame(UiRenderer ui, InventoryLayout.Rect r, float s, float fraction) {
-        int h = FLAME.length;
-        int litFrom = Math.round(h * (1f - Math.max(0f, Math.min(1f, fraction))));
-        for (int y = 0; y < h; y++) {
-            for (int x = 0; x < FLAME[y].length(); x++) {
-                char c = FLAME[y].charAt(x);
-                if (c == '.') continue;
-                if (y < litFrom) continue; // vanilla draws nothing for the unlit part of the flame
-                int rgb = switch (c) {
-                    case '#' -> 0x5A2400;
-                    case 'y' -> 0xFFD23A;
-                    case 'o' -> 0xF58A1E;
-                    default -> 0xD84A12;
-                };
-                quad(ui, r.x() + x * s, r.y() + y * s, s, s, rgb, 1f);
-            }
-        }
     }
 
     /**

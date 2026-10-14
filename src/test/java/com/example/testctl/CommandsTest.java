@@ -35,6 +35,8 @@ class CommandsTest {
         boolean throwOnGive;
         Boolean attackHeld;
         int useCalls;
+    int dropCalls;
+    boolean dropWhole;
         Double lookX, lookY, lookZ;
         boolean throwOnLook;
         Integer openedGrid;
@@ -125,6 +127,12 @@ class CommandsTest {
         @Override
         public void useItem() {
             useCalls++;
+        }
+
+        @Override
+        public void dropItem(boolean wholeStack) {
+            dropCalls++;
+            dropWhole = wholeStack;
         }
 
         @Override
@@ -504,6 +512,16 @@ class CommandsTest {
         commands.execute("useItem", params());
         commands.execute("useItem", params());
         assertEquals(2, fake.useCalls);
+    }
+
+    @Test
+    void dropItemPassesTheWholeStackFlag() {
+        commands.execute("dropItem", params());
+        assertEquals(1, fake.dropCalls);
+        assertFalse(fake.dropWhole);
+        commands.execute("dropItem", params("whole", "true"));
+        assertEquals(2, fake.dropCalls);
+        assertTrue(fake.dropWhole);
     }
 
     @Test

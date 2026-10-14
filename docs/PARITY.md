@@ -49,7 +49,7 @@ Verification in the notes column: `unit` = a unit test, `live` = checked in the 
 
 | # | Element | Vanilla (rules 5) | Code | Status | Notes / commit |
 |---|---|---|---|---|---|
-| H1 | Hotbar sprite 182x22 + selection 24x23 | at (C-91, H-22), items at +3,+3 | generated original sprites at the vanilla geometry | [x] | G2 live: original 182x22 hotbar + 24x23 selection frame (HudSprites), unit HudSpritesTest |
+| H1 | Hotbar sprite 182x22 + selection 24x23 | at (C-91, H-22), items at +3,+3 | the real hotbar sprites at the vanilla geometry | [x] | G2 live: real 182x22 hotbar + 24x23 selection frame |
 | H2 | Hearts: 10, 9x9, step 8, y=H-39, half hearts | 5.1/5.2 | 10 hearts, 9x9, step 8, y=H-39 | [x] | G2 live: hearts rounded up, half hearts correct (17 HP shows 8 + half) |
 | H3 | Heart container + damage blink | blink 3-tick phases for 20 t (10 t when healed) | flash 20 ticks on damage, 10 on heal | [x] | G2 live: container and lost hearts flash white in 3-tick phases; unit HudAnimationTest |
 | H4 | Low-health shake | <= 4 HP (wiki: 5) random 0/1 px | each heart jitters 0-1 px at <= 4 HP | [x] | G2 unit HudAnimationTest (threshold 4 HP from the decompiled source; wiki says 5, see rules 5.2) |
@@ -72,151 +72,151 @@ Verification in the notes column: `unit` = a unit test, `live` = checked in the 
 | U3 | Player inventory layout | armor column x=8,y=8 step 18; craft 2x2 at (98,18); out (154,28); offhand (77,62); storage (8,84); hotbar y=142 | layout matches except offhand/preview | [~] | G5: armor column (8,8 step 18), 2x2 grid (98,18), result (154,28), storage (8,84), hotbar y=142 all match. Still missing: offhand slot (77,62) and the player-model preview (an empty inset box is drawn) |
 | U4 | Crafting table layout | 3x3 at (30,17), out (124,35) |  | [x] | G5 live + unit: 3x3 at (30,17), result (124,35); no armor slots at the table |
 | U5 | Furnace layout | in (56,17), fuel (56,53), out (116,35), flame (56,36), arrow (79,34) |  | [x] | G5 live + unit CookingLayoutTest: in (56,17), fuel (56,53), out (116,35), flame (56,36), arrow (79,34); lit flame and half-filled arrow seen |
-| U6 | Panel and slot look | light-grey panel with bevel, inset slots | GuiPainter.panel / slot (original art, flat quads) | [x] | G5 live: light-grey bevelled panel, inset 18 px slots |
+| U6 | Panel and slot look | light-grey panel with bevel, inset slots | the real `container/*.png` backgrounds (slot frames, arrows and preview box are baked into them) | [x] | live: real inventory / crafting table / furnace backgrounds |
 | U7 | Hover highlight, held item, tooltip | white 50% square on the slot; item at cursor; dark-purple tooltip | tooltip colours from rules 6 are [U] | [x] | G5 live: white 50% hover square seen; held item drawn at 16 px x scale centred on the cursor; dark-purple tooltip (GuiPainter.tooltip) |
 | U8 | Labels | Crafting / Inventory text colour 0x404040 |  | [x] | G5 live: labels in 0x404040 ('Crafting' at (97,8) / (28,6), 'Inventory' at (8,72), furnace title centred) |
 
 ## 4. Blocks and items (one row per entry in `BlockType`)
 
-Columns: stack size, durability, mining/drop result, icon. Icon status refers to the 16x16 art, which must be original pixel art in the vanilla style (outlined shapes, 3-4 tone shading, light from the top left). `Hardness` is checked against the verified table.
+Columns: stack size, durability, mining/drop result, icon. Icon status refers to the 16x16 art, which is always the real texture file (the game draws no art of its own). `Hardness` is checked against the verified table.
 
 | Item | Kind | Stack | Dur. | Hardness / mining / drop | Icon | Status | Notes / commit |
 |---|---|---:|---:|---|---|---|---|
-| Stone (`STONE`) | block | 64 | | 1.5 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Grass Block (`GRASS_BLOCK`) | block | 64 | | 0.6 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Dirt (`DIRT`) | block | 64 | | 0.5 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Cobblestone (`COBBLESTONE`) | block | 64 | | 2 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Oak Wood Planks (`OAK_PLANKS`) | block | 64 | | 2 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Bedrock (`BEDROCK`) | block | 64 | | -1 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Water (`WATER`) | block | 64 | | -1 [U] | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Sand (`SAND`) | block | 64 | | 0.5 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Gravel (`GRAVEL`) | block | 64 | | 0.6 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Gold Ore (`GOLD_ORE`) | block | 64 | | 3 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. drops raw item (G1) |
-| Iron Ore (`IRON_ORE`) | block | 64 | | 3 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. drops raw item (G1) |
-| Coal Ore (`COAL_ORE`) | block | 64 | | 3 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Oak Wood (`OAK_LOG`) | block | 64 | | 2 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Oak Leaves (`OAK_LEAVES`) | block | 64 | | 0.2 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Glass (`GLASS`) | block | 64 | | 0.3 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Sandstone (`SANDSTONE`) | block | 64 | | 0.8 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Block of Gold (`GOLD_BLOCK`) | block | 64 | | 3 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Block of Iron (`IRON_BLOCK`) | block | 64 | | 5 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Bricks (`BRICKS`) | block | 64 | | 2 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| TNT (`TNT`) | block | 64 | | 0 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Bookshelf (`BOOKSHELF`) | block | 64 | | 1.5 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Mossy Cobblestone (`MOSSY_COBBLESTONE`) | block | 64 | | 2 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Obsidian (`OBSIDIAN`) | block | 64 | | 50 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Chest (`CHEST`) | block | 64 | | 2.5 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Diamond Ore (`DIAMOND_ORE`) | block | 64 | | 3 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Block of Diamond (`DIAMOND_BLOCK`) | block | 64 | | 5 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Crafting Table (`CRAFTING_TABLE`) | block | 64 | | 2.5 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Furnace (`FURNACE`) | block | 64 | | 3.5 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Ice (`ICE`) | block | 64 | | 0.5 [U] | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Snow Block (`SNOW_BLOCK`) | block | 64 | | 0.2 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Clay (`CLAY`) | block | 64 | | 0.6 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Pumpkin (`PUMPKIN`) | block | 64 | | 1 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. axe is the fast tool (G1) |
-| Netherrack (`NETHERRACK`) | block | 64 | | 0.4 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Glowstone (`GLOWSTONE`) | block | 64 | | 0.3 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Terracotta (`TERRACOTTA`) | block | 64 | | 1.25 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Red Sand (`RED_SAND`) | block | 64 | | 0.5 [U] | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Birch Wood (`BIRCH_LOG`) | block | 64 | | 2 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Birch Leaves (`BIRCH_LEAVES`) | block | 64 | | 0.2 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Spruce Wood (`SPRUCE_LOG`) | block | 64 | | 2 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Spruce Leaves (`SPRUCE_LEAVES`) | block | 64 | | 0.2 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Jungle Wood (`JUNGLE_LOG`) | block | 64 | | 2 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Jungle Leaves (`JUNGLE_LEAVES`) | block | 64 | | 0.2 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Acacia Wood (`ACACIA_LOG`) | block | 64 | | 2 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Acacia Leaves (`ACACIA_LEAVES`) | block | 64 | | 0.2 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Mangrove Wood (`MANGROVE_LOG`) | block | 64 | | 2 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Mangrove Leaves (`MANGROVE_LEAVES`) | block | 64 | | 0.2 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Dark Oak Wood (`DARK_OAK_LOG`) | block | 64 | | 2 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Dark Oak Leaves (`DARK_OAK_LEAVES`) | block | 64 | | 0.2 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Cherry Wood (`CHERRY_LOG`) | block | 64 | | 2 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Cherry Leaves (`CHERRY_LEAVES`) | block | 64 | | 0.2 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Mud (`MUD`) | block | 64 | | 0.5 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Mangrove Roots (`MANGROVE_ROOTS`) | block | 64 | | 0.7 [U] | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Oak Sapling (`OAK_SAPLING_STAGE_0`) | block | 64 | | 0 [U] | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Stick (`STICK`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Wooden Pickaxe (`WOODEN_PICKAXE`) | item | 1 | 59 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Stone Pickaxe (`STONE_PICKAXE`) | item | 1 | 131 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Iron Pickaxe (`IRON_PICKAXE`) | item | 1 | 250 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Wooden Axe (`WOODEN_AXE`) | item | 1 | 59 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Stone Axe (`STONE_AXE`) | item | 1 | 131 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Iron Axe (`IRON_AXE`) | item | 1 | 250 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Wooden Shovel (`WOODEN_SHOVEL`) | item | 1 | 59 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Stone Shovel (`STONE_SHOVEL`) | item | 1 | 131 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Iron Shovel (`IRON_SHOVEL`) | item | 1 | 250 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Apple (`APPLE`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Bread (`BREAD`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Cooked Beef (`COOKED_BEEF`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Blast Furnace (`BLAST_FURNACE`) | block | 64 | | 3.5 ok | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Smoker (`SMOKER`) | block | 64 | | 3.5 [U] | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Copper Ore (`COPPER_ORE`) | block | 64 | | 3 [U] | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. drops raw item (G1) |
-| Smooth Stone (`SMOOTH_STONE`) | block | 64 | | 2 [U] | original pixel art | [x] | G4 live (world wall, trees, inventory), unit BlockArtTest. |
-| Coal (`COAL`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Charcoal (`CHARCOAL`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Iron Ingot (`IRON_INGOT`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Gold Ingot (`GOLD_INGOT`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Copper Ingot (`COPPER_INGOT`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Iron Nugget (`IRON_NUGGET`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Brick (`BRICK`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Raw Iron (`RAW_IRON`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Raw Gold (`RAW_GOLD`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Raw Copper (`RAW_COPPER`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Raw Beef (`RAW_BEEF`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Raw Porkchop (`RAW_PORKCHOP`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Cooked Porkchop (`COOKED_PORKCHOP`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Raw Chicken (`RAW_CHICKEN`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Cooked Chicken (`COOKED_CHICKEN`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Raw Mutton (`RAW_MUTTON`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Cooked Mutton (`COOKED_MUTTON`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Raw Rabbit (`RAW_RABBIT`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Cooked Rabbit (`COOKED_RABBIT`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Raw Cod (`COD`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Cooked Cod (`COOKED_COD`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Raw Salmon (`SALMON`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Cooked Salmon (`COOKED_SALMON`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Potato (`POTATO`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Baked Potato (`BAKED_POTATO`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Kelp (`KELP`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Dried Kelp (`DRIED_KELP`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Rotten Flesh (`ROTTEN_FLESH`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Wooden Sword (`WOODEN_SWORD`) | item | 1 | 59 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Stone Sword (`STONE_SWORD`) | item | 1 | 131 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Iron Sword (`IRON_SWORD`) | item | 1 | 250 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Leather (`LEATHER`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Feather (`FEATHER`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Egg (`EGG`) | item | 16 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. stack 16 fixed (G1) |
-| Leather Cap (`LEATHER_HELMET`) | item | 1 | 55 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Leather Tunic (`LEATHER_CHESTPLATE`) | item | 1 | 80 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Leather Pants (`LEATHER_LEGGINGS`) | item | 1 | 75 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Leather Boots (`LEATHER_BOOTS`) | item | 1 | 65 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Iron Helmet (`IRON_HELMET`) | item | 1 | 165 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Iron Chestplate (`IRON_CHESTPLATE`) | item | 1 | 240 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Iron Leggings (`IRON_LEGGINGS`) | item | 1 | 225 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Iron Boots (`IRON_BOOTS`) | item | 1 | 195 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Golden Helmet (`GOLD_HELMET`) | item | 1 | 77 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Golden Chestplate (`GOLD_CHESTPLATE`) | item | 1 | 112 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Golden Leggings (`GOLD_LEGGINGS`) | item | 1 | 105 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Golden Boots (`GOLD_BOOTS`) | item | 1 | 91 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Diamond (`DIAMOND`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Diamond Sword (`DIAMOND_SWORD`) | item | 1 | 1561 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Diamond Axe (`DIAMOND_AXE`) | item | 1 | 1561 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Diamond Pickaxe (`DIAMOND_PICKAXE`) | item | 1 | 1561 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Diamond Shovel (`DIAMOND_SHOVEL`) | item | 1 | 1561 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Diamond Helmet (`DIAMOND_HELMET`) | item | 1 | 363 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Diamond Chestplate (`DIAMOND_CHESTPLATE`) | item | 1 | 528 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Diamond Leggings (`DIAMOND_LEGGINGS`) | item | 1 | 495 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Diamond Boots (`DIAMOND_BOOTS`) | item | 1 | 429 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Flint (`FLINT`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Clay Ball (`CLAY_BALL`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Snowball (`SNOWBALL`) | item | 16 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. stack 16 fixed (G1) |
-| Glowstone Dust (`GLOWSTONE_DUST`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Book (`BOOK`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Gunpowder (`GUNPOWDER`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Bone (`BONE`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Arrow (`ARROW`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| String (`STRING`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
-| Spider Eye (`SPIDER_EYE`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Stone (`STONE`) | block | 64 | | 1.5 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Grass Block (`GRASS_BLOCK`) | block | 64 | | 0.6 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Dirt (`DIRT`) | block | 64 | | 0.5 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Cobblestone (`COBBLESTONE`) | block | 64 | | 2 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Oak Wood Planks (`OAK_PLANKS`) | block | 64 | | 2 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Bedrock (`BEDROCK`) | block | 64 | | -1 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Water (`WATER`) | block | 64 | | -1 [U] | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Sand (`SAND`) | block | 64 | | 0.5 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Gravel (`GRAVEL`) | block | 64 | | 0.6 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Gold Ore (`GOLD_ORE`) | block | 64 | | 3 ok | real texture | [x] | G4 live (world wall, trees, inventory). drops raw item (G1) |
+| Iron Ore (`IRON_ORE`) | block | 64 | | 3 ok | real texture | [x] | G4 live (world wall, trees, inventory). drops raw item (G1) |
+| Coal Ore (`COAL_ORE`) | block | 64 | | 3 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Oak Wood (`OAK_LOG`) | block | 64 | | 2 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Oak Leaves (`OAK_LEAVES`) | block | 64 | | 0.2 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Glass (`GLASS`) | block | 64 | | 0.3 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Sandstone (`SANDSTONE`) | block | 64 | | 0.8 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Block of Gold (`GOLD_BLOCK`) | block | 64 | | 3 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Block of Iron (`IRON_BLOCK`) | block | 64 | | 5 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Bricks (`BRICKS`) | block | 64 | | 2 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
+| TNT (`TNT`) | block | 64 | | 0 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Bookshelf (`BOOKSHELF`) | block | 64 | | 1.5 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Mossy Cobblestone (`MOSSY_COBBLESTONE`) | block | 64 | | 2 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Obsidian (`OBSIDIAN`) | block | 64 | | 50 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Chest (`CHEST`) | block | 64 | | 2.5 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Diamond Ore (`DIAMOND_ORE`) | block | 64 | | 3 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Block of Diamond (`DIAMOND_BLOCK`) | block | 64 | | 5 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Crafting Table (`CRAFTING_TABLE`) | block | 64 | | 2.5 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Furnace (`FURNACE`) | block | 64 | | 3.5 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Ice (`ICE`) | block | 64 | | 0.5 [U] | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Snow Block (`SNOW_BLOCK`) | block | 64 | | 0.2 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Clay (`CLAY`) | block | 64 | | 0.6 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Pumpkin (`PUMPKIN`) | block | 64 | | 1 ok | real texture | [x] | G4 live (world wall, trees, inventory). axe is the fast tool (G1) |
+| Netherrack (`NETHERRACK`) | block | 64 | | 0.4 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Glowstone (`GLOWSTONE`) | block | 64 | | 0.3 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Terracotta (`TERRACOTTA`) | block | 64 | | 1.25 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Red Sand (`RED_SAND`) | block | 64 | | 0.5 [U] | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Birch Wood (`BIRCH_LOG`) | block | 64 | | 2 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Birch Leaves (`BIRCH_LEAVES`) | block | 64 | | 0.2 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Spruce Wood (`SPRUCE_LOG`) | block | 64 | | 2 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Spruce Leaves (`SPRUCE_LEAVES`) | block | 64 | | 0.2 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Jungle Wood (`JUNGLE_LOG`) | block | 64 | | 2 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Jungle Leaves (`JUNGLE_LEAVES`) | block | 64 | | 0.2 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Acacia Wood (`ACACIA_LOG`) | block | 64 | | 2 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Acacia Leaves (`ACACIA_LEAVES`) | block | 64 | | 0.2 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Mangrove Wood (`MANGROVE_LOG`) | block | 64 | | 2 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Mangrove Leaves (`MANGROVE_LEAVES`) | block | 64 | | 0.2 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Dark Oak Wood (`DARK_OAK_LOG`) | block | 64 | | 2 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Dark Oak Leaves (`DARK_OAK_LEAVES`) | block | 64 | | 0.2 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Cherry Wood (`CHERRY_LOG`) | block | 64 | | 2 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Cherry Leaves (`CHERRY_LEAVES`) | block | 64 | | 0.2 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Mud (`MUD`) | block | 64 | | 0.5 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Mangrove Roots (`MANGROVE_ROOTS`) | block | 64 | | 0.7 [U] | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Oak Sapling (`OAK_SAPLING_STAGE_0`) | block | 64 | | 0 [U] | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Stick (`STICK`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Wooden Pickaxe (`WOODEN_PICKAXE`) | item | 1 | 59 | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Stone Pickaxe (`STONE_PICKAXE`) | item | 1 | 131 | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Iron Pickaxe (`IRON_PICKAXE`) | item | 1 | 250 | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Wooden Axe (`WOODEN_AXE`) | item | 1 | 59 | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Stone Axe (`STONE_AXE`) | item | 1 | 131 | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Iron Axe (`IRON_AXE`) | item | 1 | 250 | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Wooden Shovel (`WOODEN_SHOVEL`) | item | 1 | 59 | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Stone Shovel (`STONE_SHOVEL`) | item | 1 | 131 | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Iron Shovel (`IRON_SHOVEL`) | item | 1 | 250 | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Apple (`APPLE`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Bread (`BREAD`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Cooked Beef (`COOKED_BEEF`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Blast Furnace (`BLAST_FURNACE`) | block | 64 | | 3.5 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Smoker (`SMOKER`) | block | 64 | | 3.5 [U] | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Copper Ore (`COPPER_ORE`) | block | 64 | | 3 [U] | real texture | [x] | G4 live (world wall, trees, inventory). drops raw item (G1) |
+| Smooth Stone (`SMOOTH_STONE`) | block | 64 | | 2 [U] | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Coal (`COAL`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Charcoal (`CHARCOAL`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Iron Ingot (`IRON_INGOT`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Gold Ingot (`GOLD_INGOT`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Copper Ingot (`COPPER_INGOT`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Iron Nugget (`IRON_NUGGET`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Brick (`BRICK`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Raw Iron (`RAW_IRON`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Raw Gold (`RAW_GOLD`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Raw Copper (`RAW_COPPER`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Raw Beef (`RAW_BEEF`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Raw Porkchop (`RAW_PORKCHOP`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Cooked Porkchop (`COOKED_PORKCHOP`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Raw Chicken (`RAW_CHICKEN`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Cooked Chicken (`COOKED_CHICKEN`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Raw Mutton (`RAW_MUTTON`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Cooked Mutton (`COOKED_MUTTON`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Raw Rabbit (`RAW_RABBIT`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Cooked Rabbit (`COOKED_RABBIT`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Raw Cod (`COD`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Cooked Cod (`COOKED_COD`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Raw Salmon (`SALMON`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Cooked Salmon (`COOKED_SALMON`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Potato (`POTATO`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Baked Potato (`BAKED_POTATO`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Kelp (`KELP`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Dried Kelp (`DRIED_KELP`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Rotten Flesh (`ROTTEN_FLESH`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Wooden Sword (`WOODEN_SWORD`) | item | 1 | 59 | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Stone Sword (`STONE_SWORD`) | item | 1 | 131 | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Iron Sword (`IRON_SWORD`) | item | 1 | 250 | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Leather (`LEATHER`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Feather (`FEATHER`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Egg (`EGG`) | item | 16 | | item | real texture | [x] | G3 live (inventory + hotbar). stack 16 fixed (G1) |
+| Leather Cap (`LEATHER_HELMET`) | item | 1 | 55 | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Leather Tunic (`LEATHER_CHESTPLATE`) | item | 1 | 80 | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Leather Pants (`LEATHER_LEGGINGS`) | item | 1 | 75 | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Leather Boots (`LEATHER_BOOTS`) | item | 1 | 65 | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Iron Helmet (`IRON_HELMET`) | item | 1 | 165 | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Iron Chestplate (`IRON_CHESTPLATE`) | item | 1 | 240 | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Iron Leggings (`IRON_LEGGINGS`) | item | 1 | 225 | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Iron Boots (`IRON_BOOTS`) | item | 1 | 195 | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Golden Helmet (`GOLD_HELMET`) | item | 1 | 77 | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Golden Chestplate (`GOLD_CHESTPLATE`) | item | 1 | 112 | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Golden Leggings (`GOLD_LEGGINGS`) | item | 1 | 105 | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Golden Boots (`GOLD_BOOTS`) | item | 1 | 91 | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Diamond (`DIAMOND`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Diamond Sword (`DIAMOND_SWORD`) | item | 1 | 1561 | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Diamond Axe (`DIAMOND_AXE`) | item | 1 | 1561 | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Diamond Pickaxe (`DIAMOND_PICKAXE`) | item | 1 | 1561 | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Diamond Shovel (`DIAMOND_SHOVEL`) | item | 1 | 1561 | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Diamond Helmet (`DIAMOND_HELMET`) | item | 1 | 363 | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Diamond Chestplate (`DIAMOND_CHESTPLATE`) | item | 1 | 528 | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Diamond Leggings (`DIAMOND_LEGGINGS`) | item | 1 | 495 | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Diamond Boots (`DIAMOND_BOOTS`) | item | 1 | 429 | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Flint (`FLINT`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Clay Ball (`CLAY_BALL`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Snowball (`SNOWBALL`) | item | 16 | | item | real texture | [x] | G3 live (inventory + hotbar). stack 16 fixed (G1) |
+| Glowstone Dust (`GLOWSTONE_DUST`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Book (`BOOK`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Gunpowder (`GUNPOWDER`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Bone (`BONE`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Arrow (`ARROW`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
+| String (`STRING`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
+| Spider Eye (`SPIDER_EYE`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
 
 ### Items and blocks vanilla has that the clone lacks (missing, tracked, not all will be built)
 
@@ -250,10 +250,7 @@ applies (render distance 12 loaded 441 chunks, 3 loaded 29).
   the three files are not on disk yet, so those mobs still draw flat placeholder colours. **Next step:** on an unfiltered network run
   `python scripts/restore-assets.py` (idempotent), then look at the real file sizes: the pig and cow got larger and may have a different UV layout,
   in which case the box UVs in `MobModelBuilder` (pig/cow/chicken) need re-mapping. Not verifiable without the files.
-- Precedence note: files in `textures/` override the original art in `ItemIcons` / `BlockArt` / `HudSprites`. To see the original art (what
-  groups G2-G5 verified), rename `textures/` away. The folders are gitignored.
-- Still missing features (not wrong, not built): offhand slot and player preview, ghost armor icons, regeneration heart bounce (no status
-  effects), gold tools/hoes/torch/bucket/bow and their recipes, the remaining unverified numbers listed in `docs/vanilla-rules.md` section 7.
+- Precedence note: there is no generated art any more (BlockArt, ItemIcons and HudSprites were deleted); every tile, icon, HUD sprite, container background, particle, sun, moon, rain and the bare hand comes from `textures/`, restored by `scripts/restore-assets.py`.
 
 ## 6. Fix batch 2 (user-reported bugs)
 
@@ -266,3 +263,20 @@ All verified live (screenshots in `test-output/screenshots/`) and by unit tests 
 - [x] Fuel: 1 coal = 8 items in furnace, blast furnace and smoker; planks 1.5, sticks 0.5; wooden tools, saplings, crafting tables, chests, bookshelves and mangrove roots burn; progress drains 2 per tick when the fire is out.
 - [x] First-person hand and held items use vanilla's transforms (right-hand anchor 0.56/-0.52/-0.72, attack rotations, tool display transform, held blocks at scale 0.4); flat items are extruded 1/16 thick; the empty hand is the 4x12x4 px arm; the swing lasts 0.3 s; the hand uses the player's FOV.
 - Known approximations: the flat-item yaw is +90 instead of the JSON's -90 (checked visually, see `HeldItemModel.FLAT_YAW`); baby pig/cow/chicken have their own 26.x textures that are not used yet.
+
+## 7. Fix batch 3 (user-reported)
+
+Live evidence in `test-output/screenshots/` (not committed). Sources for the numbers: Perplexity research on the decompiled
+1.21 `CritParticle` / `TrackingEmitter` / `Player.attack` / `ItemEntityRenderer` (tag [P]); the textures themselves are the 26.3 client jar's.
+
+- [x] All generated art deleted (`BlockArt`, `ItemIcons`, `HudSprites`, the procedural atlas, crack and HUD fallbacks, the arrow/flame/slot drawing in `GuiPainter`); missing files show vanilla's magenta-and-black square or are skipped.
+- [x] Tiles that had no real texture now use one: blast furnace, smoker, copper ore and smooth stone (block files), chest (cut from `entity/chest/normal.png`), bare hand (real arm rectangle of `steve.png`), sun, moon and rain (`environment/`).
+- [x] Night motes removed (they were invented, not vanilla).
+- [x] Rain is vanilla's: one camera-facing quad per block column within 10 blocks, real `rain.png`, scrolling per column. No per-column alpha fade yet (the shader has only a global alpha).
+- [x] Sun and moon draw additively with the real textures (vanilla's blend). The moon is always the full moon: the game has no day counter yet.
+- [x] Q drops one item (Ctrl+Q the stack); the dropped item is the real sprite extruded 1/16 thick at the ground display scale 0.5 (blocks stay 0.25 cubes). Counts above 1 are still one model (vanilla shows up to 5 copies).
+- [x] Critical hits: the rule was already right (charge >= 0.9, falling, not on ground / swimming / flying / sprint-hit, x1.5). Now the victim gets vanilla's tracking emitter (3 ticks, 16 tries per tick, `particle/critical_hit.png`), and a hit that takes more than 2 health spawns (int)(damage/2) dark hearts (`particle/damage.png`, 20 ticks, rising).
+- [x] Equip animation: changing the held item lowers the old one then raises the new one (0.15 s each, ease-out), for flat items, blocks and the bare hand; the hand also rises when a world opens. No offhand exists, so only the main hand animates.
+- [x] Inventory, crafting table, furnace, blast furnace and smoker use the real container textures and the real lit/burn progress sprites.
+- [x] Grayscale PNGs are read with their stored values (Java's `getRGB` lightened them).
+- Known gaps: player preview in the inventory (the preview box is the texture's black rectangle), the offhand slot (its frame is in the texture but unused), moon phases, rain edge fade, multiple copies of a dropped stack.

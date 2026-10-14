@@ -57,7 +57,7 @@ public final class EntityTexture {
         File file = new File(path);
         if (file.isFile()) {
             try {
-                img = ImageIO.read(file);
+                img = TextureIo.read(file);
             } catch (Exception e) {
                 log.warn("Could not read mob skin {}: {}", path, e.toString());
             }
@@ -66,6 +66,29 @@ public final class EntityTexture {
         }
         if (img == null) img = placeholder(fallbackW, fallbackH, fallbackRgb);
         return upload(img);
+    }
+
+    /** A real texture file as its own GL texture, or null when it is absent or unreadable (nothing is invented in its place). */
+    public static EntityTexture loadReal(String path, boolean repeat) {
+        File file = new File(path);
+        if (!file.isFile()) {
+            log.warn("Texture {} not found", path);
+            return null;
+        }
+        try {
+            BufferedImage img = TextureIo.read(file);
+            if (img == null) return null;
+            EntityTexture tex = upload(img);
+            if (repeat) {
+                glBindTexture(GL_TEXTURE_2D, tex.id);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+            }
+            return tex;
+        } catch (Exception e) {
+            log.warn("Could not read texture {}: {}", path, e.toString());
+            return null;
+        }
     }
 
     static BufferedImage placeholder(int w, int h, int rgb) {

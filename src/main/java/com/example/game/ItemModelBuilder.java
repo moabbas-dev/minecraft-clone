@@ -95,6 +95,30 @@ final class ItemModelBuilder {
         return n;
     }
 
+    /**
+     * Writes a flat extruded sprite (the local mesh from {@code HeldItemModel.extrudedSprite}, centred on the origin,
+     * spanning -0.5..0.5, baked per-face brightness in its block-light slot) scaled by {@code scale}, turned about the
+     * vertical axis and centred on (cx,cy,cz) - a dropped tool, food or ingot. Returns the new write index.
+     */
+    static int emitSprite(float[] out, int n, float[] local, float cx, float cy, float cz, float scale,
+                          float cos, float sin, float sky, float blockLight) {
+        for (int i = 0; i < local.length; i += FLOATS_PER_VERTEX) {
+            float lx = local[i] * scale, ly = local[i + 1] * scale, lz = local[i + 2] * scale;
+            out[n++] = cx + lx * cos + lz * sin;
+            out[n++] = cy + ly;
+            out[n++] = cz - lx * sin + lz * cos;
+            out[n++] = local[i + 3];
+            out[n++] = local[i + 4];
+            out[n++] = sky * local[i + 6];
+            out[n++] = blockLight;
+            out[n++] = local[i + 7];
+            out[n++] = local[i + 8];
+            out[n++] = local[i + 9];
+            out[n++] = 0f;
+        }
+        return n;
+    }
+
     /** Two crossing diagonal planes (the in-world sapling shape), same placement rules as {@link #emitCube}. */
     static int emitCross(float[] out, int n, float cx, float cy, float cz, float half, float cos, float sin,
                          Model m, float sky, float blockLight) {

@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """Restore the game's gitignored Mojang assets (textures/ and sounds/) from Mojang's official servers.
 
 Run from anywhere; paths resolve against the repository root. Standard library only.
@@ -38,7 +38,8 @@ SRC = ROOT / "src" / "main" / "java" / "com" / "example"
 MANIFEST_URL = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
 RESOURCES_URL = "https://resources.download.minecraft.net"
 JAR_PREFIX = "assets/minecraft/"
-BULK_TEXTURE_DIRS = ("textures/block/", "textures/item/", "textures/gui/", "textures/colormap/")
+BULK_TEXTURE_DIRS = ("textures/block/", "textures/item/", "textures/gui/", "textures/colormap/", "textures/particle/",
+                     "textures/environment/", "textures/entity/chest/", "textures/entity/player/wide/")
 UA = {"User-Agent": "minecraft-clone-asset-restore/1.0"}
 DEST = ROOT  # where textures/ and sounds/ are written (--dest overrides, used by the offline test)
 
@@ -86,6 +87,9 @@ def expected_textures():
     tex |= {f"textures/block/destroy_stage_{i}.png" for i in range(10)}  # CrackOverlay, all-or-nothing
     tex |= set(re.findall(r'"(textures/colormap/[^"]+)"', _read("world/TerrainGenerator.java")))
     tex |= set(re.findall(r'EntityTexture\.load\("(textures/entity/[^"]+)"', _read("game/Game.java")))
+    # real files the game reads by literal path: realTexture(key, "textures/...", ...) and guiSprite("textures/...")
+    tex |= set(re.findall(r'(?:realTexture\([^,]+,\s*|guiSprite\()"(textures/[^"]+\.png)"', _read("game/Game.java")))
+    tex |= set(re.findall(r'CHEST_SKIN = "(textures/[^"]+)"', _read("engine/TextureAtlas.java")))
     hud = _read("engine/HudTextures.java")
     hud_dir = re.search(r'DIR = "([^"]+)"', hud).group(1)
     tex |= {hud_dir + n for n in re.findall(r'(?:load|optional)\("([^"]+\.png)"\)', hud)}

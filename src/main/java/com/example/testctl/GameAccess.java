@@ -59,6 +59,9 @@ public interface GameAccess {
     /** Queues one use/place click, consumed by the next interaction update. */
     void useItem();
 
+    /** Presses the drop key (Q): one item, or the whole stack like Ctrl+Q. */
+    void dropItem(boolean wholeStack);
+
     /** Rotates the player to face a world point. @throws IllegalArgumentException if it is the eye position. */
     void lookAt(double x, double y, double z);
 

@@ -12,8 +12,9 @@ See `TESTING.md` for the test suite and the live test controller.
 ## Game assets (textures, sounds, options)
 
 The real textures and sounds are Mojang's files. They are **not in git** (`textures/`, `sounds/`, `minecraft-sounds/`
-and `options.txt` are gitignored) and must not be committed or published. Without them the game still runs,
-using procedural tiles, a plain HUD and silent sounds.
+and `options.txt` are gitignored) and must not be committed or published. The game draws no art of its
+own: without them it still runs, but tiles show vanilla's magenta-and-black "missing texture" square, the HUD and the
+container screens are plain, and sounds are silent.
 
 To regenerate everything from Mojang's official servers (needs Python 3, no packages):
 

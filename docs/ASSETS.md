@@ -10,9 +10,14 @@ None of these files are committed: `textures/`, `sounds/`, `minecraft-sounds/` a
 
 | Folder / file | Read by | Required? | Behaviour when missing |
 |---|---|---|---|
-| `textures/block/*.png` | `engine/TextureAtlas` (`REAL_TEXTURE_PATHS`), `engine/CrackOverlay` | no | procedural fallback tile; cracks fall back to generated strips |
-| `textures/item/*.png` | `engine/TextureAtlas` (`REAL_TEXTURE_PATHS`) | no | procedural flat icon |
+| `textures/block/*.png` | `engine/TextureAtlas` (`REAL_TEXTURE_PATHS`), `engine/CrackOverlay` | no | magenta-and-black "missing texture" tile (logged); no cracks are drawn when `destroy_stage_*` are missing |
+| `textures/item/*.png` | `engine/TextureAtlas` (`REAL_TEXTURE_PATHS`) | no | "missing texture" tile |
 | `textures/gui/sprites/hud/**` | `engine/HudTextures` | no | the 8 core sprites are all-or-nothing, else the plain colored-quad HUD; the rest are optional per group |
+| `textures/gui/container/{inventory,crafting_table,furnace,blast_furnace,smoker}.png`, `textures/gui/sprites/container/<station>/{lit,burn}_progress.png` | `game/Game` -> `ui/GuiPainter.background`, `engine/HudTextures.loadFile` | no | plain grey panel and slots; no progress sprites |
+| `textures/particle/{critical_hit,damage}.png` | `game/Game` -> `fx/SpriteParticles` | no | those particles are not drawn |
+| `textures/environment/{rain.png,celestial/sun.png,celestial/moon/full_moon.png}` | `game/Game` (`renderRain`, `renderSunAndMoon`) | no | no rain streaks / sun / moon |
+| `textures/entity/player/wide/steve.png` | `game/Game.renderHeldItem` (bare hand) | no | the bare hand is not drawn |
+| `textures/entity/chest/normal.png` | `engine/TextureAtlas.chestFace` | no | "missing texture" chest faces |
 | `textures/colormap/{grass,foliage}.png` | `world/TerrainGenerator` -> `world/Colormap` | no | fixed fallback tint |
 | `textures/entity/**` | `game/Game` -> `engine/EntityTexture.load(path, w, h, fallbackRGB)` | no | flat colored placeholder skin |
 | `sounds/**.ogg` | `audio/SoundRegistry` (`SOUNDS_ROOT = new File("sounds")`) -> `audio/SoundBuffer` | no | variation dropped; a group with none is silent (one warning) |

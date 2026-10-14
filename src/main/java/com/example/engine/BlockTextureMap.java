@@ -40,7 +40,7 @@ public class BlockTextureMap {
         uniform(BlockType.BOOKSHELF, Tile.BOOKSHELF);
         uniform(BlockType.MOSSY_COBBLESTONE, Tile.MOSSY_COBBLESTONE);
         uniform(BlockType.OBSIDIAN, Tile.OBSIDIAN);
-        uniform(BlockType.CHEST, Tile.CHEST);
+        put(BlockType.CHEST, Tile.CHEST_TOP, Tile.CHEST_SIDE, Tile.CHEST_TOP);
         uniform(BlockType.DIAMOND_ORE, Tile.DIAMOND_ORE);
         uniform(BlockType.DIAMOND_BLOCK, Tile.DIAMOND_BLOCK);
         put(BlockType.CRAFTING_TABLE, Tile.CRAFTING_TABLE_TOP, Tile.CRAFTING_TABLE_SIDE, Tile.PLANKS);
