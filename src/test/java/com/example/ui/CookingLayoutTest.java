@@ -73,6 +73,31 @@ class CookingLayoutTest {
     }
 
     @Test
+    void slotsSitAtVanillaGuiPixelPositions() {
+        CookingLayout layout = new CookingLayout(1280, 720, 3);
+        InventoryLayout.Rect p = layout.panel();
+        assertEquals(528f, p.w());
+        assertEquals(498f, p.h());
+        check(layout, p, CookingMenu.INPUT_SLOT, 56, 17);
+        check(layout, p, CookingMenu.FUEL_SLOT, 56, 53);
+        check(layout, p, CookingMenu.OUTPUT_SLOT, 116, 35);
+        check(layout, p, Inventory.HOTBAR_SIZE, 8, 84);
+        check(layout, p, 0, 8, 142);
+        InventoryLayout.Rect arrow = layout.arrow(), flame = layout.flame();
+        assertEquals(p.x() + 79 * 3f, arrow.x(), 0.01f);
+        assertEquals(p.y() + 34 * 3f, arrow.y(), 0.01f);
+        assertEquals(p.x() + 56 * 3f, flame.x(), 0.01f);
+        assertEquals(p.y() + 36 * 3f, flame.y(), 0.01f);
+    }
+
+    private static void check(CookingLayout layout, InventoryLayout.Rect panel, int slot, int gx, int gy) {
+        InventoryLayout.Rect r = layout.slotRect(slot);
+        assertEquals(panel.x() + gx * 3f, r.x(), 0.01f, "x of slot " + slot);
+        assertEquals(panel.y() + gy * 3f, r.y(), 0.01f, "y of slot " + slot);
+        assertEquals(48f, r.w(), 0.01f);
+    }
+
+    @Test
     void invalidSlotIdsAreRejected() {
         CookingLayout layout = new CookingLayout(1280, 720);
         assertThrows(IllegalArgumentException.class, () -> layout.slotRect(-1));

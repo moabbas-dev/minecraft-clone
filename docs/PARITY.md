@@ -66,14 +66,14 @@ Verification in the notes column: `unit` = a unit test, `live` = checked in the 
 
 | # | Element | Vanilla (rules 6) | Code | Status | Notes / commit |
 |---|---|---|---|---|---|
-| U1 | Panel size and scaling | 176x166 GUI px at the GUI scale | custom 40 px slots, 4 px gap, fixed 3x scale-free layout | [ ] | InventoryLayout |
-| U2 | Slot size and spacing | 18 px pitch, slot art 16 px inside | 44 px pitch | [ ] |  |
-| U3 | Player inventory layout | armor column x=8,y=8 step 18; craft 2x2 at (98,18); out (154,28); offhand (77,62); storage (8,84); hotbar y=142 | armor is a 2x2 block left of the grid, no offhand slot, no player preview | [ ] | offhand slot missing as a feature |
-| U4 | Crafting table layout | 3x3 at (30,17), out (124,35) | same custom layout | [ ] |  |
-| U5 | Furnace layout | in (56,17), fuel (56,53), out (116,35), flame (56,36), arrow (79,34) | custom layout, plain bars | [ ] | CookingLayout |
-| U6 | Panel and slot look | light-grey panel with bevel, inset slots | dark flat panel | [ ] |  |
-| U7 | Hover highlight, held item, tooltip | white 50% square on the slot; item at cursor; dark-purple tooltip | white 28% over slot; 40 px held icon; plain dark box | [ ] |  |
-| U8 | Labels | Crafting / Inventory text colour 0x404040 | near-black | [ ] |  |
+| U1 | Panel size and scaling | 176x166 GUI px at the GUI scale | scaled panel, vanilla bevel look (GuiPainter) | [x] | G5 live + unit: 176x166 GUI px panel at the auto GUI scale (InventoryLayout/CookingLayout) |
+| U2 | Slot size and spacing | 18 px pitch, slot art 16 px inside | 18 px pitch, 16 px item area | [x] | G5 unit InventoryLayoutTest.slotsSitAtVanillaGuiPixelPositions |
+| U3 | Player inventory layout | armor column x=8,y=8 step 18; craft 2x2 at (98,18); out (154,28); offhand (77,62); storage (8,84); hotbar y=142 | layout matches except offhand/preview | [~] | G5: armor column (8,8 step 18), 2x2 grid (98,18), result (154,28), storage (8,84), hotbar y=142 all match. Still missing: offhand slot (77,62) and the player-model preview (an empty inset box is drawn) |
+| U4 | Crafting table layout | 3x3 at (30,17), out (124,35) |  | [x] | G5 live + unit: 3x3 at (30,17), result (124,35); no armor slots at the table |
+| U5 | Furnace layout | in (56,17), fuel (56,53), out (116,35), flame (56,36), arrow (79,34) |  | [x] | G5 live + unit CookingLayoutTest: in (56,17), fuel (56,53), out (116,35), flame (56,36), arrow (79,34); lit flame and half-filled arrow seen |
+| U6 | Panel and slot look | light-grey panel with bevel, inset slots | GuiPainter.panel / slot (original art, flat quads) | [x] | G5 live: light-grey bevelled panel, inset 18 px slots |
+| U7 | Hover highlight, held item, tooltip | white 50% square on the slot; item at cursor; dark-purple tooltip | tooltip colours from rules 6 are [U] | [x] | G5 live: white 50% hover square seen; held item drawn at 16 px x scale centred on the cursor; dark-purple tooltip (GuiPainter.tooltip) |
+| U8 | Labels | Crafting / Inventory text colour 0x404040 |  | [x] | G5 live: labels in 0x404040 ('Crafting' at (97,8) / (28,6), 'Inventory' at (8,72), furnace title centred) |
 
 ## 4. Blocks and items (one row per entry in `BlockType`)
 
@@ -231,3 +231,5 @@ Columns: stack size, durability, mining/drop result, icon. Icon status refers to
 - [ ] redstone, lapis, emerald ores
 - [ ] TNT crafting recipe, bricks crafting recipe, bookshelf crafting recipe, book recipe
 - [ ] ender pearl, sign, banner, saddle, boat, minecart
+- [ ] offhand slot (inventory (77,62), F to swap) and the player-model preview in the inventory screen
+- [ ] ghost armor icons in empty armor slots

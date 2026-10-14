@@ -29,6 +29,7 @@ import com.example.ui.GameOptions;
 import com.example.ui.GuiEnv;
 import com.example.ui.McScreen;
 import com.example.ui.OptionsScreens;
+import com.example.ui.GuiPainter;
 import com.example.ui.InventoryLayout;
 import com.example.ui.PauseScreen;
 import com.example.ui.SelectWorldScreen;
@@ -1225,7 +1226,8 @@ public class Game implements GameAccess {
         boolean right = input.consumeMousePressed(GLFW_MOUSE_BUTTON_RIGHT);
         if (left || right) {
             float mx = (float) input.getMouseX(), my = (float) input.getMouseY();
-            InventoryLayout layout = new InventoryLayout(window.getWidth(), window.getHeight(), menu.getGridSize());
+            InventoryLayout layout = new InventoryLayout(window.getWidth(), window.getHeight(), menu.getGridSize(),
+                    com.example.ui.GuiScale.compute(window.getWidth(), window.getHeight(), options.guiScale));
             handleInventoryClick(layout.slotAt(mx, my), right, layout.panel().contains(mx, my));
         }
     }
@@ -1250,54 +1252,49 @@ public class Game implements GameAccess {
     private void renderInventoryScreen() {
         if (menu == null) return;
         int w = window.getWidth(), h = window.getHeight();
-        InventoryLayout layout = new InventoryLayout(w, h, menu.getGridSize());
+        InventoryLayout layout = new InventoryLayout(w, h, menu.getGridSize(), com.example.ui.GuiScale.compute(w, h, options.guiScale));
+        float s = layout.scale();
         float mx = (float) input.getMouseX(), my = (float) input.getMouseY();
         int hovered = layout.slotAt(mx, my);
 
-        uiRenderer.drawColorQuad(0, 0, w, h, 0f, 0f, 0f, 0.55f);
+        GuiPainter.dim(uiRenderer, w, h);
         InventoryLayout.Rect p = layout.panel();
-        uiRenderer.drawColorQuad(p.x() - 3, p.y() - 3, p.w() + 6, p.h() + 6, 0.05f, 0.05f, 0.05f, 0.95f);
-        uiRenderer.drawColorQuad(p.x(), p.y(), p.w(), p.h(), 0.34f, 0.34f, 0.36f, 0.97f);
+        GuiPainter.panel(uiRenderer, p.x(), p.y(), p.w(), p.h(), s);
+        font.draw(uiRenderer, "Crafting", layout.titleX(), layout.titleY(), s, 0x404040, false);
+        if (!layout.hasArmorSlots()) { // vanilla's player inventory has no "Inventory" caption, the crafting table does
+            font.draw(uiRenderer, "Inventory", layout.inventoryLabelX(), layout.inventoryLabelY(), s, 0x404040, false);
+        }
+        if (layout.hasArmorSlots()) {
+            InventoryLayout.Rect pv = layout.previewBox();
+            GuiPainter.inset(uiRenderer, pv.x(), pv.y(), pv.w(), pv.h(), s);
+        }
+        GuiPainter.arrow(uiRenderer, layout.arrow(), s, 0f);
 
-        String craftTitle = menu.getGridSize() == 3 ? "Crafting Table" : "Crafting";
-        font.drawText(uiRenderer, craftTitle, layout.leftX(), layout.craftingLabelY() + 2f, 0.7f, 0.12f, 0.12f, 0.12f, 1f);
-        font.drawText(uiRenderer, "Inventory", layout.leftX(), layout.inventoryLabelY() + 2f, 0.7f, 0.12f, 0.12f, 0.12f, 1f);
-        font.drawText(uiRenderer, "=>", layout.arrowX(), layout.arrowY() - 8f, 1.4f, 0.12f, 0.12f, 0.12f, 1f);
-
-        for (int s = 0; s < Inventory.DEFAULT_SLOT_COUNT; s++) drawMenuSlot(layout, s, hovered);
+        for (int slot = 0; slot < Inventory.DEFAULT_SLOT_COUNT; slot++) drawMenuSlot(layout, slot, hovered);
         for (int i = 0; i < menu.getGridSize() * menu.getGridSize(); i++) drawMenuSlot(layout, InventoryMenu.GRID_BASE + i, hovered);
         drawMenuSlot(layout, InventoryMenu.RESULT_SLOT, hovered);
-        for (int i = 0; i < 4; i++) drawMenuSlot(layout, InventoryMenu.ARMOR_BASE + i, hovered);
+        if (layout.hasArmorSlots()) for (int i = 0; i < 4; i++) drawMenuSlot(layout, InventoryMenu.ARMOR_BASE + i, hovered);
 
         ItemStack held = menu.getCursor();
         if (!held.isEmpty()) {
-            drawBlockIcon(held.type(), mx - 20f, my - 20f, 40f);
-            if (held.count() > 1) drawStackCount(held.count(), mx - 20f, my - 20f, 40f);
+            drawBlockIcon(held.type(), mx - 8 * s, my - 8 * s, 16 * s);
+            if (held.count() > 1) drawStackCount(held.count(), mx - 8 * s, my - 8 * s, 16 * s);
         } else if (hovered >= 0) {
             ItemStack under = menu.stackAt(hovered);
-            if (!under.isEmpty()) {
-                String name = under.type().displayName;
-                float tw = font.measureText(name, 1.1f);
-                float tx = mx + 14f, ty = my - 6f;
-                uiRenderer.drawColorQuad(tx - 5f, ty - 3f, tw + 10f, font.lineHeight(1.1f) + 6f, 0.05f, 0.02f, 0.1f, 0.92f);
-                font.drawText(uiRenderer, name, tx, ty, 1.1f, 1f, 1f, 1f, 1f);
-            }
+            if (!under.isEmpty()) GuiPainter.tooltip(uiRenderer, font, under.type().displayName, mx, my, s, w, h);
         }
     }
 
     private void drawMenuSlot(InventoryLayout layout, int slot, int hovered) {
         InventoryLayout.Rect r = layout.slotRect(slot);
         ItemStack stack = menu.stackAt(slot);
-        boolean isResult = slot == InventoryMenu.RESULT_SLOT;
-        uiRenderer.drawColorQuad(r.x() - 1, r.y() - 1, r.w() + 2, r.h() + 2, 0.08f, 0.08f, 0.08f, 1f);
-        float shade = isResult && !stack.isEmpty() ? 0.62f : 0.5f;
-        uiRenderer.drawColorQuad(r.x(), r.y(), r.w(), r.h(), shade, shade, isResult && !stack.isEmpty() ? 0.45f : shade, 1f);
+        GuiPainter.slot(uiRenderer, r.x(), r.y(), layout.scale());
         if (!stack.isEmpty()) {
             drawBlockIcon(stack.type(), r.x(), r.y(), r.w());
             if (stack.count() > 1) drawStackCount(stack.count(), r.x(), r.y(), r.w());
             drawDurabilityBar(stack, r.x(), r.y(), r.w());
         }
-        if (slot == hovered) uiRenderer.drawColorQuad(r.x(), r.y(), r.w(), r.h(), 1f, 1f, 1f, 0.28f);
+        if (slot == hovered) GuiPainter.highlight(uiRenderer, r);
     }
 
     // ---- cooking station screen (Furnace / Blast Furnace / Smoker) ----
@@ -1358,7 +1355,8 @@ public class Game implements GameAccess {
         boolean right = input.consumeMousePressed(GLFW_MOUSE_BUTTON_RIGHT);
         if (left || right) {
             float mx = (float) input.getMouseX(), my = (float) input.getMouseY();
-            CookingLayout layout = new CookingLayout(window.getWidth(), window.getHeight());
+            CookingLayout layout = new CookingLayout(window.getWidth(), window.getHeight(),
+                    com.example.ui.GuiScale.compute(window.getWidth(), window.getHeight(), options.guiScale));
             handleCookingClick(layout.slotAt(mx, my), right, layout.panel().contains(mx, my));
         }
     }
@@ -1377,65 +1375,49 @@ public class Game implements GameAccess {
     private void renderCookingScreen() {
         if (cookingMenu == null) return;
         int w = window.getWidth(), h = window.getHeight();
-        CookingLayout layout = new CookingLayout(w, h);
+        CookingLayout layout = new CookingLayout(w, h, com.example.ui.GuiScale.compute(w, h, options.guiScale));
+        float s = layout.scale();
         float mx = (float) input.getMouseX(), my = (float) input.getMouseY();
         int hovered = layout.slotAt(mx, my);
         CookingStationState station = cookingMenu.getStation();
 
-        uiRenderer.drawColorQuad(0, 0, w, h, 0f, 0f, 0f, 0.55f);
+        GuiPainter.dim(uiRenderer, w, h);
         InventoryLayout.Rect p = layout.panel();
-        uiRenderer.drawColorQuad(p.x() - 3, p.y() - 3, p.w() + 6, p.h() + 6, 0.05f, 0.05f, 0.05f, 0.95f);
-        uiRenderer.drawColorQuad(p.x(), p.y(), p.w(), p.h(), 0.34f, 0.34f, 0.36f, 0.97f);
+        GuiPainter.panel(uiRenderer, p.x(), p.y(), p.w(), p.h(), s);
 
-        font.drawText(uiRenderer, station.getType().displayName, layout.leftX(), layout.titleLabelY() + 2f, 0.7f, 0.12f, 0.12f, 0.12f, 1f);
-        font.drawText(uiRenderer, "Inventory", layout.leftX(), layout.inventoryLabelY() + 2f, 0.7f, 0.12f, 0.12f, 0.12f, 1f);
-        font.drawText(uiRenderer, "=>", layout.arrowX(), layout.arrowY() - 8f, 1.4f, 0.12f, 0.12f, 0.12f, 1f);
+        String title = station.getType().displayName;
+        font.draw(uiRenderer, title, layout.titleX(font.width(title, 1f)), layout.titleY(), s, 0x404040, false);
+        font.draw(uiRenderer, "Inventory", layout.inventoryLabelX(), layout.inventoryLabelY(), s, 0x404040, false);
 
-        for (int s = 0; s < Inventory.DEFAULT_SLOT_COUNT; s++) drawCookingSlot(layout, cookingMenu, s, hovered);
+        for (int slot = 0; slot < Inventory.DEFAULT_SLOT_COUNT; slot++) drawCookingSlot(layout, cookingMenu, slot, hovered);
         drawCookingSlot(layout, cookingMenu, CookingMenu.INPUT_SLOT, hovered);
         drawCookingSlot(layout, cookingMenu, CookingMenu.FUEL_SLOT, hovered);
         drawCookingSlot(layout, cookingMenu, CookingMenu.OUTPUT_SLOT, hovered);
 
-        // Burn indicator: a vertical fill behind the fuel slot, and the cook-progress arrow
-        // filling left-to-right as it completes - no icon textures exist for either (see
-        // TextureAtlas's own docs), so both are plain colored quads, matching every other HUD
-        // element in this project.
-        InventoryLayout.Rect fuelRect = layout.slotRect(CookingMenu.FUEL_SLOT);
-        if (station.isBurning()) {
-            float fill = station.burnFraction() * fuelRect.h();
-            uiRenderer.drawColorQuad(fuelRect.x() - 6f, fuelRect.y() + fuelRect.h() - fill, 4f, fill, 0.95f, 0.55f, 0.15f, 0.9f);
-        }
-        float arrowW = font.measureText("=>", 1.4f);
-        if (station.cookFraction() > 0f) {
-            uiRenderer.drawColorQuad(layout.arrowX(), layout.arrowY() + 10f, arrowW * station.cookFraction(), 3f, 0.9f, 0.75f, 0.2f, 0.95f);
-        }
+        // The flame between input and fuel burns down as the fuel does; the arrow fills as the item cooks.
+        GuiPainter.flame(uiRenderer, layout.flame(), s, station.isBurning() ? station.burnFraction() : 0f);
+        GuiPainter.arrow(uiRenderer, layout.arrow(), s, station.cookFraction());
 
         ItemStack held = cookingMenu.getCursor();
         if (!held.isEmpty()) {
-            drawBlockIcon(held.type(), mx - 20f, my - 20f, 40f);
-            if (held.count() > 1) drawStackCount(held.count(), mx - 20f, my - 20f, 40f);
+            drawBlockIcon(held.type(), mx - 8 * s, my - 8 * s, 16 * s);
+            if (held.count() > 1) drawStackCount(held.count(), mx - 8 * s, my - 8 * s, 16 * s);
         } else if (hovered >= 0) {
             ItemStack under = cookingMenu.stackAt(hovered);
-            if (!under.isEmpty()) {
-                String name = under.type().displayName;
-                float tw = font.measureText(name, 1.1f);
-                float tx = mx + 14f, ty = my - 6f;
-                uiRenderer.drawColorQuad(tx - 5f, ty - 3f, tw + 10f, font.lineHeight(1.1f) + 6f, 0.05f, 0.02f, 0.1f, 0.92f);
-                font.drawText(uiRenderer, name, tx, ty, 1.1f, 1f, 1f, 1f, 1f);
-            }
+            if (!under.isEmpty()) GuiPainter.tooltip(uiRenderer, font, under.type().displayName, mx, my, s, w, h);
         }
     }
 
     private void drawCookingSlot(CookingLayout layout, CookingMenu menu, int slot, int hovered) {
         InventoryLayout.Rect r = layout.slotRect(slot);
         ItemStack stack = menu.stackAt(slot);
-        uiRenderer.drawColorQuad(r.x() - 1, r.y() - 1, r.w() + 2, r.h() + 2, 0.08f, 0.08f, 0.08f, 1f);
-        uiRenderer.drawColorQuad(r.x(), r.y(), r.w(), r.h(), 0.5f, 0.5f, 0.5f, 1f);
+        GuiPainter.slot(uiRenderer, r.x(), r.y(), layout.scale());
         if (!stack.isEmpty()) {
             drawBlockIcon(stack.type(), r.x(), r.y(), r.w());
             if (stack.count() > 1) drawStackCount(stack.count(), r.x(), r.y(), r.w());
+            drawDurabilityBar(stack, r.x(), r.y(), r.w());
         }
-        if (slot == hovered) uiRenderer.drawColorQuad(r.x(), r.y(), r.w(), r.h(), 1f, 1f, 1f, 0.28f);
+        if (slot == hovered) GuiPainter.highlight(uiRenderer, r);
     }
 
     /** Everything that follows one completed break: the sound, the dropped items, and the

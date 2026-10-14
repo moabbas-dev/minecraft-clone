@@ -4,87 +4,82 @@ import com.example.cooking.CookingMenu;
 import com.example.inventory.Inventory;
 
 /**
- * Where everything on a cooking-station screen (Furnace/Blast Furnace/Smoker - see
- * {@code com.example.cooking.CookingStationType}) sits, and which slot a mouse position is over.
- * Pure geometry, mirroring {@link InventoryLayout}'s exact shape and conventions (same panel
- * width, same storage/hotbar layout below) so the two screens read as one family.
- *
- * Layout, top to bottom: input slot above the fuel slot (left column) with the output slot to
- * their right, then the 27 storage slots and the 9 hotbar slots - identical to InventoryLayout's
- * own bottom section.
+ * Where everything on a cooking-station screen (Furnace / Blast Furnace / Smoker) sits, and which slot a mouse
+ * position is over. Pure geometry with vanilla's numbers (docs/vanilla-rules.md section 6): a 176 x 166 GUI-pixel
+ * panel at the GUI scale, input at (56,17), fuel at (56,53), output at (116,35), the flame at (56,36), the progress
+ * arrow at (79,34), then the 27 storage slots at (8,84) and the hotbar at y=142 - the same bottom half as
+ * {@link InventoryLayout}.
  */
 public final class CookingLayout {
-    public static final float SLOT = InventoryLayout.SLOT;
-    public static final float GAP = InventoryLayout.GAP;
-    public static final float PITCH = InventoryLayout.PITCH;
-    public static final float PAD = InventoryLayout.PAD;
-    public static final float LABEL_H = InventoryLayout.LABEL_H;
-
-    public record Rect(float x, float y, float w, float h) {
-        public boolean contains(float mx, float my) {
-            return mx >= x && mx < x + w && my >= y && my < y + h;
-        }
-    }
-
+    private final float s;
+    private final float left, top;
     private final InventoryLayout.Rect panel;
-    private final float inputY, fuelY, storageY, hotbarY, inputX, outputX, panelX;
 
     public CookingLayout(int windowW, int windowH) {
-        float columnH = 2 * PITCH - GAP; // input + fuel, stacked
-        float panelW = 9 * PITCH - GAP + 2 * PAD;
-        float panelH = PAD + LABEL_H + columnH + 12f + LABEL_H + 3 * PITCH - GAP + 10f + SLOT + PAD;
-        panelX = Math.round((windowW - panelW) / 2f);
-        float panelY = Math.round((windowH - panelH) / 2f);
-        panel = new InventoryLayout.Rect(panelX, panelY, panelW, panelH);
+        this(windowW, windowH, GuiScale.compute(windowW, windowH, 0));
+    }
 
-        inputY = panelY + PAD + LABEL_H;
-        fuelY = inputY + PITCH;
-        storageY = inputY + columnH + 12f + LABEL_H;
-        hotbarY = storageY + 3 * PITCH - GAP + 10f;
-        inputX = panelX + PAD;
-        outputX = inputX + PITCH * 3f;
+    public CookingLayout(int windowW, int windowH, int scale) {
+        this.s = scale;
+        this.left = Math.round((windowW - InventoryLayout.PANEL_W * s) / 2f);
+        this.top = Math.round((windowH - InventoryLayout.PANEL_H * s) / 2f);
+        this.panel = new InventoryLayout.Rect(left, top, InventoryLayout.PANEL_W * s, InventoryLayout.PANEL_H * s);
     }
 
     public InventoryLayout.Rect panel() {
         return panel;
     }
 
-    public float titleLabelY() {
-        return inputY - LABEL_H;
+    public float scale() {
+        return s;
+    }
+
+    private InventoryLayout.Rect item(float gx, float gy) {
+        return new InventoryLayout.Rect(left + gx * s, top + gy * s, InventoryLayout.ITEM * s, InventoryLayout.ITEM * s);
+    }
+
+    /** Text origin of the title, centred like vanilla's furnace screens: pass the title's pixel width in GUI pixels. */
+    public float titleX(float titleWidthGui) {
+        return left + (InventoryLayout.PANEL_W - titleWidthGui) / 2f * s;
+    }
+
+    public float titleY() {
+        return top + 6 * s;
+    }
+
+    public float inventoryLabelX() {
+        return left + 8 * s;
     }
 
     public float inventoryLabelY() {
-        return storageY - LABEL_H;
+        return top + 72 * s;
     }
 
-    public float arrowX() {
-        return inputX + PITCH + 10f;
+    /** The 24 x 17 progress arrow. */
+    public InventoryLayout.Rect arrow() {
+        return new InventoryLayout.Rect(left + 79 * s, top + 34 * s, 24 * s, 17 * s);
     }
 
-    public float arrowY() {
-        return inputY + (PITCH - GAP) / 2f + GAP / 2f;
-    }
-
-    public float leftX() {
-        return panelX + PAD;
+    /** The 14 x 14 area of the flame icon. */
+    public InventoryLayout.Rect flame() {
+        return new InventoryLayout.Rect(left + 56 * s, top + 36 * s, 14 * s, 14 * s);
     }
 
     /** The rectangle for a menu slot id (player slot, or one of CookingMenu's 3 station slots). */
     public InventoryLayout.Rect slotRect(int slot) {
-        if (slot == CookingMenu.INPUT_SLOT) return new InventoryLayout.Rect(inputX, inputY, SLOT, SLOT);
-        if (slot == CookingMenu.FUEL_SLOT) return new InventoryLayout.Rect(inputX, fuelY, SLOT, SLOT);
-        if (slot == CookingMenu.OUTPUT_SLOT) return new InventoryLayout.Rect(outputX, inputY + (PITCH - GAP) / 2f, SLOT, SLOT);
+        if (slot == CookingMenu.INPUT_SLOT) return item(56, 17);
+        if (slot == CookingMenu.FUEL_SLOT) return item(56, 53);
+        if (slot == CookingMenu.OUTPUT_SLOT) return item(116, 35);
         if (slot < 0 || slot >= Inventory.DEFAULT_SLOT_COUNT) throw new IllegalArgumentException("no such slot: " + slot);
-        float x0 = panelX + PAD;
-        if (slot < Inventory.HOTBAR_SIZE) return new InventoryLayout.Rect(x0 + slot * PITCH, hotbarY, SLOT, SLOT);
+        if (slot < Inventory.HOTBAR_SIZE) return item(8 + slot * InventoryLayout.PITCH, 142);
         int storage = slot - Inventory.HOTBAR_SIZE;
-        return new InventoryLayout.Rect(x0 + (storage % 9) * PITCH, storageY + (storage / 9) * PITCH, SLOT, SLOT);
+        return item(8 + (storage % 9) * InventoryLayout.PITCH, 84 + (storage / 9) * InventoryLayout.PITCH);
     }
 
     /** The slot id under the mouse, or -1 if it's over none. */
     public int slotAt(float mx, float my) {
         if (!panel.contains(mx, my)) return -1;
-        for (int s = 0; s < Inventory.DEFAULT_SLOT_COUNT; s++) if (slotRect(s).contains(mx, my)) return s;
+        for (int sl = 0; sl < Inventory.DEFAULT_SLOT_COUNT; sl++) if (slotRect(sl).contains(mx, my)) return sl;
         for (int slot : new int[]{CookingMenu.INPUT_SLOT, CookingMenu.FUEL_SLOT, CookingMenu.OUTPUT_SLOT}) {
             if (slotRect(slot).contains(mx, my)) return slot;
         }

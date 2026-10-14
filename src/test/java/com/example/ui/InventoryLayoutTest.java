@@ -73,6 +73,60 @@ class InventoryLayoutTest {
         assertTrue(layout.slotRect(0).x() < layout.slotRect(1).x());
     }
 
+    /** Vanilla item-area origins in GUI pixels (docs/vanilla-rules.md section 6), checked at GUI scale 3. */
+    @Test
+    void slotsSitAtVanillaGuiPixelPositions() {
+        InventoryLayout inv = new InventoryLayout(1280, 720, 2, 3);
+        InventoryLayout.Rect p = inv.panel();
+        assertEquals(176 * 3f, p.w());
+        assertEquals(166 * 3f, p.h());
+        assertSlot(inv, p, InventoryMenu.GRID_BASE, 98, 18);
+        assertSlot(inv, p, InventoryMenu.GRID_BASE + 3, 98 + 18, 18 + 18);
+        assertSlot(inv, p, InventoryMenu.RESULT_SLOT, 154, 28);
+        assertSlot(inv, p, InventoryMenu.ARMOR_BASE, 8, 8);
+        assertSlot(inv, p, InventoryMenu.ARMOR_BASE + 3, 8, 8 + 3 * 18);
+        assertSlot(inv, p, Inventory.HOTBAR_SIZE, 8, 84);
+        assertSlot(inv, p, Inventory.DEFAULT_SLOT_COUNT - 1, 8 + 8 * 18, 84 + 2 * 18);
+        assertSlot(inv, p, 0, 8, 142);
+        assertSlot(inv, p, 8, 8 + 8 * 18, 142);
+
+        InventoryLayout table = new InventoryLayout(1280, 720, 3, 3);
+        InventoryLayout.Rect tp = table.panel();
+        assertSlot(table, tp, InventoryMenu.GRID_BASE, 30, 17);
+        assertSlot(table, tp, InventoryMenu.GRID_BASE + 8, 30 + 36, 17 + 36);
+        assertSlot(table, tp, InventoryMenu.RESULT_SLOT, 124, 35);
+        assertSlot(table, tp, 0, 8, 142);
+    }
+
+    private static void assertSlot(InventoryLayout layout, InventoryLayout.Rect panel, int slot, int gx, int gy) {
+        InventoryLayout.Rect r = layout.slotRect(slot);
+        assertEquals(panel.x() + gx * 3f, r.x(), 0.01f, "x of slot " + slot);
+        assertEquals(panel.y() + gy * 3f, r.y(), 0.01f, "y of slot " + slot);
+        assertEquals(16 * 3f, r.w(), 0.01f);
+        assertEquals(16 * 3f, r.h(), 0.01f);
+    }
+
+    @Test
+    void theCraftingTableHasNoArmorSlotsButThePlayerInventoryDoes() {
+        InventoryLayout inv = new InventoryLayout(1280, 720, 2);
+        InventoryLayout table = new InventoryLayout(1280, 720, 3);
+        assertTrue(inv.hasArmorSlots());
+        assertFalse(table.hasArmorSlots());
+        InventoryLayout.Rect armor = inv.slotRect(InventoryMenu.ARMOR_BASE + 1);
+        assertEquals(InventoryMenu.ARMOR_BASE + 1, inv.slotAt(armor.x() + 2, armor.y() + 2));
+        assertThrows(IllegalArgumentException.class, () -> table.slotRect(InventoryMenu.ARMOR_BASE));
+    }
+
+    @Test
+    void theLayoutScalesWithTheGuiScale() {
+        InventoryLayout one = new InventoryLayout(400, 300, 2, 1);
+        InventoryLayout four = new InventoryLayout(1920, 1080, 2, 4);
+        assertEquals(176f, one.panel().w());
+        assertEquals(704f, four.panel().w());
+        assertEquals(16f, one.slotRect(0).w());
+        assertEquals(64f, four.slotRect(0).w());
+    }
+
     @Test
     void invalidSlotIdsAreRejected() {
         InventoryLayout layout = new InventoryLayout(1280, 720, 2);
