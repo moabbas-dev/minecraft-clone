@@ -39,7 +39,8 @@ MANIFEST_URL = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json"
 RESOURCES_URL = "https://resources.download.minecraft.net"
 JAR_PREFIX = "assets/minecraft/"
 BULK_TEXTURE_DIRS = ("textures/block/", "textures/item/", "textures/gui/", "textures/colormap/", "textures/particle/",
-                     "textures/environment/", "textures/entity/chest/", "textures/entity/player/wide/")
+                     "textures/environment/", "textures/entity/chest/", "textures/entity/player/wide/",
+                     "textures/entity/equipment/humanoid/", "textures/entity/equipment/humanoid_leggings/")
 UA = {"User-Agent": "minecraft-clone-asset-restore/1.0"}
 DEST = ROOT  # where textures/ and sounds/ are written (--dest overrides, used by the offline test)
 

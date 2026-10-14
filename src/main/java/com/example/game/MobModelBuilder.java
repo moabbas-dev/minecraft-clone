@@ -69,13 +69,17 @@ final class MobModelBuilder {
     }
 
     /** Shared per-mob pose and output cursor. */
-    private static final class Writer {
+    static final class Writer {
         final float[] out;
         int n;
         final float px, py, pz, cos, sin, tiltCos, tiltSin, sky, blockLight, texW, texH;
         final float[] tint;
         float scale = 1f;
         float scaleY = -1f; // vertical scale; negative = same as {@link #scale}
+        /** Grows every box by this many model pixels on each side without changing its texture layout (armor, overlays). */
+        float inflate;
+        /** Optional transform of a posed part (the head turning), in the mob's local frame in blocks; null = none. */
+        org.joml.Matrix4f part;
 
         Writer(float[] out, int n, float px, float py, float pz, float yaw, float tilt, float sky, float blockLight,
                float[] tint, int texW, int texH) {
@@ -106,7 +110,7 @@ final class MobModelBuilder {
             cx *= scale;
             cy *= sv;
             cz *= scale;
-            float lhx = w / 32f * scale, lhy = h / 32f * sv, lhz = d / 32f * scale;
+            float lhx = (w / 32f + inflate / 16f) * scale, lhy = (h / 32f + inflate / 16f) * sv, lhz = (d / 32f + inflate / 16f) * scale;
             // World half extents: a quarter turn swaps the local Y and Z extents.
             float hx = lhx, hy = quarter == 0 ? lhy : lhz, hz = quarter == 0 ? lhz : lhy;
             for (int f = 0; f < 6; f++) {
@@ -133,6 +137,12 @@ final class MobModelBuilder {
 
         /** Writes one vertex given a position in the mob's local frame (feet origin, front = -Z). */
         void vertex(float lx, float ly, float lz, float tu, float tv, int face) {
+            if (part != null) {
+                org.joml.Vector3f v = part.transformPosition(new org.joml.Vector3f(lx, ly, lz));
+                lx = v.x;
+                ly = v.y;
+                lz = v.z;
+            }
             float rx = lx * tiltCos - ly * tiltSin;  // roll about the forward (Z) axis for the death topple
             float ry = lx * tiltSin + ly * tiltCos;
             out[n++] = px + rx * cos - lz * sin;
@@ -181,6 +191,11 @@ final class MobModelBuilder {
                 }
             }
         }
+    }
+
+    /** A writer at the origin for the player model: {@code yaw} turns the whole body (0 = facing -Z). */
+    static Writer writer(float[] out, int n, float yaw, float sky, float[] tint, int texW, int texH) {
+        return new Writer(out, n, 0f, 0f, 0f, yaw, 0f, sky, 0f, tint, texW, texH);
     }
 
     /** Which vanilla strip a local-frame face normal reads from (the model frame's X is flipped into ours). */

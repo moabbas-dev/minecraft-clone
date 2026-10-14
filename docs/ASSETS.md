@@ -16,7 +16,9 @@ None of these files are committed: `textures/`, `sounds/`, `minecraft-sounds/` a
 | `textures/gui/container/{inventory,crafting_table,furnace,blast_furnace,smoker}.png`, `textures/gui/sprites/container/<station>/{lit,burn}_progress.png` | `game/Game` -> `ui/GuiPainter.background`, `engine/HudTextures.loadFile` | no | plain grey panel and slots; no progress sprites |
 | `textures/particle/{critical_hit,damage}.png` | `game/Game` -> `fx/SpriteParticles` | no | those particles are not drawn |
 | `textures/environment/{rain.png,celestial/sun.png,celestial/moon/full_moon.png}` | `game/Game` (`renderRain`, `renderSunAndMoon`) | no | no rain streaks / sun / moon |
-| `textures/entity/player/wide/steve.png` | `game/Game.renderHeldItem` (bare hand) | no | the bare hand is not drawn |
+| `textures/entity/player/wide/steve.png` | `game/Game.renderHeldItem` (bare hand), `renderPlayerPreview` | no | the bare hand and the inventory player preview are not drawn |
+| `textures/entity/equipment/{humanoid,humanoid_leggings}/<material>.png` (+ `leather_overlay.png`) | `game/Game.renderPlayerPreview` | no | that armor layer is not drawn in the inventory preview |
+| `textures/gui/sprites/hud/hotbar_offhand_left.png` | `game/Game.renderRealHud` | no | the offhand item is drawn without its slot frame |
 | `textures/entity/chest/normal.png` | `engine/TextureAtlas.chestFace` | no | "missing texture" chest faces |
 | `textures/colormap/{grass,foliage}.png` | `world/TerrainGenerator` -> `world/Colormap` | no | fixed fallback tint |
 | `textures/entity/**` | `game/Game` -> `engine/EntityTexture.load(path, w, h, fallbackRGB)` | no | flat colored placeholder skin |

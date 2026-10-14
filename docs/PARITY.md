@@ -279,4 +279,17 @@ Live evidence in `test-output/screenshots/` (not committed). Sources for the num
 - [x] Equip animation: changing the held item lowers the old one then raises the new one (0.15 s each, ease-out), for flat items, blocks and the bare hand; the hand also rises when a world opens. No offhand exists, so only the main hand animates.
 - [x] Inventory, crafting table, furnace, blast furnace and smoker use the real container textures and the real lit/burn progress sprites.
 - [x] Grayscale PNGs are read with their stored values (Java's `getRGB` lightened them).
-- Known gaps: player preview in the inventory (the preview box is the texture's black rectangle), the offhand slot (its frame is in the texture but unused), moon phases, rain edge fade, multiple copies of a dropped stack.
+- Known gaps: moon phases, rain edge fade, multiple copies of a dropped stack. (The player preview and the offhand slot were done in section 8.)
+
+## 8. Offhand and player preview
+
+Sources: Perplexity research on the decompiled 1.21 `Inventory`, `InventoryScreen`, `ItemInHandRenderer` and `Gui` plus minecraft.wiki Controls/Inventory (tag [P]); live checks in `test-output/screenshots/`.
+
+- [x] Offhand slot: separate from the 36 normal slots, saved as one extra slot after them (old saves still load), dropped on death. Pick-ups top up a matching offhand stack but never fill an empty one.
+- [x] F (`key.swapOffhand`) swaps the selected hotbar stack with the offhand; over a slot in the inventory screen it swaps that slot with the offhand. Shift-click on the offhand slot sends its stack back to the inventory.
+- [x] Right click: main hand first, offhand when the main hand passes (empty hand, a non-placeable item, a block with nothing to aim at). Verified live: an offhand block is placed with an empty main hand, offhand food is eaten, a main-hand block wins over offhand food.
+- [x] HUD: offhand slot (`hotbar_offhand_left.png`, 29x24 at centre-120, bottom-23) with the item at (centre-117, bottom-19), shown only while it holds something. Left-main-arm option does not exist here, so the right-hand variant is unused.
+- [x] First person: the offhand item is the mirrored right-hand view with its own equip animation; no bare left arm; attacking is always the main hand.
+- [x] Inventory screen: offhand slot at (77,62) in the player inventory only.
+- [x] Player preview: the real Steve skin with its outer layers and the worn armor (humanoid / humanoid_leggings textures, leather tinted 0xA06540 plus its overlay) in the box (26,8)-(75,78), 30 GUI pixels per block, body yaw 20 and head yaw 40 degrees per atan((centre - mouse) / 40), pitch 20 degrees, full bright. The 32-pixel model is scaled by 15/16 like the player renderer.
+- Known gaps: items held in the hands are not drawn on the preview; the preview does not animate (no idle arm sway); armor has no enchantment glint; leather armor icons are still the untinted grey item textures (vanilla tints them 0xA06540 and adds the overlay sprite).

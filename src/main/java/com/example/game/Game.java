@@ -1310,6 +1310,7 @@ public class Game implements GameAccess {
                 ? "textures/gui/container/inventory.png" : "textures/gui/container/crafting_table.png");
         if (bg != null) GuiPainter.background(uiRenderer, bg, p);
         else GuiPainter.panel(uiRenderer, p.x(), p.y(), p.w(), p.h(), s);
+        if (layout.hasArmorSlots()) renderPlayerPreview(layout, mx, my);
         font.draw(uiRenderer, "Crafting", layout.titleX(), layout.titleY(), s, 0x404040, false);
         if (!layout.hasArmorSlots()) { // vanilla's player inventory has no "Inventory" caption, the crafting table does
             font.draw(uiRenderer, "Inventory", layout.inventoryLabelX(), layout.inventoryLabelY(), s, 0x404040, false);
@@ -1329,6 +1330,86 @@ public class Game implements GameAccess {
         } else if (hovered >= 0) {
             ItemStack under = menu.stackAt(hovered);
             if (!under.isEmpty()) GuiPainter.tooltip(uiRenderer, font, under.type().displayName, mx, my, s, w, h);
+        }
+    }
+
+    /**
+     * The inventory's player preview, as vanilla's InventoryScreen.renderEntityInInventoryFollowsMouse draws it: the player
+     * (skin, outer layers and worn armor) in the box (26,8)-(75,78) at 30 GUI pixels per block, full bright, turning to
+     * face the mouse: body yaw 20 degrees and head yaw 40 degrees per atan((boxCentre - mouse) / 40), head and body pitch 20
+     * degrees per atan of the vertical offset.
+     */
+    private void renderPlayerPreview(InventoryLayout layout, float mx, float my) {
+        com.example.engine.EntityTexture skin = realTexture("player.steve", "textures/entity/player/wide/steve.png", false);
+        if (skin == null) return;
+        float s = layout.scale();
+        InventoryLayout.Rect box = layout.previewBox();
+        float cx = box.x() + box.w() / 2f, cy = box.y() + box.h() / 2f;
+        float xAngle = (float) Math.atan((cx - mx) / (40f * s)), yAngle = (float) Math.atan((cy - my) / (40f * s));
+        PlayerModelBuilder.Pose pose = new PlayerModelBuilder.Pose((float) Math.PI + xAngle * (float) Math.toRadians(20),
+                xAngle * (float) Math.toRadians(20), -yAngle * (float) Math.toRadians(20));
+
+        float k = 30f * s; // pixels per block
+        float height = 1.8f;
+        Matrix4f model = new Matrix4f().translate(cx, cy, 0f).scale(k, -k, k)
+                .rotateX(yAngle * (float) Math.toRadians(20))
+                .translate(0f, -(height / 2f + 0.0625f), 0f);
+        Matrix4f projection = new Matrix4f().ortho(0f, window.getWidth(), window.getHeight(), 0f, -1000f, 1000f);
+
+        uiRenderer.end();
+        glClear(GL_DEPTH_BUFFER_BIT);
+        glEnable(GL_DEPTH_TEST);
+        chunkShader.bind();
+        chunkShader.setUniform("uProjection", projection);
+        chunkShader.setUniform("uView", new Matrix4f());
+        chunkShader.setUniform("uModel", model);
+        chunkShader.setUniform("uCameraPos", 0f, 0f, 0f);
+        chunkShader.setUniform("uTexture", 0);
+        chunkShader.setUniform("uDaylightFactor", 1f);
+        chunkShader.setUniform("uGamma", options.gamma);
+        chunkShader.setUniform("uWindStrength", 0f);
+        chunkShader.setUniform("uAlpha", 1f);
+        chunkShader.setUniform("uFogStart", 1_000_000f);
+        chunkShader.setUniform("uFogEnd", 2_000_000f);
+
+        drawPreviewLayer(skin, PlayerModelBuilder.emitSkin(mobScratch, 0, pose, false, 1f));
+        drawPreviewLayer(skin, PlayerModelBuilder.emitSkin(mobScratch, 0, pose, true, 1f));
+        for (com.example.combat.EquipmentSlot slot : com.example.combat.EquipmentSlot.values()) {
+            ItemStack worn = survival.getArmor().get(slot);
+            if (worn.isEmpty()) continue;
+            String material = armorMaterial(worn.type());
+            String dir = slot == com.example.combat.EquipmentSlot.LEGS ? "humanoid_leggings" : "humanoid";
+            com.example.engine.EntityTexture armor = realTexture("armor." + dir + "." + material,
+                    "textures/entity/equipment/" + dir + "/" + material + ".png", false);
+            if (armor == null) continue;
+            boolean leather = material.equals("leather");
+            float[] tint = leather ? PlayerModelBuilder.LEATHER_TINT : new float[]{1f, 1f, 1f};
+            int floats = PlayerModelBuilder.emitArmor(mobScratch, 0, pose, slot, 1f);
+            if (leather) tintLayer(mobScratch, floats, tint);
+            drawPreviewLayer(armor, floats);
+            if (leather) { // the undyed leather armor also has an untinted overlay layer
+                com.example.engine.EntityTexture overlay = realTexture("armor." + dir + ".leather_overlay",
+                        "textures/entity/equipment/" + dir + "/leather_overlay.png", false);
+                if (overlay != null) drawPreviewLayer(overlay, PlayerModelBuilder.emitArmor(mobScratch, 0, pose, slot, 1f));
+            }
+        }
+        glDisable(GL_DEPTH_TEST);
+        chunkShader.unbind();
+        uiRenderer.begin(window.getWidth(), window.getHeight());
+    }
+
+    private void drawPreviewLayer(com.example.engine.EntityTexture texture, int floats) {
+        texture.bind(0);
+        mobMesh.upload(mobScratch, floats);
+        mobMesh.draw();
+    }
+
+    /** Multiplies the tint of every vertex written so far by {@code tint}. */
+    private static void tintLayer(float[] verts, int floats, float[] tint) {
+        for (int i = 0; i < floats; i += 11) {
+            verts[i + 7] = tint[0];
+            verts[i + 8] = tint[1];
+            verts[i + 9] = tint[2];
         }
     }
 
