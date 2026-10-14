@@ -141,6 +141,20 @@ public class ItemEntityManager {
      * the world; a full inventory leaves everything untouched. No line-of-sight check - like
      * vanilla, an item behind a thin wall can still be collected.
      */
+    /** One stack (or part of one) that just flew into the player: where it lay and how old it was, for the pickup animation. */
+    public record Collected(BlockType type, int count, int damage, float x, float y, float z, float age) {
+    }
+
+    private final java.util.List<Collected> collected = new java.util.ArrayList<>();
+
+    /** The items collected since the last call (oldest first); the list is cleared. */
+    public java.util.List<Collected> drainCollected() {
+        if (collected.isEmpty()) return java.util.List.of();
+        java.util.List<Collected> out = new java.util.ArrayList<>(collected);
+        collected.clear();
+        return out;
+    }
+
     public int collect(Vector3f playerFeet, Inventory inventory) {
         int transfers = 0;
         for (int i = 0; i < entities.size(); i++) {
@@ -153,6 +167,7 @@ public class ItemEntityManager {
 
             int added = inventory.add(e.getType(), e.getCount(), e.getDamage());
             if (added > 0) {
+                collected.add(new Collected(e.getType(), added, e.getDamage(), e.position.x, e.position.y, e.position.z, e.getAge()));
                 e.removeCount(added);
                 transfers++;
             }

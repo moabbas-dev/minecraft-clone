@@ -56,6 +56,26 @@ class PlayerModelBuilderTest {
     }
 
     @Test
+    void thePlayerFollowsTheMouseInTheSameDirection() {
+        // mouse to the viewer's right: atan((centre - mouse) / 40) is negative
+        PlayerModelBuilder.Pose right = PlayerModelBuilder.followMouse(-1f, 0f, 0f);
+        PlayerModelBuilder.Pose left = PlayerModelBuilder.followMouse(1f, 0f, 0f);
+        org.joml.Vector3f faceRight = PlayerModelBuilder.headDirection(right), faceLeft = PlayerModelBuilder.headDirection(left);
+        assertTrue(faceRight.x > 0.5f, "the face turns to the right when the mouse is on the right: " + faceRight);
+        assertTrue(faceLeft.x < -0.5f, "and to the left when it is on the left: " + faceLeft);
+        // the head turns further than the body (40 degrees against 20 per unit), both the same way
+        org.joml.Vector3f bodyOnly = PlayerModelBuilder.headDirection(new PlayerModelBuilder.Pose(right.bodyYaw(), 0f, 0f));
+        assertTrue(bodyOnly.x > 0f);
+        assertTrue(faceRight.x > bodyOnly.x);
+    }
+
+    @Test
+    void theHeadLooksUpWhenTheMouseIsAbove() {
+        assertTrue(PlayerModelBuilder.headDirection(PlayerModelBuilder.followMouse(0f, 1f, 0f)).y > 0.1f);
+        assertTrue(PlayerModelBuilder.headDirection(PlayerModelBuilder.followMouse(0f, -1f, 0f)).y < -0.1f);
+    }
+
+    @Test
     void theOuterLayerSitsAHairOutsideTheBaseLayer() {
         float[] base = range(build(FRONT, false), 0), outer = range(build(FRONT, true), 0);
         assertTrue(outer[0] < base[0] && outer[1] > base[1]);

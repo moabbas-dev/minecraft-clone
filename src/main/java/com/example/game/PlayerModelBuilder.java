@@ -29,6 +29,22 @@ final class PlayerModelBuilder {
         }
     }
 
+    /**
+     * The preview pose for a mouse offset, vanilla's numbers: {@code xAngle} = atan((boxCentreX - mouseX) / 40) and
+     * {@code yAngle} = atan((boxCentreY - mouseY) / 40). The body turns 20 degrees per unit and the head another 20 (40 in all)
+     * toward the mouse, and the head tilts 20 degrees up when the mouse is above. In this model's frame the player faces the
+     * viewer at body yaw pi, and a positive head yaw turns its face towards the viewer's left.
+     */
+    static Pose followMouse(float xAngle, float yAngle, float ageTicks) {
+        return new Pose((float) Math.PI + xAngle * rad(20f), -xAngle * rad(20f), yAngle * rad(20f), ageTicks);
+    }
+
+    /** The direction the face points in the player's frame (x to the viewer's right when the player faces the viewer). */
+    static org.joml.Vector3f headDirection(Pose pose) {
+        return new Matrix4f().rotateY(-pose.bodyYaw()).rotateY(pose.headYaw()).rotateX(pose.headPitch())
+                .transformDirection(new org.joml.Vector3f(0f, 0f, -1f));
+    }
+
     private static float rad(float degrees) {
         return (float) Math.toRadians(degrees);
     }

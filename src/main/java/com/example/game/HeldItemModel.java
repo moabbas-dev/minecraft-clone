@@ -51,11 +51,11 @@ final class HeldItemModel {
     }
 
     /**
-     * The item model JSON says rotation Y -90, but with this renderer's plane orientation that sends a tool's tip towards the
-     * camera and out of the screen; +90 gives vanilla's look (tip rising toward the centre, handle in the lower-right corner),
-     * checked against the in-game screenshots of the sword, pickaxe and apple.
+     * The handheld item display transform's yaw, as the item model JSON says: rotation [0,-90,25]. Checked against a real
+     * first-person screenshot (minecraft.wiki's dual-wielding image, an iron sword): the silhouette of this transform matches that image
+     * row for row once the image's wider screen is accounted for. (An earlier +90 here looked plausible but tilted the tool wrongly.)
      */
-    static final float FLAT_YAW = 90f;
+    static final float FLAT_YAW = -90f;
 
     /** Tools, swords, food, ingots and the other flat sprite items. */
     static Matrix4f flatItem(float swing) {

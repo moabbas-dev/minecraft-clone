@@ -247,6 +247,26 @@ public class Game implements GameAccess {
     private int forcedDropRequests;
     private boolean forcedDropWholeStack;
     private int forcedSwapRequests;
+    /** Items flying into the player after being collected (vanilla's ItemPickupParticle: 3 ticks, accelerating). */
+    private static final float PICKUP_SECONDS = 0.15f;
+
+    private static final class Pickup {
+        final BlockType type;
+        final int count;
+        final float x, y, z, age;
+        float t;
+
+        Pickup(ItemEntityManager.Collected c) {
+            type = c.type();
+            count = c.count();
+            x = c.x();
+            y = c.y();
+            z = c.z();
+            age = c.age();
+        }
+    }
+
+    private final java.util.List<Pickup> pickups = new java.util.ArrayList<>();
     /** The item shown in the left hand (null = nothing) and its equip progress (0 = lowered, 1 = raised). */
     private BlockType shownOffhand;
     private float equipRaisedOff;
@@ -691,6 +711,7 @@ public class Game implements GameAccess {
         mining.reset();
         itemEntities.clear();
         particles.clear();
+        pickups.clear();
         critParticles.clear();
         damageParticles.clear();
         shownHeld = inventory.selected().isEmpty() ? null : inventory.selected().type();
@@ -1359,13 +1380,12 @@ public class Game implements GameAccess {
         InventoryLayout.Rect box = layout.previewBox();
         float cx = box.x() + box.w() / 2f, cy = box.y() + box.h() / 2f;
         float xAngle = (float) Math.atan((cx - mx) / (40f * s)), yAngle = (float) Math.atan((cy - my) / (40f * s));
-        PlayerModelBuilder.Pose pose = new PlayerModelBuilder.Pose((float) Math.PI + xAngle * (float) Math.toRadians(20),
-                xAngle * (float) Math.toRadians(20), -yAngle * (float) Math.toRadians(20), (System.nanoTime() / 50_000_000L) % 1_000_000L);
+        PlayerModelBuilder.Pose pose = PlayerModelBuilder.followMouse(xAngle, yAngle, (System.nanoTime() / 50_000_000L) % 1_000_000L);
 
         float k = 30f * s; // pixels per block
         float height = 1.8f;
         Matrix4f model = new Matrix4f().translate(cx, cy, 0f).scale(k, -k, k)
-                .rotateX(yAngle * (float) Math.toRadians(20))
+                .rotateX(-yAngle * (float) Math.toRadians(20))
                 .translate(0f, -(height / 2f + 0.0625f), 0f);
         Matrix4f projection = new Matrix4f().ortho(0f, window.getWidth(), window.getHeight(), 0f, -1000f, 1000f);
 
@@ -1466,6 +1486,14 @@ public class Game implements GameAccess {
             drawBlockIcon(stack.type(), r.x(), r.y(), r.w());
             if (stack.count() > 1) drawStackCount(stack.count(), r.x(), r.y(), r.w());
             drawDurabilityBar(stack, r.x(), r.y(), r.w());
+        } else {
+            // vanilla draws a grey outline of what belongs in an empty armor or offhand slot
+            String outline = slot == InventoryMenu.OFFHAND_SLOT ? "shield"
+                    : slot >= InventoryMenu.ARMOR_BASE && slot < InventoryMenu.ARMOR_BASE + 4
+                    ? new String[]{"helmet", "chestplate", "leggings", "boots"}[slot - InventoryMenu.ARMOR_BASE] : null;
+            com.example.engine.HudTextures.Sprite sprite = outline == null ? null
+                    : guiSprite("textures/gui/sprites/container/slot/" + outline + ".png");
+            if (sprite != null) com.example.engine.HudTextures.draw(uiRenderer, sprite, r.x(), r.y(), layout.scale());
         }
         if (slot == hovered) GuiPainter.highlight(uiRenderer, r);
     }
@@ -1664,6 +1692,12 @@ public class Game implements GameAccess {
         survival.addExperience(mobs.drainExperience());
         itemEntities.update(world, dt);
         if (itemEntities.collect(player.position, inventory) > 0) gameAudio.playPickup();
+        for (ItemEntityManager.Collected c : itemEntities.drainCollected()) pickups.add(new Pickup(c));
+        for (int i = pickups.size() - 1; i >= 0; i--) {
+            Pickup pk = pickups.get(i);
+            pk.t += dt;
+            if (pk.t >= PICKUP_SECONDS) pickups.remove(i);
+        }
         particles.update(dt);
         critParticles.update(dt);
         damageParticles.update(dt);
@@ -1878,46 +1912,61 @@ public class Game implements GameAccess {
     /**
      * All dropped items, batched through the chunk shader and atlas. Blocks are small spinning cubes (display scale 0.25);
      * everything else (food, tools, ingots, saplings) is its flat sprite extruded 1/16 thick at vanilla's ground display
-     * scale of 0.5, so a dropped steak looks like the steak icon rather than a crate.
+     * scale of 0.5, so a dropped steak looks like the steak icon rather than a crate. Items that were just collected keep
+     * spinning while they fly to the player (vanilla's pickup animation: 3 ticks, easing in).
      */
     private void renderDroppedItems() {
         java.util.List<ItemEntity> list = itemEntities.entities();
         int n = 0;
         for (int i = 0; i < list.size(); i++) {
             ItemEntity e = list.get(i);
-            ItemModelBuilder.Model m = itemModelFor(e.getType());
-            float t = e.getAge();
-            float cos = (float) Math.cos(t * 1.6f), sin = (float) Math.sin(t * 1.6f);
-            float half = m.cross() ? 0.25f : 0.125f;
-            float bob = e.isOnGround() ? 0.05f + (float) Math.sin(t * 2.6f) * 0.03f : 0f;
-            float cy = e.position.y + half + bob;
-            int bx = (int) Math.floor(e.position.x), by = (int) Math.floor(cy), bz = (int) Math.floor(e.position.z);
-            float sky = world.getSkyLight(bx, by, bz) / 15f;
-            float blk = world.getBlockLight(bx, by, bz) / 15f;
-            int copies = renderCopies(e.getCount());
-            java.util.Random spread = new java.util.Random(System.identityHashCode(e));
-            for (int c = 0; c < copies; c++) {
-                // later copies are nudged by a small fixed random offset so a stack reads as a pile
-                float ox = c == 0 ? 0f : (spread.nextFloat() * 2f - 1f) * 0.15f * 0.5f;
-                float oy = c == 0 ? 0f : (spread.nextFloat() * 2f - 1f) * 0.15f * 0.25f;
-                float oz = c == 0 ? 0f : (spread.nextFloat() * 2f - 1f) * 0.15f * 0.5f;
-                if (m.cross()) {
-                    float[] sprite = heldMeshCache.computeIfAbsent(e.getType(), this::buildFlatItemHeldVerts);
-                    if (n + sprite.length > itemScratch.length) {
-                        flushItems(n);
-                        n = 0;
-                    }
-                    n = ItemModelBuilder.emitSprite(itemScratch, n, sprite, e.position.x + ox, cy + oy, e.position.z + oz, 0.5f, cos, sin, sky, blk);
-                } else {
-                    if (n + ItemModelBuilder.MAX_FLOATS_PER_ITEM > itemScratch.length) {
-                        flushItems(n);
-                        n = 0;
-                    }
-                    n = ItemModelBuilder.emitCube(itemScratch, n, e.position.x + ox, cy + oy, e.position.z + oz, half, cos, sin, m, sky, blk);
-                }
-            }
+            float half = itemModelFor(e.getType()).cross() ? 0.25f : 0.125f;
+            float bob = e.isOnGround() ? 0.05f + (float) Math.sin(e.getAge() * 2.6f) * 0.03f : 0f;
+            n = emitItemVisual(n, e.getType(), e.getCount(), e.position.x, e.position.y + half + bob, e.position.z, e.getAge(),
+                    System.identityHashCode(e));
+        }
+        for (Pickup pk : pickups) {
+            float f = Math.min(1f, pk.t / PICKUP_SECONDS);
+            f *= f;
+            float half = itemModelFor(pk.type).cross() ? 0.25f : 0.125f;
+            Vector3f to = player.position;
+            n = emitItemVisual(n, pk.type, pk.count, pk.x + (to.x - pk.x) * f, (pk.y + half + 0.05f) + (to.y + 0.9f - (pk.y + half + 0.05f)) * f,
+                    pk.z + (to.z - pk.z) * f, pk.age + pk.t, System.identityHashCode(pk));
         }
         flushItems(n);
+    }
+
+    /** Writes one dropped stack's model(s) centred on (x, cy, z), spun by its age; returns the new write index. */
+    private int emitItemVisual(int n, BlockType type, int count, float x, float cy, float z, float age, int seed) {
+        ItemModelBuilder.Model m = itemModelFor(type);
+        float cos = (float) Math.cos(age * 1.6f), sin = (float) Math.sin(age * 1.6f);
+        float half = m.cross() ? 0.25f : 0.125f;
+        int bx = (int) Math.floor(x), by = (int) Math.floor(cy), bz = (int) Math.floor(z);
+        float sky = world.getSkyLight(bx, by, bz) / 15f;
+        float blk = world.getBlockLight(bx, by, bz) / 15f;
+        int copies = renderCopies(count);
+        java.util.Random spread = new java.util.Random(seed);
+        for (int c = 0; c < copies; c++) {
+            // later copies are nudged by a small fixed random offset so a stack reads as a pile
+            float ox = c == 0 ? 0f : (spread.nextFloat() * 2f - 1f) * 0.15f * 0.5f;
+            float oy = c == 0 ? 0f : (spread.nextFloat() * 2f - 1f) * 0.15f * 0.25f;
+            float oz = c == 0 ? 0f : (spread.nextFloat() * 2f - 1f) * 0.15f * 0.5f;
+            if (m.cross()) {
+                float[] sprite = heldMeshCache.computeIfAbsent(type, this::buildFlatItemHeldVerts);
+                if (n + sprite.length > itemScratch.length) {
+                    flushItems(n);
+                    n = 0;
+                }
+                n = ItemModelBuilder.emitSprite(itemScratch, n, sprite, x + ox, cy + oy, z + oz, 0.5f, cos, sin, sky, blk);
+            } else {
+                if (n + ItemModelBuilder.MAX_FLOATS_PER_ITEM > itemScratch.length) {
+                    flushItems(n);
+                    n = 0;
+                }
+                n = ItemModelBuilder.emitCube(itemScratch, n, x + ox, cy + oy, z + oz, half, cos, sin, m, sky, blk);
+            }
+        }
+        return n;
     }
 
     /** How many copies of the model a dropped stack is drawn with (vanilla's ItemEntityRenderer.getRenderAmount). */
@@ -2319,7 +2368,7 @@ public class Game implements GameAccess {
         chunkShader.setUniform("uFogStart", 1_000_000f);
         chunkShader.setUniform("uFogEnd", 2_000_000f);
 
-        heldItemMesh.upload(verts);
+        uploadLitHeld(verts);
         if (armSkin != null) armSkin.bind(0);
         heldItemMesh.draw();
         if (armSkin != null) atlas.bind(0);
@@ -2343,8 +2392,29 @@ public class Game implements GameAccess {
         Matrix4f model = new Matrix4f().translate(bobX * 0.5f, -bobY * 0.5f, 0f).scale(-1f, 1f, 1f)
                 .mul(flat ? HeldItemModel.flatItem(0f, drop) : HeldItemModel.block(0f, drop));
         chunkShader.setUniform("uModel", model);
-        heldItemMesh.upload(verts);
+        uploadLitHeld(verts);
         heldItemMesh.draw();
+    }
+
+    private float[] heldLit = new float[0];
+
+    /**
+     * Uploads a held-item mesh lit by the world: the sky and block light at the player's eye, with the mesh's own baked
+     * per-face brightness on the sky part, so the hands are as bright as everything else - dark at night, dim in a cave,
+     * lit by a torch (vanilla lights the first-person hands with the light at the player).
+     */
+    private void uploadLitHeld(float[] src) {
+        Vector3f eye = player.eyePosition();
+        int bx = (int) Math.floor(eye.x), by = (int) Math.floor(eye.y), bz = (int) Math.floor(eye.z);
+        float sky = world.getSkyLight(bx, by, bz) / 15f, blk = world.getBlockLight(bx, by, bz) / 15f;
+        if (heldLit.length < src.length) heldLit = new float[src.length];
+        System.arraycopy(src, 0, heldLit, 0, src.length);
+        for (int i = 0; i + 6 < src.length; i += 11) {
+            float shade = src[i + 6]; // the baked face brightness lives in the block-light slot of a held mesh
+            heldLit[i + 5] = shade * sky;
+            heldLit[i + 6] = blk;
+        }
+        heldItemMesh.upload(heldLit, src.length);
     }
 
     private float[] armVertsCache;

@@ -92,6 +92,34 @@ class ItemEntityManagerTest {
     }
 
     @Test
+    void whatWasCollectedIsReportedOnceWithWhereItLayForThePickupAnimation() {
+        manager.spawn(BlockType.DIRT, 5, new Vector3f(5.5f, 4.3f, 5.5f), new Random(1));
+        run(1f);
+        ItemEntity e = manager.entities().get(0);
+        float x = e.position.x, z = e.position.z;
+        Inventory inv = new Inventory();
+        assertTrue(manager.drainCollected().isEmpty());
+        manager.collect(above(e), inv);
+        java.util.List<ItemEntityManager.Collected> got = manager.drainCollected();
+        assertEquals(1, got.size());
+        assertEquals(BlockType.DIRT, got.get(0).type());
+        assertEquals(5, got.get(0).count());
+        assertEquals(x, got.get(0).x(), 1e-4f);
+        assertEquals(z, got.get(0).z(), 1e-4f);
+        assertTrue(manager.drainCollected().isEmpty(), "drained once");
+    }
+
+    @Test
+    void aPartlyCollectedStackReportsOnlyTheTakenPart() {
+        manager.spawn(BlockType.DIRT, 6, new Vector3f(5.5f, 4.3f, 5.5f), new Random(1));
+        run(1f);
+        Inventory inv = new Inventory(1, 1, 4);
+        manager.collect(above(manager.entities().get(0)), inv);
+        assertEquals(4, manager.drainCollected().get(0).count());
+        assertEquals(2, manager.entities().get(0).getCount());
+    }
+
+    @Test
     void aFullInventoryLeavesTheItemInTheWorldUntouched() {
         manager.spawn(BlockType.DIRT, 3, new Vector3f(5.5f, 4.3f, 5.5f), new Random(1));
         run(1f);

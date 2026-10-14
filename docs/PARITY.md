@@ -262,7 +262,7 @@ All verified live (screenshots in `test-output/screenshots/`) and by unit tests 
 - [x] Tool durability: all 16 tools and sword hits match vanilla (1 per block, sword 2 per block, 1 per mob hit).
 - [x] Fuel: 1 coal = 8 items in furnace, blast furnace and smoker; planks 1.5, sticks 0.5; wooden tools, saplings, crafting tables, chests, bookshelves and mangrove roots burn; progress drains 2 per tick when the fire is out.
 - [x] First-person hand and held items use vanilla's transforms (right-hand anchor 0.56/-0.52/-0.72, attack rotations, tool display transform, held blocks at scale 0.4); flat items are extruded 1/16 thick; the empty hand is the 4x12x4 px arm; the swing lasts 0.3 s; the hand uses the player's FOV.
-- Known approximations: the flat-item yaw is +90 instead of the JSON's -90 (checked visually, see `HeldItemModel.FLAT_YAW`); baby pig/cow/chicken have their own 26.x textures that are not used yet.
+- Held tools use the JSON's rotation [0,-90,25] (an earlier +90 was a mistake, corrected in section 10); baby pig/cow/chicken textures are used since section 9.
 
 ## 7. Fix batch 3 (user-reported)
 
@@ -307,3 +307,13 @@ Sources: Perplexity research on `SkyRenderer` / `LevelRenderer.renderSky`, `Agea
 - [x] Inventory preview: held items are drawn in the hands (vanilla's ItemInHandLayer: out along the arm, then the item's third-person display transform), and the arms sway idly (AnimationUtils.bobModelPart).
 - [x] Fixed a regression: the lazily loaded real textures shared the mob-skin map, so the mob skins never loaded and every mob was invisible. They now have their own map.
 - Known gaps: baby sounds are not pitched up; baby animals do not follow adults; no breeding; moon quad orientation per phase is unverified against vanilla.
+
+## 10. Hand light, slot outlines, preview direction, tools, pickup animation
+
+Reference images: minecraft.wiki `DualWielding.png` (a real first-person iron sword, 1920x1017) and `OffhandSlotHighlighted.png` (the real inventory with the empty-slot outlines), both looked at in the browser.
+
+- [x] First-person hands (main, offhand, bare arm) are lit like the world: the sky and block light at the player's eye, the mesh's baked face brightness on the sky part. Checked at day and at night (both swords go dark at night).
+- [x] Empty armor slots show the helmet / chestplate / leggings / boots outlines and an empty offhand slot shows the shield outline (the real `container/slot/*.png` sprites), as in the reference.
+- [x] The preview player follows the mouse in the same direction: the head had been turning the wrong way (cancelling the body's turn) and looked up when the mouse was below. Now body 20 and head 40 degrees per atan unit towards the mouse, head up when the mouse is above, body leaning back; covered by `PlayerModelBuilderTest`.
+- [x] Held tools: the flat-item display rotation is the model JSON's [0,-90,25]. I measured it: the simulated left-edge silhouette of the iron sword matches the reference image row for row once the reference's wider screen (aspect 1.887 against 1.778) is allowed for (a uniform 42 px shift, which is exactly the aspect difference). The +90 used since the held-item rework was the cause of the tools looking wrong.
+- [x] Pickup animation: a collected stack keeps spinning and flies to the player in 0.15 s (3 ticks) easing in (position x f^2 with f = t / 0.15), then is gone; the inventory still receives it at once. `ItemEntityManager.drainCollected()` reports what was taken (a partly collected stack reports only the taken part).
