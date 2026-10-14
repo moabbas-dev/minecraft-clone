@@ -39,16 +39,23 @@ public final class GuiPainter {
         quad(ui, itemX - s, itemY - s, 18 * s, 18 * s, 0x8B8B8B, 1f);
     }
 
-    /** The white half-transparent square drawn over the hovered slot's item area. */
+    /** The white half-transparent square drawn over the hovered slot when the highlight sprites are missing. */
     public static void highlight(UiRenderer ui, InventoryLayout.Rect itemArea) {
         quad(ui, itemArea.x(), itemArea.y(), itemArea.w(), itemArea.h(), 0xFFFFFF, 0.5f);
     }
 
+    /** One half of vanilla's slot highlight (24x24 around the 16x16 item area): the back half goes under the item, the front over it. */
+    public static void highlightSprite(UiRenderer ui, HudTextures.Sprite sprite, InventoryLayout.Rect itemArea, float s) {
+        HudTextures.draw(ui, sprite, itemArea.x() - 4 * s, itemArea.y() - 4 * s, s);
+    }
+
     /**
-     * A vanilla-style tooltip near the mouse: dark purple box with a thin violet border, white text with a shadow.
-     * Kept on screen by flipping to the left of the cursor or sliding up when it would overflow.
+     * A vanilla tooltip near the mouse: the real tooltip background and frame sprites (9-slice, borders 9 and 10) around the
+     * text, which has a 3 GUI-pixel padding; a dark box when the sprites are missing. It flips to the left of the cursor or
+     * slides up when it would leave the screen. Positions and sizes are framebuffer pixels, {@code s} the GUI scale.
      */
-    public static void tooltip(UiRenderer ui, Font font, String text, float mouseX, float mouseY, float s, float screenW, float screenH) {
+    public static void tooltip(UiRenderer ui, Font font, String text, float mouseX, float mouseY, float s, float screenW, float screenH,
+                               UiSprites sprites) {
         float textW = font.width(text, s);
         float padX = 3 * s, textH = 8 * s;
         float w = textW + 2 * padX, h = textH + 6 * s;
@@ -56,12 +63,12 @@ public final class GuiPainter {
         if (x + w > screenW) x = mouseX - 12 * s - w;
         if (y + h > screenH) y = screenH - h;
         if (y < 0) y = 0;
-        quad(ui, x, y, w, h, 0x100010, 0.94f);
-        quad(ui, x, y + s, w, h - 2 * s, 0x100010, 0.94f);
-        quad(ui, x + s, y, w - 2 * s, s, 0x5000FF, 0.35f);
-        quad(ui, x + s, y + h - s, w - 2 * s, s, 0x28007F, 0.35f);
-        quad(ui, x, y + s, s, h - 2 * s, 0x5000FF, 0.35f);
-        quad(ui, x + w - s, y + s, s, h - 2 * s, 0x28007F, 0.35f);
+        float ox = x + padX - (3 + 9) * s, oy = y + 3 * s - (3 + 9) * s; // sprite rectangle: the text box grown by padding + border
+        float ow = textW + (3 + 3 + 18) * s, oh = textH + (3 + 3 + 18) * s;
+        boolean drawn = sprites != null
+                && sprites.nineSlice(ui, "tooltip/background", ox, oy, ow, oh, 9 * s, 9 * s, 9 * s, 9 * s)
+                && sprites.nineSlice(ui, "tooltip/frame", ox, oy, ow, oh, 10 * s, 10 * s, 10 * s, 10 * s);
+        if (!drawn) quad(ui, x, y, w, h, 0x100010, 0.94f);
         font.draw(ui, text, x + padX, y + 3 * s, s, 0xFFFFFF, true);
     }
 }

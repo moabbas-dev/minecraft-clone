@@ -61,7 +61,7 @@ Verification in the notes column: `unit` = a unit test, `live` = checked in the 
 | H10 | XP bar 182x5 + green level number | y about H-29 | y = H-29 | [x] | G2 live: 182x5 bar with green fill and level number |
 | H11 | Attack indicator (crosshair / hotbar) | 5.1 | original sprites | [x] | G2 live: crosshair indicator bar fills with charge; hotbar mode uses the same sprites |
 | H12 | Item count text, durability bar | 13 px bar green->red | Game.drawDurabilityBar | [x] | G2: 13 px bar, rounded width, red-to-green hue like vanilla |
-| H13 | Crosshair | 16x16 sprite, white inverted |  | [~] | minor: vanilla crosshair is an inverted-blend 15x15 sprite; the two white quads are close enough |
+| H13 | Crosshair | 15x15 sprite, inverted blend |  | [x] | G11 live: the real `hud/crosshair.png` drawn with `glBlendFuncSeparate(ONE_MINUS_DST_COLOR, ONE_MINUS_SRC_COLOR, ONE, ZERO)`; it reads red on the blue sky |
 
 ## 3. Inventory and crafting UI
 
@@ -73,7 +73,7 @@ Verification in the notes column: `unit` = a unit test, `live` = checked in the 
 | U4 | Crafting table layout | 3x3 at (30,17), out (124,35) |  | [x] | G5 live + unit: 3x3 at (30,17), result (124,35); no armor slots at the table |
 | U5 | Furnace layout | in (56,17), fuel (56,53), out (116,35), flame (56,36), arrow (79,34) |  | [x] | G5 live + unit CookingLayoutTest: in (56,17), fuel (56,53), out (116,35), flame (56,36), arrow (79,34); lit flame and half-filled arrow seen |
 | U6 | Panel and slot look | light-grey panel with bevel, inset slots | the real `container/*.png` backgrounds (slot frames, arrows and preview box are baked into them) | [x] | live: real inventory / crafting table / furnace backgrounds |
-| U7 | Hover highlight, held item, tooltip | white 50% square on the slot; item at cursor; dark-purple tooltip | tooltip colours from rules 6 are [U] | [x] | G5 live: white 50% hover square seen; held item drawn at 16 px x scale centred on the cursor; dark-purple tooltip (GuiPainter.tooltip) |
+| U7 | Hover highlight, held item, tooltip | white 50% square on the slot; item at cursor; dark-purple tooltip | tooltip colours from rules 6 are [U] | [x] | G5 live: held item drawn at 16 px x scale centred on the cursor; G11: the real `slot_highlight_back/front` sprites (hovered interior measured 139 -> 192) and the real `tooltip/background` + `tooltip/frame` 9-slice sprites |
 | U8 | Labels | Crafting / Inventory text colour 0x404040 |  | [x] | G5 live: labels in 0x404040 ('Crafting' at (97,8) / (28,6), 'Inventory' at (8,72), furnace title centred) |
 
 ## 4. Blocks and items (one row per entry in `BlockType`)
@@ -317,3 +317,14 @@ Reference images: minecraft.wiki `DualWielding.png` (a real first-person iron sw
 - [x] The preview player follows the mouse in the same direction: the head had been turning the wrong way (cancelling the body's turn) and looked up when the mouse was below. Now body 20 and head 40 degrees per atan unit towards the mouse, head up when the mouse is above, body leaning back; covered by `PlayerModelBuilderTest`.
 - [x] Held tools: the flat-item display rotation is the model JSON's [0,-90,25]. I measured it: the simulated left-edge silhouette of the iron sword matches the reference image row for row once the reference's wider screen (aspect 1.887 against 1.778) is allowed for (a uniform 42 px shift, which is exactly the aspect difference). The +90 used since the held-item rework was the cause of the tools looking wrong.
 - [x] Pickup animation: a collected stack keeps spinning and flies to the player in 0.15 s (3 ticks) easing in (position x f^2 with f = t / 0.15), then is gone; the inventory still receives it at once. `ItemEntityManager.drainCollected()` reports what was taken (a partly collected stack reports only the taken part).
+
+## 11. Menus drawn only from the real files (G11)
+
+- [x] The font is the real `textures/font/ascii.png`: `PixelFont` measures each glyph (width = rightmost lit column + 1, advance +1, space 4) instead of carrying drawn glyphs. Without the file nothing is drawn and layouts still work (advance 6).
+- [x] Buttons, sliders (track + handle with their own borders), text fields, the world-list scrollbar, the tooltip and the slot highlight are the real 9-slice sprites (`ui/UiSprites`, borders from the `.mcmeta` files: button 3, slider 1, handle 2/2/2/3, text field 1, scroller 1, tooltip 9/10). Button text is white, grey when disabled. Slider handle position checked: FOV 70 sits at 50%.
+- [x] The title screen shows the real `title/minecraft.png` logo (256x44 at y=30), the `edition.png` plate, and a splash picked from the real `texts/splashes.txt` (yellow, rotated -20 degrees, pulsing). The invented block-letter logo, hill silhouette and splash list are gone.
+- [x] **Limit:** this jar's `panorama_*.png`, `menu_background.png`... : the panoramas are 1x1 stubs, and `menu_background.png` is a 16x16 black at alpha 64 meant to sit over the panorama. So the title screen is the sky colour with that faint overlay, which is what the real files give; it needs the real panorama images to look like vanilla.
+- [x] Scrolling lists are clipped with a GL scissor (`UiRenderer.setClip`) instead of being hidden under opaque strips, because the real backgrounds are translucent.
+- [x] XP orbs use the real `entity/experience/experience_orb.png` (16 icons of 16x16 chosen by value as in vanilla, 0.3-block camera-facing quads, green-yellow pulse). The tinted snow tile is gone.
+- [x] The crosshair is the real sprite with vanilla's inverting blend.
+- Tests: 747 passing (`PixelFontTest` and `UiSpritesTest` are new; the font tests use a made-up sheet so they do not depend on the real file).

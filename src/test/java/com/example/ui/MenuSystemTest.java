@@ -1,6 +1,5 @@
 package com.example.ui;
 
-import com.example.engine.PixelFont;
 import com.example.world.Difficulty;
 import com.example.world.WorldIO;
 import com.example.world.WorldSettings;
@@ -36,39 +35,6 @@ class MenuSystemTest {
     void logicalSizeRoundsUp() {
         assertEquals(480, GuiScale.logical(1920, 4));
         assertEquals(427, GuiScale.logical(1280, 3));
-    }
-
-    // ---- font metrics (Minecraft-style proportional bitmap font) ----
-
-    @Test
-    void everyPrintableAsciiGlyphIsDefinedAndNarrowerThanItsCell() {
-        for (char c = 33; c <= 126; c++) {
-            assertTrue(PixelFont.glyphWidth(c) >= 1 && PixelFont.glyphWidth(c) <= 5, "glyph " + c);
-            boolean lit = false;
-            for (int y = 0; y < 8; y++) for (int x = 0; x < PixelFont.glyphWidth(c); x++) lit |= PixelFont.pixel(c, x, y);
-            assertTrue(lit, "glyph " + c + " has pixels");
-        }
-    }
-
-    @Test
-    void advanceIsWidthPlusOneAndSpaceIsFour() {
-        assertEquals(4, PixelFont.advance(' '));
-        assertEquals(2, PixelFont.advance('.'), "a period is 1 wide + 1 gap");
-        assertEquals(2, PixelFont.advance('!'));
-        assertEquals(6, PixelFont.advance('W'));
-        assertEquals(PixelFont.advance('H') + PixelFont.advance('i'), PixelFont.textWidth("Hi"));
-        assertEquals(9, PixelFont.LINE_HEIGHT);
-    }
-
-    @Test
-    void glyphSheetIsTheVanilla128x128With8x8Cells() {
-        var sheet = PixelFont.buildSheet();
-        assertEquals(128, sheet.getWidth());
-        assertEquals(128, sheet.getHeight());
-        // 'A' (65) lives in cell column 1, row 4.
-        boolean any = false;
-        for (int y = 0; y < 8; y++) for (int x = 0; x < 8; x++) any |= (sheet.getRGB(8 + x, 32 + y) >>> 24) != 0;
-        assertTrue(any);
     }
 
     // ---- options ----

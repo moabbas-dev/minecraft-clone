@@ -1,14 +1,20 @@
 package com.example.ui;
 
-/** Shared, long-lived inputs every menu screen needs: the user options and the dirt background texture. */
+/**
+ * Shared, long-lived inputs every menu screen needs: the user options and the real GUI sprites. {@code sprites} is null
+ * in headless tests, where the screens fall back to plain flat drawing.
+ */
 public final class GuiEnv {
     public final GameOptions options;
-    public final int dirtTexture;
-    public final float[] dirtUv;
+    public final UiSprites sprites;
 
-    public GuiEnv(GameOptions options, int dirtTexture, float[] dirtUv) {
+    public GuiEnv(GameOptions options, UiSprites sprites) {
         this.options = options;
-        this.dirtTexture = dirtTexture;
-        this.dirtUv = dirtUv;
+        this.sprites = sprites;
+    }
+
+    /** Headless (no sprites). */
+    public GuiEnv(GameOptions options) {
+        this(options, null);
     }
 }

@@ -330,7 +330,7 @@ public class Game implements GameAccess {
         });
         gameAudio.init(); // never throws - degrades to silent no-ops if no device/OpenAL fails
 
-        guiEnv = new GuiEnv(options, atlas.getTextureId(), atlas.getUv(Tile.DIRT));
+        guiEnv = new GuiEnv(options, new com.example.ui.UiSprites());
         applyOptions();
 
         titleScreen = new TitleScreen(guiEnv, new TitleScreen.Listener() {
@@ -1363,7 +1363,7 @@ public class Game implements GameAccess {
             if (held.count() > 1) drawStackCount(held.count(), mx - 8 * s, my - 8 * s, 16 * s);
         } else if (hovered >= 0) {
             ItemStack under = menu.stackAt(hovered);
-            if (!under.isEmpty()) GuiPainter.tooltip(uiRenderer, font, under.type().displayName, mx, my, s, w, h);
+            if (!under.isEmpty()) GuiPainter.tooltip(uiRenderer, font, under.type().displayName, mx, my, s, w, h, guiEnv.sprites);
         }
     }
 
@@ -1482,6 +1482,9 @@ public class Game implements GameAccess {
         InventoryLayout.Rect r = layout.slotRect(slot);
         ItemStack stack = menu.stackAt(slot);
         if (frame) GuiPainter.slot(uiRenderer, r.x(), r.y(), layout.scale());
+        com.example.engine.HudTextures.Sprite hlBack = slot == hovered ? guiSprite("textures/gui/sprites/container/slot_highlight_back.png") : null;
+        com.example.engine.HudTextures.Sprite hlFront = slot == hovered ? guiSprite("textures/gui/sprites/container/slot_highlight_front.png") : null;
+        if (hlBack != null) GuiPainter.highlightSprite(uiRenderer, hlBack, r, layout.scale());
         if (!stack.isEmpty()) {
             drawBlockIcon(stack.type(), r.x(), r.y(), r.w());
             if (stack.count() > 1) drawStackCount(stack.count(), r.x(), r.y(), r.w());
@@ -1495,7 +1498,8 @@ public class Game implements GameAccess {
                     : guiSprite("textures/gui/sprites/container/slot/" + outline + ".png");
             if (sprite != null) com.example.engine.HudTextures.draw(uiRenderer, sprite, r.x(), r.y(), layout.scale());
         }
-        if (slot == hovered) GuiPainter.highlight(uiRenderer, r);
+        if (hlFront != null) GuiPainter.highlightSprite(uiRenderer, hlFront, r, layout.scale());
+        else if (slot == hovered && hlBack == null) GuiPainter.highlight(uiRenderer, r);
     }
 
     // ---- cooking station screen (Furnace / Blast Furnace / Smoker) ----
@@ -1619,7 +1623,7 @@ public class Game implements GameAccess {
             if (held.count() > 1) drawStackCount(held.count(), mx - 8 * s, my - 8 * s, 16 * s);
         } else if (hovered >= 0) {
             ItemStack under = cookingMenu.stackAt(hovered);
-            if (!under.isEmpty()) GuiPainter.tooltip(uiRenderer, font, under.type().displayName, mx, my, s, w, h);
+            if (!under.isEmpty()) GuiPainter.tooltip(uiRenderer, font, under.type().displayName, mx, my, s, w, h, guiEnv.sprites);
         }
     }
 
@@ -1627,12 +1631,16 @@ public class Game implements GameAccess {
         InventoryLayout.Rect r = layout.slotRect(slot);
         ItemStack stack = menu.stackAt(slot);
         if (frame) GuiPainter.slot(uiRenderer, r.x(), r.y(), layout.scale());
+        com.example.engine.HudTextures.Sprite hlBack = slot == hovered ? guiSprite("textures/gui/sprites/container/slot_highlight_back.png") : null;
+        com.example.engine.HudTextures.Sprite hlFront = slot == hovered ? guiSprite("textures/gui/sprites/container/slot_highlight_front.png") : null;
+        if (hlBack != null) GuiPainter.highlightSprite(uiRenderer, hlBack, r, layout.scale());
         if (!stack.isEmpty()) {
             drawBlockIcon(stack.type(), r.x(), r.y(), r.w());
             if (stack.count() > 1) drawStackCount(stack.count(), r.x(), r.y(), r.w());
             drawDurabilityBar(stack, r.x(), r.y(), r.w());
         }
-        if (slot == hovered) GuiPainter.highlight(uiRenderer, r);
+        if (hlFront != null) GuiPainter.highlightSprite(uiRenderer, hlFront, r, layout.scale());
+        else if (slot == hovered && hlBack == null) GuiPainter.highlight(uiRenderer, r);
     }
 
     /** Everything that follows one completed break: the sound, the dropped items, and the
@@ -2100,28 +2108,47 @@ public class Game implements GameAccess {
     }
 
     /** Experience orbs: small camera-facing quads, full bright, pulsing between green and yellow like vanilla. */
+    /** Which of the 16 icons of {@code experience_orb.png} an orb of this value uses (vanilla's ExperienceOrbRenderer.getIcon). */
+    static int xpOrbIcon(int value) {
+        if (value >= 2477) return 10;
+        if (value >= 1237) return 9;
+        if (value >= 617) return 8;
+        if (value >= 307) return 7;
+        if (value >= 149) return 6;
+        if (value >= 73) return 5;
+        if (value >= 37) return 4;
+        if (value >= 17) return 3;
+        if (value >= 7) return 2;
+        if (value >= 3) return 1;
+        return 0;
+    }
+
+    /** Experience orbs: camera-facing 0.3-block quads of the real orb sheet, full bright, pulsing between green and yellow like vanilla. */
     private void renderXpOrbs() {
         java.util.List<com.example.entity.XpOrbManager.Orb> orbs = xpOrbs.orbs();
         if (orbs.isEmpty()) return;
+        com.example.engine.EntityTexture tex = realTexture("entity.experience_orb", "textures/entity/experience/experience_orb.png", false);
+        if (tex == null) return;
         Vector3f front = player.frontVector();
         Vector3f right = new Vector3f(-front.z, 0, front.x);
         if (right.lengthSquared() < 1e-6f) right.set(1, 0, 0);
         right.normalize();
         Vector3f up = new Vector3f(right).cross(front).normalize();
-        float[] uv = atlas.getUv(com.example.engine.Tile.SNOW_BLOCK);
         int n = 0;
         for (com.example.entity.XpOrbManager.Orb o : orbs) {
             if (n + 6 * 11 > mobScratch.length) break;
-            float size = 0.12f + 0.012f * (10 - o.sizeIndex());
-            float pulse = (float) (Math.sin(o.age * 6.0 + o.value) * 0.5 + 0.5);
-            float r = 0.35f + 0.65f * pulse, g = 1f, b = 0.1f;
+            int icon = xpOrbIcon(o.value);
+            float u0 = (icon % 4) * 16f / 64f, v0 = (icon / 4) * 16f / 64f, u1 = u0 + 16f / 64f, v1 = v0 + 16f / 64f;
+            float phase = o.age * 20f / 2f; // vanilla: (age + partial) / 2
+            float r = ((float) Math.sin(phase) + 1f) * 0.5f, g = 1f, b = ((float) Math.sin(phase + 4.1887903f) + 1f) * 0.1f;
+            float half = 0.15f; // the quad is 0.3 blocks wide
             float[][] c = {{-1, -1}, {1, -1}, {1, 1}, {-1, 1}};
             int[] order = {0, 1, 2, 0, 2, 3};
-            float[][] uvc = {{uv[0], uv[3]}, {uv[2], uv[3]}, {uv[2], uv[1]}, {uv[0], uv[1]}};
+            float[][] uvc = {{u0, v1}, {u1, v1}, {u1, v0}, {u0, v0}};
             for (int k : order) {
-                mobScratch[n++] = o.position.x + (right.x * c[k][0] + up.x * c[k][1]) * size;
-                mobScratch[n++] = o.position.y + 0.15f + (right.y * c[k][0] + up.y * c[k][1]) * size;
-                mobScratch[n++] = o.position.z + (right.z * c[k][0] + up.z * c[k][1]) * size;
+                mobScratch[n++] = o.position.x + (right.x * c[k][0] + up.x * c[k][1]) * half;
+                mobScratch[n++] = o.position.y + 0.15f + (right.y * c[k][0] + up.y * c[k][1]) * half;
+                mobScratch[n++] = o.position.z + (right.z * c[k][0] + up.z * c[k][1]) * half;
                 mobScratch[n++] = uvc[k][0];
                 mobScratch[n++] = uvc[k][1];
                 mobScratch[n++] = 1f;
@@ -2133,9 +2160,11 @@ public class Game implements GameAccess {
             }
         }
         if (n == 0) return;
-        mobMesh.upload(mobScratch, n);
         chunkShader.setUniform("uModel", IDENTITY);
+        tex.bind(0);
+        mobMesh.upload(mobScratch, n);
         mobMesh.draw();
+        atlas.bind(0);
     }
 
     private void drawAirBubbles(HudTextures t, float hx, float y, float s) {
@@ -2727,8 +2756,17 @@ public class Game implements GameAccess {
         if (hideHud) return;
         float cx = window.getWidth() / 2f;
         float cy = window.getHeight() / 2f;
-        uiRenderer.drawColorQuad(cx - 5, cy - 1, 10, 2, 1, 1, 1, 0.9f);
-        uiRenderer.drawColorQuad(cx - 1, cy - 5, 2, 10, 1, 1, 1, 0.9f);
+        com.example.engine.HudTextures.Sprite crosshair = guiSprite("textures/gui/sprites/hud/crosshair.png");
+        if (crosshair != null) {
+            // the real 15x15 crosshair, drawn with vanilla's inverting blend so it reads on any background
+            float cs = com.example.ui.GuiScale.compute(window.getWidth(), window.getHeight(), options.guiScale);
+            glBlendFuncSeparate(GL_ONE_MINUS_DST_COLOR, GL_ONE_MINUS_SRC_COLOR, GL_ONE, GL_ZERO);
+            com.example.engine.HudTextures.draw(uiRenderer, crosshair, (float) Math.floor(cx - 7.5f * cs), (float) Math.floor(cy - 7.5f * cs), cs);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        } else {
+            uiRenderer.drawColorQuad(cx - 5, cy - 1, 10, 2, 1, 1, 1, 0.9f);
+            uiRenderer.drawColorQuad(cx - 1, cy - 5, 2, 10, 1, 1, 1, 0.9f);
+        }
 
         if (hudTextures != null && inventory.getHotbarSize() == 9) {
             renderRealHud();

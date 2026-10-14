@@ -51,6 +51,12 @@ public class Slider extends Widget {
     @Override
     public void render(GuiContext g) {
         boolean hovered = active && (contains(g.mx, g.my) || dragging);
+        int kx0 = x + Math.round(value * (w - 8));
+        if (g.nineSlice(hovered ? "widget/slider_highlighted" : "widget/slider", x, y, w, h, 1)
+                && g.nineSlice(hovered ? "widget/slider_handle_highlighted" : "widget/slider_handle", kx0, y, 8, h, 2, 2, 2, 3)) {
+            g.textCentered(label.apply(value), x + w / 2f, y + (h - 8) / 2f, active ? 0xFFFFFF : 0xA0A0A0);
+            return;
+        }
         Button.drawFrame(g, x, y, w, h, 0x2B2B2B, false);
         int kx = x + Math.round(value * (w - 8));
         Button.drawFrame(g, kx, y, 8, h, active ? (hovered ? Button.HOVER_FILL : Button.NORMAL_FILL) : Button.DISABLED_FILL, active);

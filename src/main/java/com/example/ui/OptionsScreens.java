@@ -386,13 +386,12 @@ public final class OptionsScreens {
         @Override
         protected void drawContent(GuiContext g) {
             KeyBindings.Bind[] binds = KeyBindings.Bind.values();
+            g.listBackground(30, g.h - 40);
             for (int i = 0; i < binds.length; i++) {
                 float y = 36 + i * 24 - Math.round(scroll);
                 if (y < 30 || y > g.h - 56) continue;
                 g.text(binds[i].label, g.w / 2f - 155, y + 6, o.keys.conflicts(binds[i]) ? 0xFF5555 : 0xFFFFFF);
             }
-            g.dirtStrip(0, g.h - 40, g.w, 40);
-            g.dirtStrip(0, 0, g.w, 30);
             g.textCentered(title, g.w / 2f, 15, 0xFFFFFF);
         }
     }

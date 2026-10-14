@@ -10,6 +10,7 @@ import static org.lwjgl.opengl.GL33.*;
 public class UiRenderer {
     private final Shader shader;
     private final Mesh mesh;
+    private float logicalW = 1, logicalH = 1;
 
     public UiRenderer() {
         shader = new Shader(Shaders.UI_VERTEX, Shaders.UI_FRAGMENT);
@@ -24,6 +25,22 @@ public class UiRenderer {
     public void begin(float logicalWidth, float logicalHeight) {
         shader.bind();
         shader.setUniform("uScreenSize", logicalWidth, logicalHeight);
+        logicalW = logicalWidth;
+        logicalH = logicalHeight;
+    }
+
+    /** Limits drawing to a rectangle given in the current logical units (scrolling lists hide what is past their edges). */
+    public void setClip(float x, float y, float w, float h) {
+        int[] vp = new int[4];
+        glGetIntegerv(GL_VIEWPORT, vp);
+        float sx = vp[2] / logicalW, sy = vp[3] / logicalH;
+        int px = Math.round(x * sx), py = Math.round(y * sy), pw = Math.round(w * sx), ph = Math.round(h * sy);
+        glEnable(GL_SCISSOR_TEST);
+        glScissor(vp[0] + px, vp[1] + vp[3] - py - ph, Math.max(0, pw), Math.max(0, ph));
+    }
+
+    public void clearClip() {
+        glDisable(GL_SCISSOR_TEST);
     }
 
     public void drawColorQuad(float x, float y, float w, float h, float r, float g, float b, float a) {

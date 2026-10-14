@@ -141,6 +141,8 @@ public class SelectWorldScreen extends McScreen {
         public void render(GuiContext g) {
             scroll = clampScroll(scroll);
             float left = (g.w - LIST_W) / 2f;
+            g.listBackground(HEADER_H, g.h - FOOTER_H);
+            g.clip(0, HEADER_H, g.w, g.h - HEADER_H - FOOTER_H);
             for (int i = 0; i < worlds.size(); i++) {
                 float y = HEADER_H - scroll + i * ROW_H;
                 if (y + ROW_H < HEADER_H || y > g.h - FOOTER_H) continue;
@@ -154,17 +156,12 @@ public class SelectWorldScreen extends McScreen {
                 String mode = w.type() == WorldSettings.WorldType.FLAT ? "Survival Mode - Superflat" : "Survival Mode";
                 g.text(mode, left + 2, y + 23, 0x808080);
             }
-            // Header/footer strips hide rows scrolled past the list area and frame it like vanilla.
-            g.dirtStrip(0, 0, g.w, HEADER_H);
-            g.dirtStrip(0, g.h - FOOTER_H, g.w, FOOTER_H);
-            g.gradient(0, HEADER_H, g.w, 4, 0x000000, 1f, 0x000000, 0f);
-            g.gradient(0, g.h - FOOTER_H - 4, g.w, 4, 0x000000, 0f, 0x000000, 1f);
+            g.unclip();
             float total = worlds.size() * ROW_H;
             if (total > viewH()) {
                 float barH = Math.max(16, viewH() * viewH() / total);
                 float barY = HEADER_H + (viewH() - barH) * (scroll / (total - viewH()));
-                g.fill(g.w - 8, HEADER_H, 6, viewH(), 0x000000);
-                g.fill(g.w - 8, barY, 6, barH, 0x808080);
+                g.scrollbar(g.w - 8, HEADER_H, viewH(), barY, barH);
             }
         }
     }

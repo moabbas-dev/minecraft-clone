@@ -4,7 +4,7 @@ What the game expects on disk and where it loads it from. Derived from the sourc
 `scripts/restore-assets.py` re-derives the same lists from the source every time it runs.
 
 All paths are **relative to the working directory**, which is the repository root (the game is started with `mvn exec:java` from there).
-None of these files are committed: `textures/`, `sounds/`, `minecraft-sounds/` and `options.txt` are in `.gitignore`.
+None of these files are committed: `textures/`, `texts/`, `sounds/`, `minecraft-sounds/` and `options.txt` are in `.gitignore`.
 
 ## Folder layout
 
@@ -14,6 +14,12 @@ None of these files are committed: `textures/`, `sounds/`, `minecraft-sounds/` a
 | `textures/item/*.png` | `engine/TextureAtlas` (`REAL_TEXTURE_PATHS`) | no | "missing texture" tile |
 | `textures/gui/sprites/hud/**` | `engine/HudTextures` | no | the 8 core sprites are all-or-nothing, else the plain colored-quad HUD; the rest are optional per group |
 | `textures/gui/container/{inventory,crafting_table,furnace,blast_furnace,smoker}.png`, `textures/gui/sprites/container/<station>/{lit,burn}_progress.png` | `game/Game` -> `ui/GuiPainter.background`, `engine/HudTextures.loadFile` | no | plain grey panel and slots; no progress sprites |
+| `textures/font/ascii.png` | `engine/PixelFont` (glyph widths and the atlas `engine/Font` draws) | no | no text is drawn (every character advances 6, spaces 4) |
+| `textures/gui/sprites/widget/{button*,slider*,slider_handle*,text_field*,scroller*}.png`, `textures/gui/sprites/tooltip/{background,frame}.png`, `textures/gui/sprites/container/slot_highlight_{back,front}.png` | `ui/UiSprites` (9-slice) via `ui/GuiContext`, `ui/GuiPainter` | no | plain flat boxes (buttons, fields), a dark tooltip box, a white 50% hover square |
+| `textures/gui/{menu_background,menu_list_background,header_separator,footer_separator}.png`, `textures/gui/title/{minecraft,edition}.png` | `ui/GuiContext`, `ui/TitleScreen` | no | a dark plain fill; the title is drawn as the word MINECRAFT |
+| `textures/gui/sprites/hud/crosshair.png` | `game/Game.renderHud` | no | two white quads |
+| `texts/splashes.txt` | `ui/Splashes` | no | no splash text |
+| `textures/entity/experience/experience_orb.png` | `game/Game.renderXpOrbs` | no | orbs are not drawn |
 | `textures/particle/{critical_hit,damage}.png` | `game/Game` -> `fx/SpriteParticles` | no | those particles are not drawn |
 | `textures/environment/{rain.png,celestial/sun.png,celestial/moon/full_moon.png}` | `game/Game` (`renderRain`, `renderSunAndMoon`) | no | no rain streaks / sun / moon |
 | `textures/entity/player/wide/steve.png` | `game/Game.renderHeldItem` (bare hand), `renderPlayerPreview` | no | the bare hand and the inventory player preview are not drawn |

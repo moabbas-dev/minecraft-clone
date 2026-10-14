@@ -2,7 +2,7 @@ package com.example.ui;
 
 import java.util.function.Supplier;
 
-/** Vanilla-style push button (200x20 wide; 150/98/72-wide variants are used by the screens). */
+/** Vanilla push button drawn from the real widget sprites (200x20, with the 150/98/72-wide variants), plain boxes without them. */
 public class Button extends Widget {
     public static final int NORMAL_FILL = 0x707070, HOVER_FILL = 0x6F7DC8, DISABLED_FILL = 0x4A4A4A;
     public static final int BEVEL_LIGHT = 0xA0A0A0, BEVEL_DARK = 0x3C3C3C;
@@ -34,6 +34,12 @@ public class Button extends Widget {
     @Override
     public void render(GuiContext g) {
         boolean hovered = active && contains(g.mx, g.my);
+        String sprite = !active ? "widget/button_disabled" : hovered ? "widget/button_highlighted" : "widget/button";
+        if (g.nineSlice(sprite, x, y, w, h, 3)) {
+            // vanilla's button text: white, or grey when disabled
+            g.textCentered(label.get(), x + w / 2f, y + (h - 8) / 2f, active ? 0xFFFFFF : 0xA0A0A0);
+            return;
+        }
         drawFrame(g, x, y, w, h, active ? (hovered ? HOVER_FILL : NORMAL_FILL) : DISABLED_FILL, active);
         int color = !active ? 0xA0A0A0 : hovered ? 0xFFFFA0 : 0xE0E0E0;
         g.textCentered(label.get(), x + w / 2f, y + (h - 8) / 2f, color);

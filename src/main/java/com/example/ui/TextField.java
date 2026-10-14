@@ -51,8 +51,10 @@ public class TextField extends Widget {
 
     @Override
     public void render(GuiContext g) {
-        g.fill(x, y, w, h, focused ? 0xFFFFFF : 0xA0A0A0);
-        g.fill(x + 1, y + 1, w - 2, h - 2, 0x000000);
+        if (!g.nineSlice(focused ? "widget/text_field_highlighted" : "widget/text_field", x, y, w, h, 1)) {
+            g.fill(x, y, w, h, focused ? 0xFFFFFF : 0xA0A0A0);
+            g.fill(x + 1, y + 1, w - 2, h - 2, 0x000000);
+        }
         String shown = text.toString();
         while (shown.length() > 1 && g.textWidth(shown) > w - 10) shown = shown.substring(1);
         float tx = x + 4, ty = y + (h - 8) / 2f;

@@ -60,3 +60,5 @@ options.txt
 # JVM crash dumps
 hs_err_pid*.log
 replay_pid*.log
+# The title screen splash list copied from the real game by scripts/restore-assets.py (same policy as textures/).
+texts/

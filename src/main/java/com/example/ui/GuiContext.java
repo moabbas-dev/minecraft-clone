@@ -65,9 +65,27 @@ public final class GuiContext {
         return font.width(s);
     }
 
-    /** Tiled dirt menu background, darkened like vanilla's 0x404040 tint. */
+    /** Restricts drawing to a rectangle until {@link #unclip()}. */
+    public void clip(float x, float y, float cw, float ch) {
+        ui.setClip(x, y, cw, ch);
+    }
+
+    public void unclip() {
+        ui.clearClip();
+    }
+
+    /** The real 9-slice sprite (or false when there are no sprites / the file is missing, so the caller can draw a plain stand-in). */
+    public boolean nineSlice(String name, float x, float y, float sw, float sh, float border) {
+        return env.sprites != null && env.sprites.nineSlice(ui, name, x, y, sw, sh, border);
+    }
+
+    public boolean nineSlice(String name, float x, float y, float sw, float sh, float l, float t, float r, float b) {
+        return env.sprites != null && env.sprites.nineSlice(ui, name, x, y, sw, sh, l, t, r, b);
+    }
+
+    /** The menu background: the real {@code menu_background.png} tiled at 16 GUI pixels (a dark plain fill if it is missing). */
     public void dirtBackground() {
-        ui.drawTiled(env.dirtTexture, env.dirtUv, 0, 0, w, h, 32f, 0.25f, 0.25f, 0.25f, 1f);
+        if (env.sprites == null || !env.sprites.tile(ui, "menu_background", 0, 0, w, h, 16f)) fill(0, 0, w, h, 0x202020);
     }
 
     /** Dim overlay behind in-game menus (vanilla's dark translucent gradient). */
@@ -75,8 +93,20 @@ public final class GuiContext {
         gradient(0, 0, w, h, 0x101010, 0.75f, 0x101010, 0.82f);
     }
 
-    /** Dirt strip, for list-screen headers and footers. */
-    public void dirtStrip(float x, float y, float sw, float sh) {
-        ui.drawTiled(env.dirtTexture, env.dirtUv, x, y, sw, sh, 32f, 0.25f, 0.25f, 0.25f, 1f);
+    /** The list area background between a header and a footer, with the separator lines on both edges. */
+    public void listBackground(float top, float bottom) {
+        if (env.sprites == null || !env.sprites.tile(ui, "menu_list_background", 0, top, w, bottom - top, 16f)) {
+            fill(0, top, w, bottom - top, 0x101010);
+        }
+        if (env.sprites != null) {
+            env.sprites.tile(ui, "header_separator", 0, top - 2, w, 2, 32f);
+            env.sprites.tile(ui, "footer_separator", 0, bottom, w, 2, 32f);
+        }
+    }
+
+    /** A scrollbar in the list's right margin: the real track and thumb sprites. */
+    public void scrollbar(float x, float top, float height, float thumbY, float thumbH) {
+        if (!nineSlice("widget/scroller_background", x, top, 6, height, 1)) fill(x, top, 6, height, 0x000000);
+        if (!nineSlice("widget/scroller", x, thumbY, 6, thumbH, 1)) fill(x, thumbY, 6, thumbH, 0x808080);
     }
 }

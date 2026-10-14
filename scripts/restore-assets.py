@@ -40,8 +40,10 @@ RESOURCES_URL = "https://resources.download.minecraft.net"
 JAR_PREFIX = "assets/minecraft/"
 BULK_TEXTURE_DIRS = ("textures/block/", "textures/item/", "textures/gui/", "textures/colormap/", "textures/particle/",
                      "textures/environment/", "textures/entity/chest/", "textures/entity/player/wide/",
-                     "textures/entity/equipment/humanoid/", "textures/entity/equipment/humanoid_leggings/")
+                     "textures/entity/equipment/humanoid/", "textures/entity/equipment/humanoid_leggings/", "textures/entity/experience/",
+                     "textures/font/")
 UA = {"User-Agent": "minecraft-clone-asset-restore/1.0"}
+EXTRA_FILES = ("texts/splashes.txt",)  # plain data files outside textures/ that the game reads
 DEST = ROOT  # where textures/ and sounds/ are written (--dest overrides, used by the offline test)
 
 
@@ -167,7 +169,7 @@ def restore_textures(version_json, textures, report):
             rel = name[len(JAR_PREFIX):]
             if ".." in rel.split("/"):
                 continue  # zip-slip guard
-            if rel.startswith(BULK_TEXTURE_DIRS) or rel in wanted_entity:
+            if rel.startswith(BULK_TEXTURE_DIRS) or rel in wanted_entity or rel in EXTRA_FILES:
                 target = DEST / rel
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes(zf.read(name))

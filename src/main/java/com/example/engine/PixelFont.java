@@ -1,13 +1,15 @@
 package com.example.engine;
 
 import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.IOException;
 
 /**
- * Headless glyph data + metrics for the 8x8-cell bitmap font that mimics Minecraft's default
- * ({@code ascii.png}) look: a 128x128 sheet of 16x16 cells, glyphs drawn up to 5px wide x 8px tall
- * (cap height 7, baseline at row 6, descenders on row 7), proportional advance = glyph width + 1,
- * space = 4, line height 9. The real Mojang sheet is not bundled (not redistributable) - these
- * glyphs are original pixel art in the same spirit. Kept free of any GL so metrics are unit-testable.
+ * Glyph data and metrics of Minecraft's default font, read from the real {@code textures/font/ascii.png}: a 128x128 sheet
+ * of 8x8 cells in character-code order (code c sits in cell (c % 16, c / 16)). Like vanilla's bitmap font provider, a
+ * glyph is as wide as its rightmost lit column, the advance is that width + 1, a space is 4 and the line height is 9. Without
+ * the file no glyph is drawn and every character advances 6, so layouts still work. Kept free of GL so the metrics are
+ * unit-testable; tests inject a sheet with {@link #useSheet}.
  */
 public final class PixelFont {
     private PixelFont() {
@@ -19,134 +21,40 @@ public final class PixelFont {
     public static final int LAST = 126;
     public static final int LINE_HEIGHT = 9;
     public static final int SPACE_ADVANCE = 4;
+    /** Advance used for every character while the font file is missing. */
+    public static final int FALLBACK_ADVANCE = 6;
 
-    /** 8 rows per glyph ('/'-separated, '#' = lit), authored centered in a 5-wide box. */
-    private static final String[] GLYPHS = {
-            "...../...../...../...../...../...../...../.....", // space
-            "..#../..#../..#../..#../..#../...../..#../.....", // !
-            ".#.#./.#.#./.#.#./...../...../...../...../.....", // quote
-            ".#.#./.#.#./#####/.#.#./#####/.#.#./.#.#./.....", // #
-            "..#../.####/#.#../.###./..#.#/####./..#../.....", // $
-            "##..#/##..#/...#./..#../.#.../#..##/#..##/.....", // %
-            ".##../#..#./#.#../.#.../#.#.#/#..#./.##.#/.....", // &
-            "..#../..#../.#.../...../...../...../...../.....", // apostrophe
-            "...#./..#../.#.../.#.../.#.../..#../...#./.....", // (
-            ".#.../..#../...#./...#./...#./..#../.#.../.....", // )
-            "...../..#../#.#.#/.###./#.#.#/..#../...../.....", // *
-            "...../..#../..#../#####/..#../..#../...../.....", // +
-            "...../...../...../...../...../..#../..#../.#...", // ,
-            "...../...../...../#####/...../...../...../.....", // -
-            "...../...../...../...../...../...../..#../.....", // .
-            "....#/....#/...#./..#../.#.../#..../#..../.....", // /
-            ".###./#...#/#..##/#.#.#/##..#/#...#/.###./.....", // 0
-            "..#../.##../..#../..#../..#../..#../.###./.....", // 1
-            ".###./#...#/....#/...#./..#../.#.../#####/.....", // 2
-            ".###./#...#/....#/..##./....#/#...#/.###./.....", // 3
-            "...#./..##./.#.#./#..#./#####/...#./...#./.....", // 4
-            "#####/#..../####./....#/....#/#...#/.###./.....", // 5
-            "..##./.#.../#..../####./#...#/#...#/.###./.....", // 6
-            "#####/....#/...#./..#../.#.../.#.../.#.../.....", // 7
-            ".###./#...#/#...#/.###./#...#/#...#/.###./.....", // 8
-            ".###./#...#/#...#/.####/....#/...#./.##../.....", // 9
-            "...../...../..#../...../...../..#../...../.....", // :
-            "...../...../..#../...../...../..#../..#../.#...", // ;
-            "...#./..#../.#.../#..../.#.../..#../...#./.....", // <
-            "...../...../#####/...../#####/...../...../.....", // =
-            ".#.../..#../...#./....#/...#./..#../.#.../.....", // >
-            ".###./#...#/....#/...#./..#../...../..#../.....", // ?
-            ".###./#...#/#.###/#.#.#/#.###/#..../.###./.....", // @
-            ".###./#...#/#...#/#####/#...#/#...#/#...#/.....", // A
-            "####./#...#/#...#/####./#...#/#...#/####./.....", // B
-            ".###./#...#/#..../#..../#..../#...#/.###./.....", // C
-            "###../#..#./#...#/#...#/#...#/#..#./###../.....", // D
-            "#####/#..../#..../####./#..../#..../#####/.....", // E
-            "#####/#..../#..../####./#..../#..../#..../.....", // F
-            ".###./#...#/#..../#.###/#...#/#...#/.####/.....", // G
-            "#...#/#...#/#...#/#####/#...#/#...#/#...#/.....", // H
-            ".###./..#../..#../..#../..#../..#../.###./.....", // I
-            "..###/...#./...#./...#./...#./#..#./.##../.....", // J
-            "#...#/#..#./#.#../##.../#.#../#..#./#...#/.....", // K
-            "#..../#..../#..../#..../#..../#..../#####/.....", // L
-            "#...#/##.##/#.#.#/#.#.#/#...#/#...#/#...#/.....", // M
-            "#...#/##..#/#.#.#/#..##/#...#/#...#/#...#/.....", // N
-            ".###./#...#/#...#/#...#/#...#/#...#/.###./.....", // O
-            "####./#...#/#...#/####./#..../#..../#..../.....", // P
-            ".###./#...#/#...#/#...#/#.#.#/#..#./.##.#/.....", // Q
-            "####./#...#/#...#/####./#.#../#..#./#...#/.....", // R
-            ".####/#..../#..../.###./....#/....#/####./.....", // S
-            "#####/..#../..#../..#../..#../..#../..#../.....", // T
-            "#...#/#...#/#...#/#...#/#...#/#...#/.###./.....", // U
-            "#...#/#...#/#...#/#...#/#...#/.#.#./..#../.....", // V
-            "#...#/#...#/#...#/#.#.#/#.#.#/##.##/#...#/.....", // W
-            "#...#/#...#/.#.#./..#../.#.#./#...#/#...#/.....", // X
-            "#...#/#...#/.#.#./..#../..#../..#../..#../.....", // Y
-            "#####/....#/...#./..#../.#.../#..../#####/.....", // Z
-            ".###./.#.../.#.../.#.../.#.../.#.../.###./.....", // [
-            "#..../#..../.#.../..#../...#./....#/....#/.....", // backslash
-            ".###./...#./...#./...#./...#./...#./.###./.....", // ]
-            "..#../.#.#./#...#/...../...../...../...../.....", // ^
-            "...../...../...../...../...../...../...../#####", // _
-            ".#.../..#../...../...../...../...../...../.....", // grave
-            "...../...../.###./....#/.####/#...#/.####/.....", // a
-            "#..../#..../####./#...#/#...#/#...#/####./.....", // b
-            "...../...../.###./#..../#..../#...#/.###./.....", // c
-            "....#/....#/.####/#...#/#...#/#...#/.####/.....", // d
-            "...../...../.###./#...#/#####/#..../.###./.....", // e
-            "..##./.#..#/.#.../###../.#.../.#.../.#.../.....", // f
-            "...../...../.####/#...#/#...#/.####/....#/.###.", // g
-            "#..../#..../#.##./##..#/#...#/#...#/#...#/.....", // h
-            "..#../...../.##../..#../..#../..#../.###./.....", // i
-            "...#./...../..##./...#./...#./...#./#..#./.##..", // j
-            "#..../#..../#..#./#.#../##.../#.#../#..#./.....", // k
-            ".##../..#../..#../..#../..#../..#../.###./.....", // l
-            "...../...../##.#./#.#.#/#.#.#/#...#/#...#/.....", // m
-            "...../...../#.##./##..#/#...#/#...#/#...#/.....", // n
-            "...../...../.###./#...#/#...#/#...#/.###./.....", // o
-            "...../...../####./#...#/#...#/####./#..../#....", // p
-            "...../...../.####/#...#/#...#/.####/....#/....#", // q
-            "...../...../#.##./##..#/#..../#..../#..../.....", // r
-            "...../...../.####/#..../.###./....#/####./.....", // s
-            ".#.../.#.../###../.#.../.#.../.#..#/..##./.....", // t
-            "...../...../#...#/#...#/#...#/#..##/.##.#/.....", // u
-            "...../...../#...#/#...#/#...#/.#.#./..#../.....", // v
-            "...../...../#...#/#...#/#.#.#/#.#.#/.#.#./.....", // w
-            "...../...../#...#/.#.#./..#../.#.#./#...#/.....", // x
-            "...../...../#...#/#...#/#...#/.####/....#/.###.", // y
-            "...../...../#####/...#./..#../.#.../#####/.....", // z
-            "...#./..#../..#../.#.../..#../..#../...#./.....", // {
-            "..#../..#../..#../..#../..#../..#../..#../.....", // |
-            ".#.../..#../..#../...#./..#../..#../.#.../.....", // }
-            "...../...../.#.../#.#.#/...#./...../...../.....", // ~
-    };
-
-    private static final int[][] ROWS = new int[LAST - FIRST + 1][8];
     private static final int[] WIDTH = new int[LAST - FIRST + 1];
-    private static final int[] LEFT = new int[LAST - FIRST + 1];
+    private static BufferedImage sheet;
 
     static {
-        if (GLYPHS.length != LAST - FIRST + 1) throw new IllegalStateException("glyph table size " + GLYPHS.length);
-        for (int i = 0; i < GLYPHS.length; i++) {
-            String[] rows = GLYPHS[i].split("/", -1);
-            int minCol = 5, maxCol = -1;
-            for (int r = 0; r < 8; r++) {
-                int bits = 0;
-                for (int c = 0; c < 5; c++) {
-                    if (rows[r].charAt(c) == '#') {
-                        bits |= 1 << c;
-                        minCol = Math.min(minCol, c);
-                        maxCol = Math.max(maxCol, c);
-                    }
-                }
-                ROWS[i][r] = bits;
-            }
-            if (maxCol < 0) {
-                LEFT[i] = 0;
-                WIDTH[i] = 0;
-            } else {
-                LEFT[i] = minCol;
-                WIDTH[i] = maxCol - minCol + 1;
-            }
+        File file = new File("textures/font/ascii.png");
+        try {
+            if (file.isFile()) useSheet(TextureIo.read(file));
+        } catch (IOException | RuntimeException e) {
+            sheet = null;
         }
+    }
+
+    /** Uses {@code img} (128x128, 8x8 cells) as the glyph sheet and measures every glyph; null clears it. */
+    public static synchronized void useSheet(BufferedImage img) {
+        if (img == null || img.getWidth() != SHEET || img.getHeight() != SHEET) {
+            sheet = null;
+            java.util.Arrays.fill(WIDTH, 0);
+            return;
+        }
+        sheet = img;
+        for (int c = FIRST; c <= LAST; c++) {
+            int ox = (c % 16) * CELL, oy = (c / 16) * CELL, widest = 0;
+            for (int y = 0; y < CELL; y++)
+                for (int x = 0; x < CELL; x++)
+                    if ((img.getRGB(ox + x, oy + y) >>> 24) > 0) widest = Math.max(widest, x + 1);
+            WIDTH[c - FIRST] = c == ' ' ? 0 : widest;
+        }
+    }
+
+    public static boolean loaded() {
+        return sheet != null;
     }
 
     public static boolean has(char c) {
@@ -161,6 +69,7 @@ public final class PixelFont {
     /** Horizontal advance in font pixels: width + 1 gap, space and unknown chars = 4. */
     public static int advance(char c) {
         if (!has(c) || c == ' ') return SPACE_ADVANCE;
+        if (sheet == null) return FALLBACK_ADVANCE;
         return WIDTH[c - FIRST] + 1;
     }
 
@@ -171,21 +80,14 @@ public final class PixelFont {
         return w;
     }
 
-    /** True if pixel (x, y) of the left-trimmed glyph is lit. */
+    /** True if pixel (x, y) of the glyph is lit. */
     public static boolean pixel(char c, int x, int y) {
-        if (!has(c) || y < 0 || y >= 8 || x < 0 || x >= WIDTH[c - FIRST]) return false;
-        return ((ROWS[c - FIRST][y] >> (LEFT[c - FIRST] + x)) & 1) != 0;
+        if (sheet == null || !has(c) || y < 0 || y >= CELL || x < 0 || x >= WIDTH[c - FIRST]) return false;
+        return (sheet.getRGB((c % 16) * CELL + x, (c / 16) * CELL + y) >>> 24) > 0;
     }
 
-    /** The 128x128 sheet: glyph for char code c sits left-aligned in cell (c % 16, c / 16). */
+    /** The 128x128 glyph sheet (fully transparent when the font file is missing). */
     public static BufferedImage buildSheet() {
-        BufferedImage img = new BufferedImage(SHEET, SHEET, BufferedImage.TYPE_INT_ARGB);
-        for (int c = FIRST; c <= LAST; c++) {
-            int ox = (c % 16) * CELL, oy = (c / 16) * CELL;
-            for (int y = 0; y < 8; y++)
-                for (int x = 0; x < glyphWidth((char) c); x++)
-                    if (pixel((char) c, x, y)) img.setRGB(ox + x, oy + y, 0xFFFFFFFF);
-        }
-        return img;
+        return sheet != null ? sheet : new BufferedImage(SHEET, SHEET, BufferedImage.TYPE_INT_ARGB);
     }
 }
