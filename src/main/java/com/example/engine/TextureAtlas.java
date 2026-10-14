@@ -294,6 +294,18 @@ public class TextureAtlas {
         return drawTile(tile);
     }
 
+    private final Map<Tile, boolean[]> alphaMasks = new EnumMap<>(Tile.class);
+
+    /** 16x16 row-major (top row first): true where the tile has a visible pixel. Used to extrude flat held items. */
+    public boolean[] alphaMask(Tile tile) {
+        return alphaMasks.computeIfAbsent(tile, t -> {
+            BufferedImage img = loadOrDrawTile(t);
+            boolean[] m = new boolean[TILE_PX * TILE_PX];
+            for (int y = 0; y < TILE_PX; y++) for (int x = 0; x < TILE_PX; x++) m[y * TILE_PX + x] = (img.getRGB(x, y) >>> 24) > 40;
+            return m;
+        });
+    }
+
     private int[] cellOrigin(Tile tile) {
         int col = tile.ordinal() % COLS;
         int row = tile.ordinal() / COLS;

@@ -254,3 +254,15 @@ applies (render distance 12 loaded 441 chunks, 3 loaded 29).
   groups G2-G5 verified), rename `textures/` away. The folders are gitignored.
 - Still missing features (not wrong, not built): offhand slot and player preview, ghost armor icons, regeneration heart bounce (no status
   effects), gold tools/hoes/torch/bucket/bow and their recipes, the remaining unverified numbers listed in `docs/vanilla-rules.md` section 7.
+
+## 6. Fix batch 2 (user-reported bugs)
+
+All verified live (screenshots in `test-output/screenshots/`) and by unit tests where a screenshot cannot show it.
+
+- [x] Pig, cow and chicken skins: real 26.x textures (`*_temperate.png`) load; pig and cow keep the old box layout on a 64x64 canvas.
+- [x] Block-break cracks are black (the supplied crack textures are converted instead of drawn with white highlights).
+- [x] Furnace / crafting-table / inventory arrows have the real shapes (22x15, 22x15, 16x13), measured pixel by pixel from the wiki's GUI images; the unlit flame is not drawn.
+- [x] Tool durability: all 16 tools and sword hits match vanilla (1 per block, sword 2 per block, 1 per mob hit).
+- [x] Fuel: 1 coal = 8 items in furnace, blast furnace and smoker; planks 1.5, sticks 0.5; wooden tools, saplings, crafting tables, chests, bookshelves and mangrove roots burn; progress drains 2 per tick when the fire is out.
+- [x] First-person hand and held items use vanilla's transforms (right-hand anchor 0.56/-0.52/-0.72, attack rotations, tool display transform, held blocks at scale 0.4); flat items are extruded 1/16 thick; the empty hand is the 4x12x4 px arm; the swing lasts 0.3 s; the hand uses the player's FOV.
+- Known approximations: the flat-item yaw is +90 instead of the JSON's -90 (checked visually, see `HeldItemModel.FLAT_YAW`); baby pig/cow/chicken have their own 26.x textures that are not used yet.

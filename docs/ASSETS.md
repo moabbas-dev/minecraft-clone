@@ -184,9 +184,9 @@ changelog via Perplexity, https://www.minecraft.net/en-us/article/minecraft-java
 (`EntityTexture.loadFirst`) looks for the new name first and the old one second; `scripts/restore-assets.py` reports a pair
 as missing only when neither exists.
 
-- `textures/entity/pig/temperate_pig.png` or `textures/entity/pig/pig.png`
-- `textures/entity/cow/temperate_cow.png` or `textures/entity/cow/cow.png`
-- `textures/entity/chicken/temperate_chicken.png` or `textures/entity/chicken.png`
+- `textures/entity/pig/pig_temperate.png`, `textures/entity/pig/temperate_pig.png` or `textures/entity/pig/pig.png`
+- `textures/entity/cow/cow_temperate.png`, `textures/entity/cow/temperate_cow.png` or `textures/entity/cow/cow.png`
+- `textures/entity/chicken/chicken_temperate.png`, `textures/entity/chicken/temperate_chicken.png` or `textures/entity/chicken.png`
 
 The new pig and cow files are larger than 64x32 and may use a different UV layout; the box UVs in `MobModelBuilder` are
 the old layout divided by the real file size, so the first look at the real files decides whether they need re-mapping.

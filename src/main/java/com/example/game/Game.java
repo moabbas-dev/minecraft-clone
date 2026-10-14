@@ -85,7 +85,7 @@ public class Game implements GameAccess {
     private static final float RAIN_FALL_SPEED = 12f;
     private static final float SPRINT_FOV_BOOST = 5f;
     private static final float FOV_LERP_RATE = 9f;
-    private static final float SWING_DURATION = 0.28f;
+    private static final float SWING_DURATION = 0.3f; // vanilla: 6 ticks
 
     // Biome atmosphere: how strongly the biome's own fog tint nudges the time-of-day sky color
     // (see BiomeColors - these are deliberately subtle mood tints, not a sky repaint), how far
@@ -2044,7 +2044,8 @@ public class Game implements GameAccess {
         ItemStack heldStack = inventory.selected();
         glClear(GL_DEPTH_BUFFER_BIT);
 
-        Matrix4f vmProjection = new Matrix4f().perspective((float) Math.toRadians(50f), window.aspectRatio(), 0.05f, 10f);
+        // Vanilla draws the hand with the player's field of view; the transforms below are vanilla's ItemInHandRenderer ones.
+        Matrix4f vmProjection = new Matrix4f().perspective((float) Math.toRadians(options.fov), window.aspectRatio(), 0.05f, 20f);
         Matrix4f vmView = new Matrix4f();
 
         float bobPhase = player.getBobPhase();
@@ -2052,41 +2053,22 @@ public class Game implements GameAccess {
         float bobX = (float) Math.sin(bobPhase) * bobAmount * 0.6f;
         float bobY = (float) Math.abs(Math.sin(bobPhase * 2f)) * bobAmount * 0.5f;
 
-        float swingArc = swingTimer > 0f ? (float) Math.sin((1f - swingTimer / SWING_DURATION) * Math.PI) : 0f;
+        // 0..1 progress through the swing (vanilla's attackAnim); 0 when idle
+        float swing = swingTimer > 0f ? 1f - swingTimer / SWING_DURATION : 0f;
 
         float[] verts;
         Matrix4f model;
         if (heldStack.isEmpty()) {
-            // Nothing selected: the player's bare arm, reaching in from the lower right and
-            // swinging on break/place exactly like a held block does.
+            // Nothing in the hand: the bare 4x12x4 px arm, the only time vanilla draws the arm.
             verts = armVerts();
-            model = new Matrix4f()
-                    .translate(0.5f + bobX, -0.55f - bobY - swingArc * 0.14f, -1.05f - swingArc * 0.3f)
-                    .rotateY((float) Math.toRadians(12f - swingArc * 20f))
-                    .rotateX((float) Math.toRadians(22f + swingArc * 30f));
+            model = HeldItemModel.emptyArm(swing);
         } else {
             BlockType held = heldStack.type();
-            // Saplings (and any future cross/plant block) are a thin flat cross in-world, never a
-            // cube (see ChunkMeshBuilder.emitCrossPlant) - held in hand, they were rendering as the
-            // same solid cube every other block gets.
-            boolean flatItem = ChunkMeshBuilder.isFlatIconItem(held) && !ChunkMeshBuilder.isCrossShapedPlant(held);
-            verts = flatItem ? buildFlatItemHeldVerts(held)
-                    : ChunkMeshBuilder.isFlatIconItem(held) ? buildCrossPlantHeldVerts(held) : buildHeldItemVerts(held);
-            model = flatItem
-                    // Tools/food/ingots: one mirrored sprite plane held diagonally in the right hand
-                    // (handle toward the hand, head up and away), like vanilla's first-person item.
-                    ? new Matrix4f()
-                    .translate(0.3f + bobX, -0.2f - bobY - swingArc * 0.1f, -0.7f - swingArc * 0.2f)
-                    .rotateY((float) Math.toRadians(-25f + swingArc * 20f))
-                    .rotateX((float) Math.toRadians(5f - swingArc * 55f))
-                    .rotateZ((float) Math.toRadians(-4f))
-                    .scale(0.26f)
-                    : new Matrix4f()
-                    .translate(0.62f + bobX, -0.52f - bobY - swingArc * 0.12f, -1.1f - swingArc * 0.25f)
-                    .rotateY((float) Math.toRadians(28f - swingArc * 35f))
-                    .rotateX((float) Math.toRadians(-12f - swingArc * 25f))
-                    .scale(0.5f);
+            boolean flat = ChunkMeshBuilder.isFlatIconItem(held);
+            verts = heldMeshCache.computeIfAbsent(held, h -> flat ? buildFlatItemHeldVerts(h) : buildHeldItemVerts(h));
+            model = flat ? HeldItemModel.flatItem(swing) : HeldItemModel.block(swing);
         }
+        model = new Matrix4f().translate(bobX * 0.5f, -bobY * 0.5f, 0f).mul(model);
 
         chunkShader.setUniform("uProjection", vmProjection);
         chunkShader.setUniform("uView", vmView);
@@ -2101,13 +2083,11 @@ public class Game implements GameAccess {
 
     private float[] armVertsCache;
 
-    /** The bare-hand arm: a long thin box in skin tone, built once (its motion comes from the model matrix). */
+    private final java.util.Map<BlockType, float[]> heldMeshCache = new java.util.EnumMap<>(BlockType.class);
+
+    /** The bare-hand arm: the 4x12x4 px player arm in skin tone, built once (its motion comes from the model matrix). */
     private float[] armVerts() {
-        if (armVertsCache == null) {
-            float[] v = new float[ItemModelBuilder.BOX_VERTICES * ItemModelBuilder.FLOATS_PER_VERTEX];
-            ItemModelBuilder.emitBox(v, 0, 0.1f, 0.1f, 0.6f, atlas.getUv(Tile.SKIN), NEUTRAL_ICON_TINT);
-            armVertsCache = v;
-        }
+        if (armVertsCache == null) armVertsCache = HeldItemModel.armBox(atlas.getUv(Tile.SKIN));
         return armVertsCache;
     }
 
@@ -2150,25 +2130,8 @@ public class Game implements GameAccess {
      *  leaf, not the grass block), so this always uses the neutral tint. */
     /** A single sprite plane (front + back), U mirrored so a tool's head points away from the hand. */
     private float[] buildFlatItemHeldVerts(BlockType block) {
-        float[] uv = atlas.getUv(textureMap.facesFor(block).side());
-        float[] mirrored = {uv[2], uv[1], uv[0], uv[3]};
-        float[] verts = new float[6 * 11];
-        // Front face only: a second, back-facing copy showed through the sprite's transparent pixels
-        // as a ghost of the item flipped horizontally.
-        emitCubeFace(verts, 0, new float[]{-0.5f, -0.5f, 0f}, new float[]{0.5f, -0.5f, 0f},
-                new float[]{0.5f, 0.5f, 0f}, new float[]{-0.5f, 0.5f, 0f}, mirrored, 1f, NEUTRAL_ICON_TINT);
-        return verts;
-    }
-
-    private float[] buildCrossPlantHeldVerts(BlockType block) {
-        float[] uv = atlas.getUv(textureMap.facesFor(block).side());
-        float[] verts = new float[2 * 6 * 11];
-        int idx = 0;
-        idx = emitCubeFace(verts, idx, new float[]{-0.5f, -0.5f, -0.5f}, new float[]{0.5f, -0.5f, 0.5f},
-                new float[]{0.5f, 0.5f, 0.5f}, new float[]{-0.5f, 0.5f, -0.5f}, uv, 1f, NEUTRAL_ICON_TINT);
-        idx = emitCubeFace(verts, idx, new float[]{0.5f, -0.5f, -0.5f}, new float[]{-0.5f, -0.5f, 0.5f},
-                new float[]{-0.5f, 0.5f, 0.5f}, new float[]{0.5f, 0.5f, -0.5f}, uv, 1f, NEUTRAL_ICON_TINT);
-        return verts;
+        Tile tile = textureMap.facesFor(block).side();
+        return HeldItemModel.extrudedSprite(atlas.alphaMask(tile), atlas.getUv(tile));
     }
 
     private int emitCubeFace(float[] arr, int idx, float[] p0, float[] p1, float[] p2, float[] p3, float[] uv, float shade, float[] tint) {
