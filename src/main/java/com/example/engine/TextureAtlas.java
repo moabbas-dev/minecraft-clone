@@ -373,6 +373,8 @@ public class TextureAtlas {
     // ---------- procedural drawing ----------
 
     private BufferedImage drawTile(Tile tile) {
+        BufferedImage icon = ItemIcons.draw(tile); // original pixel-art item icons
+        if (icon != null) return icon;
         BufferedImage img = new BufferedImage(TILE_PX, TILE_PX, BufferedImage.TYPE_INT_ARGB);
         Random rnd = new Random(tile.ordinal() * 7919L + 13);
         Graphics2D g = img.createGraphics();

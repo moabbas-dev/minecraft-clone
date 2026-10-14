@@ -134,88 +134,88 @@ Columns: stack size, durability, mining/drop result, icon. Icon status refers to
 | Mud (`MUD`) | block | 64 |  | 0.5 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
 | Mangrove Roots (`MANGROVE_ROOTS`) | block | 64 |  | 0.7 [U] | wrong: noise fill, no vanilla pattern | [ ] |  |
 | Oak Sapling (`OAK_SAPLING_STAGE_0`) | block | 64 |  | 0 [U] | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Stick (`STICK`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
-| Wooden Pickaxe (`WOODEN_PICKAXE`) | item | 1 | 59 | item | wrong: placeholder shape | [ ] |  |
-| Stone Pickaxe (`STONE_PICKAXE`) | item | 1 | 131 | item | wrong: placeholder shape | [ ] |  |
-| Iron Pickaxe (`IRON_PICKAXE`) | item | 1 | 250 | item | wrong: placeholder shape | [ ] |  |
-| Wooden Axe (`WOODEN_AXE`) | item | 1 | 59 | item | wrong: placeholder shape | [ ] |  |
-| Stone Axe (`STONE_AXE`) | item | 1 | 131 | item | wrong: placeholder shape | [ ] |  |
-| Iron Axe (`IRON_AXE`) | item | 1 | 250 | item | wrong: placeholder shape | [ ] |  |
-| Wooden Shovel (`WOODEN_SHOVEL`) | item | 1 | 59 | item | wrong: placeholder shape | [ ] |  |
-| Stone Shovel (`STONE_SHOVEL`) | item | 1 | 131 | item | wrong: placeholder shape | [ ] |  |
-| Iron Shovel (`IRON_SHOVEL`) | item | 1 | 250 | item | wrong: placeholder shape | [ ] |  |
-| Apple (`APPLE`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
-| Bread (`BREAD`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
-| Cooked Beef (`COOKED_BEEF`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
+| Stick (`STICK`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Wooden Pickaxe (`WOODEN_PICKAXE`) | item | 1 | 59 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Stone Pickaxe (`STONE_PICKAXE`) | item | 1 | 131 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Iron Pickaxe (`IRON_PICKAXE`) | item | 1 | 250 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Wooden Axe (`WOODEN_AXE`) | item | 1 | 59 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Stone Axe (`STONE_AXE`) | item | 1 | 131 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Iron Axe (`IRON_AXE`) | item | 1 | 250 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Wooden Shovel (`WOODEN_SHOVEL`) | item | 1 | 59 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Stone Shovel (`STONE_SHOVEL`) | item | 1 | 131 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Iron Shovel (`IRON_SHOVEL`) | item | 1 | 250 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Apple (`APPLE`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Bread (`BREAD`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Cooked Beef (`COOKED_BEEF`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
 | Blast Furnace (`BLAST_FURNACE`) | block | 64 |  | 3.5 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
 | Smoker (`SMOKER`) | block | 64 |  | 3.5 [U] | wrong: noise fill, no vanilla pattern | [ ] |  |
 | Copper Ore (`COPPER_ORE`) | block | 64 |  | 3 [U] | wrong: noise fill, no vanilla pattern | [ ] | drops raw item (G1) |
 | Smooth Stone (`SMOOTH_STONE`) | block | 64 |  | 2 [U] | wrong: noise fill, no vanilla pattern | [ ] |  |
-| Coal (`COAL`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
-| Charcoal (`CHARCOAL`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
-| Iron Ingot (`IRON_INGOT`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
-| Gold Ingot (`GOLD_INGOT`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
-| Copper Ingot (`COPPER_INGOT`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
-| Iron Nugget (`IRON_NUGGET`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
-| Brick (`BRICK`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
-| Raw Iron (`RAW_IRON`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
-| Raw Gold (`RAW_GOLD`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
-| Raw Copper (`RAW_COPPER`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
-| Raw Beef (`RAW_BEEF`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
-| Raw Porkchop (`RAW_PORKCHOP`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
-| Cooked Porkchop (`COOKED_PORKCHOP`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
-| Raw Chicken (`RAW_CHICKEN`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
-| Cooked Chicken (`COOKED_CHICKEN`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
-| Raw Mutton (`RAW_MUTTON`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
-| Cooked Mutton (`COOKED_MUTTON`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
-| Raw Rabbit (`RAW_RABBIT`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
-| Cooked Rabbit (`COOKED_RABBIT`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
-| Raw Cod (`COD`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
-| Cooked Cod (`COOKED_COD`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
-| Raw Salmon (`SALMON`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
-| Cooked Salmon (`COOKED_SALMON`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
-| Potato (`POTATO`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
-| Baked Potato (`BAKED_POTATO`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
-| Kelp (`KELP`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
-| Dried Kelp (`DRIED_KELP`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
-| Rotten Flesh (`ROTTEN_FLESH`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
-| Wooden Sword (`WOODEN_SWORD`) | item | 1 | 59 | item | wrong: placeholder shape | [ ] |  |
-| Stone Sword (`STONE_SWORD`) | item | 1 | 131 | item | wrong: placeholder shape | [ ] |  |
-| Iron Sword (`IRON_SWORD`) | item | 1 | 250 | item | wrong: placeholder shape | [ ] |  |
-| Leather (`LEATHER`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
-| Feather (`FEATHER`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
-| Egg (`EGG`) | item | 16 |  | item | wrong: placeholder shape | [ ] | stack 16 fixed (G1) |
-| Leather Cap (`LEATHER_HELMET`) | item | 1 | 55 | item | wrong: placeholder shape | [ ] |  |
-| Leather Tunic (`LEATHER_CHESTPLATE`) | item | 1 | 80 | item | wrong: placeholder shape | [ ] |  |
-| Leather Pants (`LEATHER_LEGGINGS`) | item | 1 | 75 | item | wrong: placeholder shape | [ ] |  |
-| Leather Boots (`LEATHER_BOOTS`) | item | 1 | 65 | item | wrong: placeholder shape | [ ] |  |
-| Iron Helmet (`IRON_HELMET`) | item | 1 | 165 | item | wrong: placeholder shape | [ ] |  |
-| Iron Chestplate (`IRON_CHESTPLATE`) | item | 1 | 240 | item | wrong: placeholder shape | [ ] |  |
-| Iron Leggings (`IRON_LEGGINGS`) | item | 1 | 225 | item | wrong: placeholder shape | [ ] |  |
-| Iron Boots (`IRON_BOOTS`) | item | 1 | 195 | item | wrong: placeholder shape | [ ] |  |
-| Golden Helmet (`GOLD_HELMET`) | item | 1 | 77 | item | wrong: placeholder shape | [ ] |  |
-| Golden Chestplate (`GOLD_CHESTPLATE`) | item | 1 | 112 | item | wrong: placeholder shape | [ ] |  |
-| Golden Leggings (`GOLD_LEGGINGS`) | item | 1 | 105 | item | wrong: placeholder shape | [ ] |  |
-| Golden Boots (`GOLD_BOOTS`) | item | 1 | 91 | item | wrong: placeholder shape | [ ] |  |
-| Diamond (`DIAMOND`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
-| Diamond Sword (`DIAMOND_SWORD`) | item | 1 | 1561 | item | wrong: placeholder shape | [ ] |  |
-| Diamond Axe (`DIAMOND_AXE`) | item | 1 | 1561 | item | wrong: placeholder shape | [ ] |  |
-| Diamond Pickaxe (`DIAMOND_PICKAXE`) | item | 1 | 1561 | item | wrong: placeholder shape | [ ] |  |
-| Diamond Shovel (`DIAMOND_SHOVEL`) | item | 1 | 1561 | item | wrong: placeholder shape | [ ] |  |
-| Diamond Helmet (`DIAMOND_HELMET`) | item | 1 | 363 | item | wrong: placeholder shape | [ ] |  |
-| Diamond Chestplate (`DIAMOND_CHESTPLATE`) | item | 1 | 528 | item | wrong: placeholder shape | [ ] |  |
-| Diamond Leggings (`DIAMOND_LEGGINGS`) | item | 1 | 495 | item | wrong: placeholder shape | [ ] |  |
-| Diamond Boots (`DIAMOND_BOOTS`) | item | 1 | 429 | item | wrong: placeholder shape | [ ] |  |
-| Flint (`FLINT`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
-| Clay Ball (`CLAY_BALL`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
-| Snowball (`SNOWBALL`) | item | 16 |  | item | wrong: placeholder shape | [ ] | stack 16 fixed (G1) |
-| Glowstone Dust (`GLOWSTONE_DUST`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
-| Book (`BOOK`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
-| Gunpowder (`GUNPOWDER`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
-| Bone (`BONE`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
-| Arrow (`ARROW`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
-| String (`STRING`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
-| Spider Eye (`SPIDER_EYE`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
+| Coal (`COAL`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Charcoal (`CHARCOAL`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Iron Ingot (`IRON_INGOT`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Gold Ingot (`GOLD_INGOT`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Copper Ingot (`COPPER_INGOT`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Iron Nugget (`IRON_NUGGET`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Brick (`BRICK`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Raw Iron (`RAW_IRON`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Raw Gold (`RAW_GOLD`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Raw Copper (`RAW_COPPER`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Raw Beef (`RAW_BEEF`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Raw Porkchop (`RAW_PORKCHOP`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Cooked Porkchop (`COOKED_PORKCHOP`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Raw Chicken (`RAW_CHICKEN`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Cooked Chicken (`COOKED_CHICKEN`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Raw Mutton (`RAW_MUTTON`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Cooked Mutton (`COOKED_MUTTON`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Raw Rabbit (`RAW_RABBIT`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Cooked Rabbit (`COOKED_RABBIT`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Raw Cod (`COD`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Cooked Cod (`COOKED_COD`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Raw Salmon (`SALMON`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Cooked Salmon (`COOKED_SALMON`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Potato (`POTATO`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Baked Potato (`BAKED_POTATO`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Kelp (`KELP`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Dried Kelp (`DRIED_KELP`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Rotten Flesh (`ROTTEN_FLESH`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Wooden Sword (`WOODEN_SWORD`) | item | 1 | 59 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Stone Sword (`STONE_SWORD`) | item | 1 | 131 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Iron Sword (`IRON_SWORD`) | item | 1 | 250 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Leather (`LEATHER`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Feather (`FEATHER`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Egg (`EGG`) | item | 16 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. stack 16 fixed (G1) |
+| Leather Cap (`LEATHER_HELMET`) | item | 1 | 55 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Leather Tunic (`LEATHER_CHESTPLATE`) | item | 1 | 80 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Leather Pants (`LEATHER_LEGGINGS`) | item | 1 | 75 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Leather Boots (`LEATHER_BOOTS`) | item | 1 | 65 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Iron Helmet (`IRON_HELMET`) | item | 1 | 165 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Iron Chestplate (`IRON_CHESTPLATE`) | item | 1 | 240 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Iron Leggings (`IRON_LEGGINGS`) | item | 1 | 225 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Iron Boots (`IRON_BOOTS`) | item | 1 | 195 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Golden Helmet (`GOLD_HELMET`) | item | 1 | 77 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Golden Chestplate (`GOLD_CHESTPLATE`) | item | 1 | 112 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Golden Leggings (`GOLD_LEGGINGS`) | item | 1 | 105 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Golden Boots (`GOLD_BOOTS`) | item | 1 | 91 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Diamond (`DIAMOND`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Diamond Sword (`DIAMOND_SWORD`) | item | 1 | 1561 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Diamond Axe (`DIAMOND_AXE`) | item | 1 | 1561 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Diamond Pickaxe (`DIAMOND_PICKAXE`) | item | 1 | 1561 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Diamond Shovel (`DIAMOND_SHOVEL`) | item | 1 | 1561 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Diamond Helmet (`DIAMOND_HELMET`) | item | 1 | 363 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Diamond Chestplate (`DIAMOND_CHESTPLATE`) | item | 1 | 528 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Diamond Leggings (`DIAMOND_LEGGINGS`) | item | 1 | 495 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Diamond Boots (`DIAMOND_BOOTS`) | item | 1 | 429 | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Flint (`FLINT`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Clay Ball (`CLAY_BALL`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Snowball (`SNOWBALL`) | item | 16 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. stack 16 fixed (G1) |
+| Glowstone Dust (`GLOWSTONE_DUST`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Book (`BOOK`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Gunpowder (`GUNPOWDER`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Bone (`BONE`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Arrow (`ARROW`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| String (`STRING`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
+| Spider Eye (`SPIDER_EYE`) | item | 64 | | item | original pixel art | [x] | G3 live (inventory + hotbar), unit ItemIconsTest. |
 
 ### Items and blocks vanilla has that the clone lacks (missing, tracked, not all will be built)
 
