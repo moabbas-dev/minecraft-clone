@@ -25,9 +25,14 @@ public class WorldIO {
      *  doesn't depend on the {@code survival} package, so it hands back plain numbers, not a
      *  {@code PlayerSurvival}/{@code HealthComponent}/{@code HungerComponent} instance). */
     public record LoadedMeta(long seed, WorldSettings settings, Vector3f playerPos, float dayTime, int selectedIndex,
-                             Inventory inventory, SurvivalSnapshot survival) {
+                             Inventory inventory, SurvivalSnapshot survival, long dayCount) {
+        public LoadedMeta(long seed, WorldSettings settings, Vector3f playerPos, float dayTime, int selectedIndex,
+                          Inventory inventory, SurvivalSnapshot survival) {
+            this(seed, settings, playerPos, dayTime, selectedIndex, inventory, survival, 0L);
+        }
+
         public LoadedMeta(long seed, WorldSettings settings, Vector3f playerPos, float dayTime, int selectedIndex) {
-            this(seed, settings, playerPos, dayTime, selectedIndex, null, null);
+            this(seed, settings, playerPos, dayTime, selectedIndex, null, null, 0L);
         }
     }
 
@@ -40,6 +45,8 @@ public class WorldIO {
     private static final int INVENTORY_MAGIC = 0x494E5601;
     /** Marks the optional survival (difficulty + health/hunger) section appended after that. */
     private static final int SURVIVAL_MAGIC = 0x53555256;
+    /** Marks the optional day counter (whole days since the world began, for the moon phase) appended last. */
+    private static final int DAY_MAGIC = 0x44415901;
 
     public static String sanitizeFolderName(String name) {
         String cleaned = name.trim().replaceAll("[\\\\/:*?\"<>|]", "_");
@@ -78,6 +85,11 @@ public class WorldIO {
      *  than each getting their own ad-hoc appended field. */
     public static void saveMeta(File dir, WorldSettings settings, long seed, float px, float py, float pz, float dayTime,
                                 int selectedIndex, Inventory inventory, SurvivalSnapshot survival) {
+        saveMeta(dir, settings, seed, px, py, pz, dayTime, selectedIndex, inventory, survival, 0L);
+    }
+
+    public static void saveMeta(File dir, WorldSettings settings, long seed, float px, float py, float pz, float dayTime,
+                                int selectedIndex, Inventory inventory, SurvivalSnapshot survival, long dayCount) {
         dir.mkdirs();
         try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(new File(dir, "world.dat"))))) {
             out.writeLong(seed);
@@ -99,6 +111,10 @@ public class WorldIO {
                 out.writeFloat(survival.foodLevel());
                 out.writeFloat(survival.saturation());
                 out.writeFloat(survival.exhaustion());
+            }
+            if (dayCount > 0) {
+                out.writeInt(DAY_MAGIC);
+                out.writeLong(dayCount);
             }
         } catch (IOException e) {
             System.err.println("Failed to save world metadata: " + e.getMessage());
@@ -150,20 +166,26 @@ public class WorldIO {
             Inventory inventory = null;
             Difficulty difficulty = Difficulty.NORMAL;
             SurvivalSnapshot survival = null;
-            try { // absent in saves from before inventories existed - just end-of-file, not an error
-                if (in.readInt() == INVENTORY_MAGIC) inventory = Inventory.read(in);
-            } catch (EOFException ignored) {
-                // old-format save: no inventory section
-            }
-            try { // absent in saves from before health/hunger existed - same "just EOF" tolerance
-                if (in.readInt() == SURVIVAL_MAGIC) {
-                    difficulty = Difficulty.values()[in.readInt()];
-                    survival = new SurvivalSnapshot(in.readFloat(), in.readFloat(), in.readFloat(), in.readFloat());
+            long dayCount = 0L;
+            try { // optional trailing sections, each introduced by a magic number; saves from before one existed just end earlier
+                boolean more = true;
+                while (more) {
+                    int magic = in.readInt();
+                    if (magic == INVENTORY_MAGIC) {
+                        inventory = Inventory.read(in);
+                    } else if (magic == SURVIVAL_MAGIC) {
+                        difficulty = Difficulty.values()[in.readInt()];
+                        survival = new SurvivalSnapshot(in.readFloat(), in.readFloat(), in.readFloat(), in.readFloat());
+                    } else if (magic == DAY_MAGIC) {
+                        dayCount = in.readLong();
+                    } else {
+                        more = false;
+                    }
                 }
             } catch (EOFException ignored) {
-                // old-format save: no survival section
+                // the end of the file: no further sections
             }
-            return new LoadedMeta(seed, new WorldSettings(name, type, difficulty), new Vector3f(px, py, pz), dayTime, selectedIndex, inventory, survival);
+            return new LoadedMeta(seed, new WorldSettings(name, type, difficulty), new Vector3f(px, py, pz), dayTime, selectedIndex, inventory, survival, dayCount);
         } catch (IOException e) {
             System.err.println("Failed to load world metadata from " + dir + ": " + e.getMessage());
             return null;

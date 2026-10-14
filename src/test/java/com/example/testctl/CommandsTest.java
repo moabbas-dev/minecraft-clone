@@ -37,6 +37,7 @@ class CommandsTest {
         int useCalls;
     int dropCalls;
     int swapCalls;
+    long day = -1;
     boolean dropWhole;
         Double lookX, lookY, lookZ;
         boolean throwOnLook;
@@ -128,6 +129,11 @@ class CommandsTest {
         @Override
         public void useItem() {
             useCalls++;
+        }
+
+        @Override
+        public void setDay(long day) {
+            this.day = day;
         }
 
         @Override
@@ -518,6 +524,12 @@ class CommandsTest {
         commands.execute("useItem", params());
         commands.execute("useItem", params());
         assertEquals(2, fake.useCalls);
+    }
+
+    @Test
+    void setTimeAcceptsAnOptionalDay() {
+        commands.execute("setTime", params("time", "0.5", "day", "3"));
+        assertEquals(3L, fake.day);
     }
 
     @Test

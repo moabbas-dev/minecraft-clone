@@ -76,7 +76,12 @@ public class Game implements GameAccess {
     /** Full day/night cycle length: vanilla's 1200 s (20 min). */
     private static final float DAY_LENGTH_SECONDS = 1200f; // vanilla: 24000 ticks = 20 minutes
     private static final float CELESTIAL_DISTANCE = 180f;
-    private static final float CELESTIAL_SIZE = 28f;
+    /** Vanilla's quads are 60 (sun) and 40 (moon) blocks wide at a distance of 100; these keep the same angular size at {@link #CELESTIAL_DISTANCE}. */
+    private static final float SUN_HALF_SIZE = 30f * CELESTIAL_DISTANCE / 100f;
+    private static final float MOON_HALF_SIZE = 20f * CELESTIAL_DISTANCE / 100f;
+    /** The moon sprite per phase index 0..7 (vanilla order). */
+    private static final String[] MOON_PHASE_TEXTURES = {"full_moon", "waning_gibbous", "third_quarter", "waning_crescent",
+            "new_moon", "waxing_crescent", "first_quarter", "waxing_gibbous"};
     /** Vanilla draws rain in the (2 x radius + 1)^2 block columns around the camera: 10 on Fancy graphics. */
     private static final int RAIN_COLUMN_RADIUS = 10;
     private static final float SPRINT_FOV_BOOST = 5f;
@@ -177,6 +182,8 @@ public class Game implements GameAccess {
     private double titleTimer = 0;
     /** 0=midnight, 0.25=sunrise, 0.5=noon, 0.75=sunset. */
     private float dayTime = 0.5f;
+    /** Whole days elapsed since the world began (the moon phase cycles every 8 of them). */
+    private long dayCount;
     private final GameOptions options = GameOptions.load(GameOptions.DEFAULT_FILE);
     private GuiEnv guiEnv;
     private McScreen optionsScreen;
@@ -231,6 +238,8 @@ public class Game implements GameAccess {
     /** 0 = hand fully lowered, 1 = fully raised; drives the equip animation. */
     private float equipRaised;
     private final java.util.Set<String> missingTextures = new java.util.HashSet<>();
+    /** Real texture files loaded on demand by {@link #realTexture} (kept apart from the mob skins, which load as a set). */
+    private final java.util.Map<String, com.example.engine.EntityTexture> realTextures = new java.util.HashMap<>();
     private final com.example.fx.SpriteParticles critParticles =
             new com.example.fx.SpriteParticles(com.example.fx.SpriteParticles.Kind.CRIT, new java.util.Random());
     private final com.example.fx.SpriteParticles damageParticles =
@@ -420,6 +429,7 @@ public class Game implements GameAccess {
         currentSettings = settings;
         world.setSaveDir(WorldIO.worldDir(currentWorldFolder));
         dayTime = 0.3f; // fresh worlds start shortly after sunrise
+        dayCount = 0L;
 
         saplingGrowth = new SaplingGrowth(seed);
         cookingStations = new CookingStationManager(); // fresh world: nothing to restore
@@ -480,6 +490,7 @@ public class Game implements GameAccess {
         currentWorldFolder = saved.folderName();
         currentSettings = meta.settings();
         dayTime = meta.dayTime();
+        dayCount = meta.dayCount();
 
         saplingGrowth = new SaplingGrowth(meta.seed());
         cookingStations = new CookingStationManager();
@@ -539,7 +550,7 @@ public class Game implements GameAccess {
                 survival.getHealth().getCurrentHealth(), survival.getHunger().getFoodLevel(),
                 survival.getHunger().getSaturation(), survival.getHunger().getExhaustion());
         WorldIO.saveMeta(dir, currentSettings, world.seed, player.position.x, player.position.y, player.position.z,
-                dayTime, inventory.getSelectedSlot(), inventory, survivalSnapshot);
+                dayTime, inventory.getSelectedSlot(), inventory, survivalSnapshot, dayCount);
         for (Chunk c : world.chunkMap().values()) {
             if (c.isGenerated()) WorldIO.saveChunk(dir, c);
         }
@@ -849,7 +860,9 @@ public class Game implements GameAccess {
         }
 
         dayTime += dt / DAY_LENGTH_SECONDS;
-        dayTime -= (float) Math.floor(dayTime);
+        float wholeDays = (float) Math.floor(dayTime);
+        dayCount += (long) wholeDays;
+        dayTime -= wholeDays;
         weather.update(dt);
         rainTime += dt;
         saplingGrowth.update(world, dt);
@@ -1347,7 +1360,7 @@ public class Game implements GameAccess {
         float cx = box.x() + box.w() / 2f, cy = box.y() + box.h() / 2f;
         float xAngle = (float) Math.atan((cx - mx) / (40f * s)), yAngle = (float) Math.atan((cy - my) / (40f * s));
         PlayerModelBuilder.Pose pose = new PlayerModelBuilder.Pose((float) Math.PI + xAngle * (float) Math.toRadians(20),
-                xAngle * (float) Math.toRadians(20), -yAngle * (float) Math.toRadians(20));
+                xAngle * (float) Math.toRadians(20), -yAngle * (float) Math.toRadians(20), (System.nanoTime() / 50_000_000L) % 1_000_000L);
 
         float k = 30f * s; // pixels per block
         float height = 1.8f;
@@ -1393,9 +1406,23 @@ public class Game implements GameAccess {
                 if (overlay != null) drawPreviewLayer(overlay, PlayerModelBuilder.emitArmor(mobScratch, 0, pose, slot, 1f));
             }
         }
+        drawPreviewHeldItem(model, pose, inventory.selected(), false);
+        drawPreviewHeldItem(model, pose, inventory.getOffhand(), true);
         glDisable(GL_DEPTH_TEST);
         chunkShader.unbind();
         uiRenderer.begin(window.getWidth(), window.getHeight());
+    }
+
+    /** The item in one of the preview player's hands, drawn from the block atlas with the same meshes as the first-person view. */
+    private void drawPreviewHeldItem(Matrix4f preview, PlayerModelBuilder.Pose pose, ItemStack stack, boolean left) {
+        if (stack.isEmpty()) return;
+        BlockType type = stack.type();
+        boolean flat = ChunkMeshBuilder.isFlatIconItem(type);
+        float[] verts = heldMeshCache.computeIfAbsent(type, h -> flat ? buildFlatItemHeldVerts(h) : buildHeldItemVerts(h));
+        chunkShader.setUniform("uModel", new Matrix4f(preview).mul(PlayerModelBuilder.handItemMatrix(pose, left, flat)));
+        atlas.bind(0);
+        heldItemMesh.upload(verts);
+        heldItemMesh.draw();
     }
 
     private void drawPreviewLayer(com.example.engine.EntityTexture texture, int floats) {
@@ -1867,22 +1894,39 @@ public class Game implements GameAccess {
             int bx = (int) Math.floor(e.position.x), by = (int) Math.floor(cy), bz = (int) Math.floor(e.position.z);
             float sky = world.getSkyLight(bx, by, bz) / 15f;
             float blk = world.getBlockLight(bx, by, bz) / 15f;
-            if (m.cross()) {
-                float[] sprite = heldMeshCache.computeIfAbsent(e.getType(), this::buildFlatItemHeldVerts);
-                if (n + sprite.length > itemScratch.length) {
-                    flushItems(n);
-                    n = 0;
+            int copies = renderCopies(e.getCount());
+            java.util.Random spread = new java.util.Random(System.identityHashCode(e));
+            for (int c = 0; c < copies; c++) {
+                // later copies are nudged by a small fixed random offset so a stack reads as a pile
+                float ox = c == 0 ? 0f : (spread.nextFloat() * 2f - 1f) * 0.15f * 0.5f;
+                float oy = c == 0 ? 0f : (spread.nextFloat() * 2f - 1f) * 0.15f * 0.25f;
+                float oz = c == 0 ? 0f : (spread.nextFloat() * 2f - 1f) * 0.15f * 0.5f;
+                if (m.cross()) {
+                    float[] sprite = heldMeshCache.computeIfAbsent(e.getType(), this::buildFlatItemHeldVerts);
+                    if (n + sprite.length > itemScratch.length) {
+                        flushItems(n);
+                        n = 0;
+                    }
+                    n = ItemModelBuilder.emitSprite(itemScratch, n, sprite, e.position.x + ox, cy + oy, e.position.z + oz, 0.5f, cos, sin, sky, blk);
+                } else {
+                    if (n + ItemModelBuilder.MAX_FLOATS_PER_ITEM > itemScratch.length) {
+                        flushItems(n);
+                        n = 0;
+                    }
+                    n = ItemModelBuilder.emitCube(itemScratch, n, e.position.x + ox, cy + oy, e.position.z + oz, half, cos, sin, m, sky, blk);
                 }
-                n = ItemModelBuilder.emitSprite(itemScratch, n, sprite, e.position.x, cy, e.position.z, 0.5f, cos, sin, sky, blk);
-            } else {
-                if (n + ItemModelBuilder.MAX_FLOATS_PER_ITEM > itemScratch.length) {
-                    flushItems(n);
-                    n = 0;
-                }
-                n = ItemModelBuilder.emitCube(itemScratch, n, e.position.x, cy, e.position.z, half, cos, sin, m, sky, blk);
             }
         }
         flushItems(n);
+    }
+
+    /** How many copies of the model a dropped stack is drawn with (vanilla's ItemEntityRenderer.getRenderAmount). */
+    static int renderCopies(int count) {
+        if (count <= 1) return 1;
+        if (count <= 16) return 2;
+        if (count <= 32) return 3;
+        if (count <= 48) return 4;
+        return 5;
     }
 
     private void flushItems(int floats) {
@@ -1945,7 +1989,14 @@ public class Game implements GameAccess {
             mobSkins.put("chicken", com.example.engine.EntityTexture.loadFirst(
                     new String[]{"textures/entity/chicken/chicken_temperate.png", "textures/entity/chicken/temperate_chicken.png", "textures/entity/chicken.png"},
                     64, 32, 0xF0F0F0));
-            for (String species : new String[]{"pig", "cow", "chicken"}) {
+            // 26.x gives the baby pig, cow and chicken their own textures (and models).
+            mobSkins.put("pig_baby", com.example.engine.EntityTexture.loadFirst(
+                    new String[]{"textures/entity/pig/pig_temperate_baby.png"}, 32, 32, 0xECA0A0));
+            mobSkins.put("cow_baby", com.example.engine.EntityTexture.loadFirst(
+                    new String[]{"textures/entity/cow/cow_temperate_baby.png"}, 64, 64, 0x694628));
+            mobSkins.put("chicken_baby", com.example.engine.EntityTexture.loadFirst(
+                    new String[]{"textures/entity/chicken/chicken_temperate_baby.png"}, 16, 16, 0xF0F0F0));
+            for (String species : new String[]{"pig", "cow", "chicken", "pig_baby", "cow_baby", "chicken_baby"}) {
                 MobModelBuilder.setSkinSize(species, mobSkins.get(species).width(), mobSkins.get(species).height());
             }
             mobSkins.put("creeper", com.example.engine.EntityTexture.load("textures/entity/creeper/creeper.png", 64, 32, 0x4FA13A));
@@ -1956,7 +2007,7 @@ public class Game implements GameAccess {
         for (java.util.Map.Entry<String, com.example.engine.EntityTexture> skin : mobSkins.entrySet()) {
             int n = 0;
             for (Mob m : list) {
-                if (!skin.getKey().equals(m.typeId())) continue;
+                if (!skin.getKey().equals(skinKeyOf(m))) continue;
                 if (n + MobModelBuilder.FLOATS_PER_MOB > mobScratch.length) break;
                 int bx = (int) Math.floor(m.position.x), by = (int) Math.floor(m.position.y + 1f), bz = (int) Math.floor(m.position.z);
                 float sky = world.getSkyLight(bx, by, bz) / 15f, blk = world.getBlockLight(bx, by, bz) / 15f;
@@ -1968,6 +2019,10 @@ public class Game implements GameAccess {
                 float walk = m.getWalkPhase(), amt = m.getWalkAmount();
                 switch (skin.getKey()) {
                     case "pig" -> n = MobModelBuilder.emitPig(mobScratch, n, px, py, pz, yaw, tilt, walk, amt, sky, blk, tint);
+                    case "pig_baby" -> n = MobModelBuilder.emitBabyPig(mobScratch, n, px, py, pz, yaw, tilt, walk, amt, sky, blk, tint);
+                    case "cow_baby" -> n = MobModelBuilder.emitBabyCow(mobScratch, n, px, py, pz, yaw, tilt, walk, amt, sky, blk, tint);
+                    case "chicken_baby" -> n = MobModelBuilder.emitBabyChicken(mobScratch, n, px, py, pz, yaw, tilt, walk, amt,
+                            !m.isOnGround(), sky, blk, tint);
                     case "creeper" -> {
                         float swell = ((com.example.entity.mob.Creeper) m).getSwellFraction();
                         float[] t2 = ((int) Math.floor(swell * 10f) & 1) == 1 && m.isAlive() ? new float[]{2.4f, 2.4f, 2.4f} : tint;
@@ -1987,6 +2042,12 @@ public class Game implements GameAccess {
             mobMesh.draw();
         }
         atlas.bind(0); // everything drawn after the mobs expects the block atlas on unit 0
+    }
+
+    /** The skin (and model) a mob is drawn with: baby pigs, cows and chickens have their own, other babies are scaled adults. */
+    private static String skinKeyOf(Mob m) {
+        String id = m.typeId();
+        return m.isBaby() && (id.equals("pig") || id.equals("cow") || id.equals("chicken")) ? id + "_baby" : id;
     }
 
     /** Experience orbs: small camera-facing quads, full bright, pulsing between green and yellow like vanilla. */
@@ -2181,14 +2242,14 @@ public class Game implements GameAccess {
     /** The real texture file under {@code key}, loaded once; null (and remembered) when the file is not there. */
     private com.example.engine.EntityTexture realTexture(String key, String path, boolean repeat) {
         if (missingTextures.contains(key)) return null;
-        com.example.engine.EntityTexture tex = mobSkins.get(key);
+        com.example.engine.EntityTexture tex = realTextures.get(key);
         if (tex == null) {
             tex = com.example.engine.EntityTexture.loadReal(path, repeat);
             if (tex == null) {
                 missingTextures.add(key);
                 return null;
             }
-            mobSkins.put(key, tex);
+            realTextures.put(key, tex);
         }
         return tex;
     }
@@ -2372,8 +2433,22 @@ public class Game implements GameAccess {
      * {@code environment/rain.png}, one block wide with four blocks per texture height, and scrolled downwards at a rate that
      * is randomised per column. Columns under a roof draw nothing because their quad would be empty.
      */
+    /** The shader has one alpha per draw, so the columns are drawn in this many alpha steps (nearest the camera first). */
+    private static final int RAIN_ALPHA_STEPS = 6;
+    private final float[][] rainBuckets = new float[RAIN_ALPHA_STEPS][(2 * RAIN_COLUMN_RADIUS + 1) * (2 * RAIN_COLUMN_RADIUS + 1) * 6 * 11];
+
+    /**
+     * Vanilla's alpha for a rain column: ((1 - d^2) * 0.5 + 0.5) times the rain level, with d the column's distance from the
+     * camera as a fraction of the rain radius, so the streaks fade out towards the edge of the rain.
+     */
+    static float rainColumnAlpha(float distanceFraction, float rainLevel) {
+        float d = Math.min(1f, distanceFraction);
+        return ((1f - d * d) * 0.5f + 0.5f) * rainLevel;
+    }
+
     private void renderRain() {
-        if (!weather.isRaining()) return;
+        float rainLevel = weather.getStormIntensity();
+        if (!weather.isRaining() && rainLevel < 0.01f) return;
         com.example.engine.EntityTexture rain = realTexture("environment.rain", "textures/environment/rain.png", true);
         if (rain == null) return;
 
@@ -2383,8 +2458,7 @@ public class Game implements GameAccess {
         float partial = rainTime * 20f - ticks;
         int r = RAIN_COLUMN_RADIUS;
 
-        float[] verts = new float[(2 * r + 1) * (2 * r + 1) * 6 * 11];
-        int idx = 0;
+        int[] counts = new int[RAIN_ALPHA_STEPS];
         for (int z = cz - r; z <= cz + r; z++) {
             for (int x = cx - r; x <= cx + r; x++) {
                 int surface = world.getColumnHeightAt(x, z) + 1;
@@ -2392,6 +2466,8 @@ public class Game implements GameAccess {
                 if (bottom == top) continue;
                 float dx = x - cx, dz = z - cz;
                 float len = (float) Math.sqrt(dx * dx + dz * dz);
+                float alpha = rainColumnAlpha(len / r, rainLevel);
+                int step = Math.min(RAIN_ALPHA_STEPS - 1, (int) (alpha * RAIN_ALPHA_STEPS));
                 if (len < 1e-4f) { dx = 0f; dz = 1f; len = 1f; }
                 float sx = -dz / len * 0.5f, sz = dx / len * 0.5f; // half the quad's width, sideways to the line of sight
                 int seed = x * x * 3121 + x * 45238971 + z * z * 418711 + z * 13761;
@@ -2403,24 +2479,29 @@ public class Game implements GameAccess {
                 float z0 = z - cam.z + 0.5f - sz, z1 = z - cam.z + 0.5f + sz;
                 float yTop = top - cam.y, yBot = bottom - cam.y;
                 float vTop = bottom * 0.25f + scroll, vBot = top * 0.25f + scroll;
+                float[] verts = rainBuckets[step];
+                int idx = counts[step];
                 idx = rainVertex(verts, idx, x0, yTop, z0, 0f, vTop, sky, blk);
                 idx = rainVertex(verts, idx, x1, yTop, z1, 1f, vTop, sky, blk);
                 idx = rainVertex(verts, idx, x1, yBot, z1, 1f, vBot, sky, blk);
                 idx = rainVertex(verts, idx, x0, yTop, z0, 0f, vTop, sky, blk);
                 idx = rainVertex(verts, idx, x1, yBot, z1, 1f, vBot, sky, blk);
                 idx = rainVertex(verts, idx, x0, yBot, z0, 0f, vBot, sky, blk);
+                counts[step] = idx;
             }
         }
-        if (idx == 0) return;
         chunkShader.setUniform("uModel", new Matrix4f().translation(cam.x, cam.y, cam.z));
-        chunkShader.setUniform("uAlpha", 0.8f);
         chunkShader.setUniform("uFogStart", 1_000_000f);
         chunkShader.setUniform("uFogEnd", 2_000_000f);
         rain.bind(0);
         glDisable(GL_CULL_FACE);
         glDepthMask(false);
-        rainMesh.upload(verts, idx);
-        rainMesh.draw();
+        for (int step = 0; step < RAIN_ALPHA_STEPS; step++) {
+            if (counts[step] == 0) continue;
+            chunkShader.setUniform("uAlpha", (step + 0.5f) / RAIN_ALPHA_STEPS);
+            rainMesh.upload(rainBuckets[step], counts[step]);
+            rainMesh.draw();
+        }
         glDepthMask(true);
         atlas.bind(0);
     }
@@ -2473,11 +2554,13 @@ public class Game implements GameAccess {
         chunkShader.setUniform("uAlpha", celestialAlpha);
 
         Vector3f sunCenter = new Vector3f(eye).add(new Vector3f(sunDir).mul(CELESTIAL_DISTANCE));
-        renderCelestialBody("environment.sun", "textures/environment/celestial/sun.png", sunCenter, right, up);
+        renderCelestialBody("environment.sun", "textures/environment/celestial/sun.png", sunCenter, right, up, SUN_HALF_SIZE, false);
 
         Vector3f moonDir = new Vector3f(sunDir).negate();
         Vector3f moonCenter = new Vector3f(eye).add(new Vector3f(moonDir).mul(CELESTIAL_DISTANCE));
-        renderCelestialBody("environment.moon", "textures/environment/celestial/moon/full_moon.png", moonCenter, right, up);
+        String phase = MOON_PHASE_TEXTURES[moonPhase(dayCount, dayTime)];
+        renderCelestialBody("environment.moon." + phase, "textures/environment/celestial/moon/" + phase + ".png", moonCenter, right, up,
+                MOON_HALF_SIZE, true);
     }
 
     /**
@@ -2493,11 +2576,20 @@ public class Game implements GameAccess {
         return 1f + (target - 1f) * clamped;
     }
 
-    private void renderCelestialBody(String key, String path, Vector3f center, Vector3f right, Vector3f up) {
+    /**
+     * The moon phase 0..7 (0 = full moon). Vanilla's phase is the number of the current day, which changes at sunrise
+     * (day time 0 is sunrise there), so one night keeps one phase; here the day counter turns over at midnight, so the
+     * hours before sunrise still belong to the previous day.
+     */
+    static int moonPhase(long dayCount, float dayTime) {
+        return (int) Math.floorMod(dayCount - (dayTime < 0.25f ? 1L : 0L), 8L);
+    }
+
+    private void renderCelestialBody(String key, String path, Vector3f center, Vector3f right, Vector3f up, float half, boolean flipped) {
         com.example.engine.EntityTexture tex = realTexture(key, path, false);
         if (tex == null) return;
-        float u0 = 0f, v0 = 0f, u1 = 1f, v1 = 1f;
-        float half = CELESTIAL_SIZE / 2f;
+        // 26.x draws the moon quad with both texture axes reversed relative to the sun's.
+        float u0 = flipped ? 1f : 0f, v0 = flipped ? 1f : 0f, u1 = flipped ? 0f : 1f, v1 = flipped ? 0f : 1f;
 
         Vector3f rHalf = new Vector3f(right).mul(half);
         Vector3f uHalf = new Vector3f(up).mul(half);
@@ -2981,6 +3073,11 @@ public class Game implements GameAccess {
     }
 
     @Override
+    public void setDay(long day) {
+        dayCount = Math.max(0L, day);
+    }
+
+    @Override
     public void setTime(float dayTimeFraction) {
         dayTime = dayTimeFraction;
     }
@@ -3439,6 +3536,7 @@ public class Game implements GameAccess {
         itemMesh.destroy();
         mobMesh.destroy();
         for (com.example.engine.EntityTexture t : mobSkins.values()) t.destroy();
+        for (com.example.engine.EntityTexture t : realTextures.values()) t.destroy();
         particleMesh.destroy();
         crackOverlay.destroy();
         chunkShader.destroy();

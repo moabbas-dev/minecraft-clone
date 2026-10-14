@@ -68,7 +68,8 @@ class PlayerModelBuilderTest {
         float[] bodyAndArms = java.util.Arrays.copyOf(out, chest);
         float width = range(bodyAndArms, 0)[1] - range(bodyAndArms, 0)[0];
         // arms at +-6 px, 4 px wide, +1 px each side: 6+2+1 = 9 px from the centre, scaled by 15/16 and 1/16 px per unit
-        assertEquals(2 * 9f / 16f * PlayerModelBuilder.MODEL_SCALE, width, 1e-4f);
+        float expected = 2 * 9f / 16f * PlayerModelBuilder.MODEL_SCALE;
+        assertTrue(width >= expected - 1e-4f && width < expected + 0.2f, "the idle arm sway only swings the arms slightly outward: " + width);
 
         int legs = PlayerModelBuilder.emitArmor(out, 0, FRONT, EquipmentSlot.LEGS, 1f);
         float[] legBoxes = java.util.Arrays.copyOf(out, legs);

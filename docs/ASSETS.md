@@ -19,6 +19,9 @@ None of these files are committed: `textures/`, `sounds/`, `minecraft-sounds/` a
 | `textures/entity/player/wide/steve.png` | `game/Game.renderHeldItem` (bare hand), `renderPlayerPreview` | no | the bare hand and the inventory player preview are not drawn |
 | `textures/entity/equipment/{humanoid,humanoid_leggings}/<material>.png` (+ `leather_overlay.png`) | `game/Game.renderPlayerPreview` | no | that armor layer is not drawn in the inventory preview |
 | `textures/gui/sprites/hud/hotbar_offhand_left.png` | `game/Game.renderRealHud` | no | the offhand item is drawn without its slot frame |
+| `textures/entity/{pig,cow,chicken}/*_temperate_baby.png` | `game/Game` (`EntityTexture.loadFirst`) | no | flat placeholder colour on the baby model |
+| `textures/environment/celestial/moon/<phase>.png` (eight phases) | `game/Game.renderSunAndMoon` | no | no moon |
+| `textures/item/leather_<piece>_overlay.png` | `engine/TextureAtlas.dyeLeather` | no | the leather icon without its overlay |
 | `textures/entity/chest/normal.png` | `engine/TextureAtlas.chestFace` | no | "missing texture" chest faces |
 | `textures/colormap/{grass,foliage}.png` | `world/TerrainGenerator` -> `world/Colormap` | no | fixed fallback tint |
 | `textures/entity/**` | `game/Game` -> `engine/EntityTexture.load(path, w, h, fallbackRGB)` | no | flat colored placeholder skin |

@@ -330,6 +330,63 @@ final class MobModelBuilder {
         return n;
     }
 
+    /**
+     * The baby pig, cow and chicken are dedicated models in 26.x (BabyPigModel, BabyCowModel, BabyChickenModel), not the
+     * adult scaled down. Every box below is read from those classes in the client jar: the part's offset plus the box's
+     * corner give the centre, the box size and texture offset are used as they are. Texture sizes: pig 32x32, cow 64x64,
+     * chicken 16x16.
+     */
+    static int emitBabyPig(float[] out, int n, float px, float py, float pz, float yaw, float tilt, float walkPhase,
+                           float walkAmount, float sky, float blockLight, float[] tint) {
+        Writer w = new Writer(out, n, px, py, pz, yaw, tilt, sky, blockLight, tint, skinW("pig_baby"), skinH("pig_baby"));
+        float swing = (float) Math.sin(walkPhase) * 1.2f * walkAmount;
+        float lift = Math.max(0f, (float) Math.sin(walkPhase)) * 0.6f * walkAmount, liftB = Math.max(0f, -(float) Math.sin(walkPhase)) * 0.6f * walkAmount;
+        w.box(0, 19, 0.5f, 7, 6, 9, 0, 0, 0, false);                    // body
+        w.inflate = 0.025f;
+        w.box(0, 17, -4, 7, 6, 6, 0, 15, 0, false);                     // head
+        w.inflate = 0.015f;
+        w.box(0, 18.025f, -7.5f, 3, 2, 1, 6, 27, 0, false);             // snout
+        w.inflate = 0f;
+        w.box(2.5f, 23 - lift, -3 + swing, 2, 2, 2, 0, 0, 0, false);    // left front leg
+        w.box(-2.5f, 23 - liftB, -3 - swing, 2, 2, 2, 23, 0, 0, false); // right front leg
+        w.box(2.5f, 23 - liftB, 4 - swing, 2, 2, 2, 0, 4, 0, false);    // left hind leg
+        w.box(-2.5f, 23 - lift, 4 + swing, 2, 2, 2, 23, 4, 0, false);   // right hind leg
+        return w.n;
+    }
+
+    static int emitBabyCow(float[] out, int n, float px, float py, float pz, float yaw, float tilt, float walkPhase,
+                           float walkAmount, float sky, float blockLight, float[] tint) {
+        Writer w = new Writer(out, n, px, py, pz, yaw, tilt, sky, blockLight, tint, skinW("cow_baby"), skinH("cow_baby"));
+        float swing = (float) Math.sin(walkPhase) * 1.5f * walkAmount;
+        float lift = Math.max(0f, (float) Math.sin(walkPhase)) * 0.8f * walkAmount, liftB = Math.max(0f, -(float) Math.sin(walkPhase)) * 0.8f * walkAmount;
+        w.box(0, 12, -7.5f, 6, 6, 5, 0, 18, 0, false);                  // head
+        w.box(3.5f, 9, -8.5f, 1, 2, 1, 8, 29, 0, false);                // horn
+        w.box(-3.5f, 9, -8.5f, 1, 2, 1, 4, 29, 0, true);                // horn (mirrored)
+        w.box(0, 13.5f, -10.5f, 4, 3, 1, 12, 29, 0, false);             // muzzle
+        w.box(0, 15, 0, 8, 6, 12, 0, 0, 0, false);                      // body
+        w.box(-2.5f, 21 - lift, -3.5f + swing, 3, 6, 3, 22, 18, 0, false);  // right front leg
+        w.box(2.5f, 21 - liftB, -3.5f - swing, 3, 6, 3, 34, 18, 0, false);  // left front leg
+        w.box(-2.5f, 21 - liftB, 3.5f - swing, 3, 6, 3, 22, 27, 0, false);  // right hind leg
+        w.box(2.5f, 21 - lift, 3.5f + swing, 3, 6, 3, 34, 27, 0, false);    // left hind leg
+        return w.n;
+    }
+
+    static int emitBabyChicken(float[] out, int n, float px, float py, float pz, float yaw, float tilt, float walkPhase,
+                               float walkAmount, boolean airborne, float sky, float blockLight, float[] tint) {
+        Writer w = new Writer(out, n, px, py, pz, yaw, tilt, sky, blockLight, tint, skinW("chicken_baby"), skinH("chicken_baby"));
+        float swing = (float) Math.sin(walkPhase) * 0.8f * walkAmount;
+        w.box(0, 20, 0, 4, 4, 4, 0, 0, 0, false);                       // body (the chick has no separate head)
+        w.box(0, 20.5f, -2.5f, 2, 1, 1, 10, 8, 0, false);               // beak
+        w.box(1, 23 - Math.max(0f, swing), 0.5f + swing, 1, 2, 0, 2, 2, 0, false);   // left leg
+        w.box(1, 24, 0 + swing, 1, 0, 1, 0, 1, 0, false);               // left foot
+        w.box(-1, 23 - Math.max(0f, -swing), 0.5f - swing, 1, 2, 0, 0, 2, 0, false); // right leg
+        w.box(-1, 24, 0 - swing, 1, 0, 1, 0, 0, 0, false);              // right foot
+        float flap = airborne ? -1.5f : 0f;
+        w.box(2.5f, 20 + flap, 0, 1, 0, 2, 6, 8, 0, false);             // right wing
+        w.box(-2.5f, 20 + flap, 0, 1, 0, 2, 4, 8, 0, false);            // left wing
+        return w.n;
+    }
+
     static int emitPig(float[] out, int n, float px, float py, float pz, float yaw, float tilt, float walkPhase,
                        float walkAmount, float sky, float blockLight, float[] tint) {
         Writer w = new Writer(out, n, px, py, pz, yaw, tilt, sky, blockLight, tint, skinW("pig"), skinH("pig"));

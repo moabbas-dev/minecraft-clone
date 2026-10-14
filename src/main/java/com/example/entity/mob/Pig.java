@@ -17,12 +17,12 @@ public class Pig extends PassiveMob {
 
     @Override
     public float getWidth() {
-        return WIDTH;
+        return WIDTH * babyScale();
     }
 
     @Override
     public float getHeight() {
-        return HEIGHT;
+        return HEIGHT * babyScale();
     }
 
     @Override
@@ -38,6 +38,7 @@ public class Pig extends PassiveMob {
     @Override
     public List<BlockDrops.Resolved> getDrops(Random random) {
         List<BlockDrops.Resolved> out = newDrops();
+        if (isBaby()) return out; // baby animals drop nothing
         roll(out, random, BlockType.RAW_PORKCHOP, 1, 3);
         return out;
     }

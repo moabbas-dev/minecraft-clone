@@ -21,6 +21,13 @@ import java.util.Random;
  * Subclasses add the stats, panic speed and drops.
  */
 public abstract class PassiveMob extends Mob {
+    /** Vanilla's baby age: -24000 ticks, i.e. 20 minutes until it is an adult. */
+    public static final float BABY_SECONDS = 1200f;
+    /** Chance that a later member of a naturally spawned group is a baby (AgeableMob's default 0.05). */
+    public static final float BABY_SPAWN_CHANCE = 0.05f;
+
+    private float babySecondsLeft;
+
     protected PassiveMob(Vector3f spawnPosition, float yaw, float maxHealth, float panicMultiplier) {
         super(spawnPosition, yaw, maxHealth);
         setNavigator(new GroundNavigator());
@@ -37,9 +44,56 @@ public abstract class PassiveMob extends Mob {
         return true;
     }
 
+    /** Makes this animal a baby that grows up after {@link #BABY_SECONDS}. */
+    public void makeBaby() {
+        babySecondsLeft = BABY_SECONDS;
+    }
+
+    @Override
+    public boolean isBaby() {
+        return babySecondsLeft > 0f;
+    }
+
+    /** 1 for an adult, 0.5 for a baby: babies have half the adult's hitbox in every direction. */
+    protected float babyScale() {
+        return isBaby() ? 0.5f : 1f;
+    }
+
+    @Override
+    protected void onTick(com.example.world.World world, float dt) {
+        if (babySecondsLeft > 0f) {
+            babySecondsLeft = Math.max(0f, babySecondsLeft - dt);
+            if (babySecondsLeft == 0f) grewUp();
+        }
+    }
+
+    /** Called once when a baby becomes an adult. */
+    protected void grewUp() {
+    }
+
+    /** Babies give no experience. */
     @Override
     public int xpReward(Random random) {
-        return 1 + random.nextInt(3);
+        return isBaby() ? 0 : 1 + random.nextInt(3);
+    }
+
+    /** A baby is saved as minus its remaining seconds, an adult as whatever the species keeps (the chicken's egg timer). */
+    @Override
+    public float extraState() {
+        return isBaby() ? -babySecondsLeft : adultExtraState();
+    }
+
+    @Override
+    public void restoreExtraState(float value) {
+        if (value < 0f) babySecondsLeft = Math.min(BABY_SECONDS, -value);
+        else restoreAdultExtraState(value);
+    }
+
+    protected float adultExtraState() {
+        return 0f;
+    }
+
+    protected void restoreAdultExtraState(float value) {
     }
 
     /** One drop line: {@code min..max} uniformly (each count equally likely, ignoring Looting). */

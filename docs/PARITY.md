@@ -279,7 +279,7 @@ Live evidence in `test-output/screenshots/` (not committed). Sources for the num
 - [x] Equip animation: changing the held item lowers the old one then raises the new one (0.15 s each, ease-out), for flat items, blocks and the bare hand; the hand also rises when a world opens. No offhand exists, so only the main hand animates.
 - [x] Inventory, crafting table, furnace, blast furnace and smoker use the real container textures and the real lit/burn progress sprites.
 - [x] Grayscale PNGs are read with their stored values (Java's `getRGB` lightened them).
-- Known gaps: moon phases, rain edge fade, multiple copies of a dropped stack. (The player preview and the offhand slot were done in section 8.)
+- Known gaps at that time: moon phases, rain edge fade, multiple copies of a dropped stack, the preview and the offhand slot (all done in sections 8 and 9).
 
 ## 8. Offhand and player preview
 
@@ -292,4 +292,18 @@ Sources: Perplexity research on the decompiled 1.21 `Inventory`, `InventoryScree
 - [x] First person: the offhand item is the mirrored right-hand view with its own equip animation; no bare left arm; attacking is always the main hand.
 - [x] Inventory screen: offhand slot at (77,62) in the player inventory only.
 - [x] Player preview: the real Steve skin with its outer layers and the worn armor (humanoid / humanoid_leggings textures, leather tinted 0xA06540 plus its overlay) in the box (26,8)-(75,78), 30 GUI pixels per block, body yaw 20 and head yaw 40 degrees per atan((centre - mouse) / 40), pitch 20 degrees, full bright. The 32-pixel model is scaled by 15/16 like the player renderer.
-- Known gaps: items held in the hands are not drawn on the preview; the preview does not animate (no idle arm sway); armor has no enchantment glint; leather armor icons are still the untinted grey item textures (vanilla tints them 0xA06540 and adds the overlay sprite).
+- Known gaps at that time: held items on the preview, idle arm sway, leather icon tint (done in section 9); armor has no enchantment glint (no enchanting exists here).
+
+## 9. Sky, babies, leather, rain, stacks, preview extras
+
+Sources: Perplexity research on `SkyRenderer` / `LevelRenderer.renderSky`, `AgeableMob`, `ItemEntityRenderer`, `ItemInHandLayer` (tag [P]); the baby and adult model boxes are read from the 26.3 client jar itself (`javap` on `BabyPigModel`, `BabyCowModel`, `BabyChickenModel`, `CowModel`, `AdultChickenModel`), which is unobfuscated.
+
+- [x] Sun and moon size: vanilla's quads are 60 (sun) and 40 (moon) blocks wide at distance 100; they are drawn at the same angular size at the game's sky distance of 180 (sun half-size 54, moon 36). They were about 4x too small.
+- [x] Moon phases: 8 sprites in vanilla's order (full, waning gibbous, third quarter, waning crescent, new, waxing crescent, first quarter, waxing gibbous), chosen by the number of the current day, which changes at sunrise like vanilla's day count. The day count is saved in `world.dat` (an optional trailing section; old saves start at day 0). `setTime?time=&day=` sets it for tests. The moon quad uses the sprite with both axes reversed, as 26.x does.
+- [x] Baby pig, cow and chicken: dedicated models and textures (`*_temperate_baby.png`), box for box from the jar; hitbox half the adult's; grow up after 1200 s (24000 ticks); no drops and no experience; saved as minus their remaining age; later members of a naturally spawned group are babies with a 5% chance (the first is always an adult); chicks lay no eggs. `spawnMob?type=pig_baby` (also cow_baby, chicken_baby) for tests.
+- [x] Leather armor icons: the grey item texture is multiplied by the default dye 0xA06540 and the `_overlay` sprite is laid over it, in the inventory, hotbar, hand and on the ground.
+- [x] Rain fades towards its edge like vanilla (alpha = ((1 - d^2) * 0.5 + 0.5) x rain level), drawn in six alpha steps because the shader has one alpha per draw.
+- [x] Dropped stacks draw 1, 2, 3, 4 or 5 copies (counts 1 / 2-16 / 17-32 / 33-48 / 49+) with small fixed random offsets. [P] The offset sizes are approximate.
+- [x] Inventory preview: held items are drawn in the hands (vanilla's ItemInHandLayer: out along the arm, then the item's third-person display transform), and the arms sway idly (AnimationUtils.bobModelPart).
+- [x] Fixed a regression: the lazily loaded real textures shared the mob-skin map, so the mob skins never loaded and every mob was invisible. They now have their own map.
+- Known gaps: baby sounds are not pitched up; baby animals do not follow adults; no breeding; moon quad orientation per phase is unverified against vanilla.

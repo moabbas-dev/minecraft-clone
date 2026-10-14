@@ -87,7 +87,9 @@ public final class Commands {
         if (t == null) return Result.badRequest("setTime requires a numeric 'time' param in [0,1)");
         if (t < 0f || t >= 1f) return Result.badRequest("time must be in [0,1), got: " + t);
         game.setTime(t);
-        return Result.ok("time set to " + t);
+        Long day = parseLong(p, "day");
+        if (day != null) game.setDay(day);
+        return Result.ok("time set to " + t + (day != null ? ", day " + day : ""));
     }
 
     private Result setWeather(Map<String, String> p) {

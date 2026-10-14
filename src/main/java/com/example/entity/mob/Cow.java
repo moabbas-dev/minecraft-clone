@@ -17,12 +17,12 @@ public class Cow extends PassiveMob {
 
     @Override
     public float getWidth() {
-        return WIDTH;
+        return WIDTH * babyScale();
     }
 
     @Override
     public float getHeight() {
-        return HEIGHT;
+        return HEIGHT * babyScale();
     }
 
     @Override
@@ -38,6 +38,7 @@ public class Cow extends PassiveMob {
     @Override
     public List<BlockDrops.Resolved> getDrops(Random random) {
         List<BlockDrops.Resolved> out = newDrops();
+        if (isBaby()) return out; // baby animals drop nothing
         roll(out, random, BlockType.RAW_BEEF, 1, 3);
         roll(out, random, BlockType.LEATHER, 0, 2);
         return out;

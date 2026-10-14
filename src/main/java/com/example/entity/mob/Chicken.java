@@ -32,12 +32,12 @@ public class Chicken extends PassiveMob {
 
     @Override
     public float getWidth() {
-        return WIDTH;
+        return WIDTH * babyScale();
     }
 
     @Override
     public float getHeight() {
-        return HEIGHT;
+        return HEIGHT * babyScale();
     }
 
     @Override
@@ -57,14 +57,21 @@ public class Chicken extends PassiveMob {
 
     @Override
     protected void onTick(World world, float dt) {
+        super.onTick(world, dt);
         if (!isOnGround() && velocity.y < 0f) {
             velocity.y *= (float) Math.pow(FALL_DRAG_PER_TICK, dt * 20f); // wings flap: slow fall
         }
+        if (isBaby()) return; // chicks lay no eggs
         eggTimer -= dt;
         if (eggTimer <= 0f) {
             eggReady = true;
             eggTimer = nextEggDelay(random);
         }
+    }
+
+    @Override
+    protected void grewUp() {
+        eggTimer = nextEggDelay(random);
     }
 
     @Override
@@ -76,18 +83,19 @@ public class Chicken extends PassiveMob {
     }
 
     @Override
-    public float extraState() {
+    protected float adultExtraState() {
         return eggTimer;
     }
 
     @Override
-    public void restoreExtraState(float value) {
+    protected void restoreAdultExtraState(float value) {
         if (value > 0f && value <= MAX_EGG_SECONDS) eggTimer = value;
     }
 
     @Override
     public List<BlockDrops.Resolved> getDrops(Random random) {
         List<BlockDrops.Resolved> out = newDrops();
+        if (isBaby()) return out; // baby animals drop nothing
         roll(out, random, BlockType.RAW_CHICKEN, 1, 1);
         roll(out, random, BlockType.FEATHER, 0, 2);
         return out;

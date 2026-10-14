@@ -293,7 +293,7 @@ public class TextureAtlas {
                     int h = Math.min(TILE_PX, real.getHeight());
                     return real.getSubimage(0, 0, w, h);
                 } else if (real.getWidth() == TILE_PX && real.getHeight() == TILE_PX) {
-                    return real;
+                    return DYEABLE.contains(tile) ? dyeLeather(real, path) : real;
                 } else {
                     log.warn("Texture {} is {}x{}, expected {}x{} - using the missing-texture placeholder for {}",
                             path, real.getWidth(), real.getHeight(), TILE_PX, TILE_PX, tile);
@@ -402,6 +402,49 @@ public class TextureAtlas {
             for (int x = 0; x < TILE_PX; x++)
                 img.setRGB(x, y, ((x / 8 + y / 8) & 1) == 0 ? 0xFFF800F8 : 0xFF000000);
         return img;
+    }
+
+    /** Leather armor: the item texture is grey and vanilla tints it with the (default) dye colour, then draws the overlay sprite. */
+    private static final java.util.Set<Tile> DYEABLE = java.util.EnumSet.of(
+            Tile.LEATHER_HELMET, Tile.LEATHER_CHESTPLATE, Tile.LEATHER_LEGGINGS, Tile.LEATHER_BOOTS);
+    /** Vanilla's undyed leather colour, 0xA06540. */
+    static final int LEATHER_DYE = 0xA06540;
+
+    /**
+     * Multiplies the grey base by the dye colour and lays the matching {@code <name>_overlay.png} (untinted rivets and
+     * edges) over it, as the item model's two layers do.
+     */
+    static BufferedImage dyeLeather(BufferedImage base, String path) {
+        BufferedImage out = new BufferedImage(TILE_PX, TILE_PX, BufferedImage.TYPE_INT_ARGB);
+        BufferedImage overlay = null;
+        try {
+            File f = new File(path.replace(".png", "_overlay.png"));
+            if (f.isFile()) overlay = TextureIo.read(f);
+        } catch (IOException e) {
+            log.warn("Couldn't read the leather overlay for {}: {}", path, e.getMessage());
+        }
+        for (int y = 0; y < TILE_PX; y++) {
+            for (int x = 0; x < TILE_PX; x++) {
+                int argb = base.getRGB(x, y);
+                int a = argb >>> 24;
+                int r = ((argb >> 16) & 0xFF) * ((LEATHER_DYE >> 16) & 0xFF) / 255;
+                int g = ((argb >> 8) & 0xFF) * ((LEATHER_DYE >> 8) & 0xFF) / 255;
+                int b = (argb & 0xFF) * (LEATHER_DYE & 0xFF) / 255;
+                if (overlay != null && overlay.getWidth() == TILE_PX && overlay.getHeight() == TILE_PX) {
+                    int o = overlay.getRGB(x, y);
+                    int oa = o >>> 24;
+                    if (oa > 0) { // source-over: the overlay on top of the dyed base
+                        float k = oa / 255f, ba = a / 255f, outA = k + (1 - k) * ba;
+                        r = Math.round((((o >> 16) & 0xFF) * k + r * (1 - k) * ba) / outA);
+                        g = Math.round((((o >> 8) & 0xFF) * k + g * (1 - k) * ba) / outA);
+                        b = Math.round(((o & 0xFF) * k + b * (1 - k) * ba) / outA);
+                        a = Math.round(255f * outA);
+                    }
+                }
+                out.setRGB(x, y, (a << 24) | (Math.min(255, r) << 16) | (Math.min(255, g) << 8) | Math.min(255, b));
+            }
+        }
+        return out;
     }
 
     private static final String CHEST_SKIN = "textures/entity/chest/normal.png";

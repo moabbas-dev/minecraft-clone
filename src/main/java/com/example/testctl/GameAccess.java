@@ -15,6 +15,9 @@ public interface GameAccess {
     /** fraction in [0,1): 0=midnight, 0.25=sunrise, 0.5=noon, 0.75=sunset. */
     void setTime(float dayTimeFraction);
 
+    /** Sets the number of whole days elapsed (the moon phase is this modulo 8). */
+    void setDay(long day);
+
     /** state is one of "CLEAR", "RAIN", "THUNDER". */
     void setWeather(String state);
 

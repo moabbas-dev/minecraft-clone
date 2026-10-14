@@ -93,6 +93,11 @@ public class PassiveSpawner {
                 case 1 -> new Cow(at, yaw);
                 default -> new Chicken(at, yaw);
             };
+            // Vanilla: the first member of a group is always an adult, every later one has a 5% chance of being a baby.
+            if (placed > 0 && random.nextFloat() <= com.example.entity.mob.PassiveMob.BABY_SPAWN_CHANCE
+                    && mob instanceof com.example.entity.mob.PassiveMob animal) {
+                animal.makeBaby();
+            }
             if (mobs.spawn(mob)) placed++;
         }
         return placed;
