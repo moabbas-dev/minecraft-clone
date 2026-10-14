@@ -59,6 +59,10 @@ public interface GameAccess {
     /** Holds (or releases) the attack button through the same path real mouse input takes. */
     void holdAttack(boolean held);
 
+    /** Holds (or releases) the use button, as a player holding right click to eat. */
+    default void holdUse(boolean held) {
+    }
+
     /** Queues one use/place click, consumed by the next interaction update. */
     void useItem();
 

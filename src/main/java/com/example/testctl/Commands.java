@@ -39,6 +39,7 @@ public final class Commands {
             case "selectSlot" -> selectSlot(params);
             case "giveItem" -> giveItem(params);
             case "holdAttack" -> holdAttack(params);
+            case "holdUse" -> holdUse(params);
             case "useItem" -> useItem();
             case "swapOffhand" -> swapOffhand();
             case "dropItem" -> dropItem(params);
@@ -241,6 +242,15 @@ public final class Commands {
             return Result.badRequest(e.getMessage());
         }
         return Result.ok("hunger set to food=" + food + " saturation=" + saturation + " exhaustion=" + exhaustion);
+    }
+
+    private Result holdUse(Map<String, String> p) {
+        String held = p.get("held");
+        if (held == null || !(held.equalsIgnoreCase("true") || held.equalsIgnoreCase("false"))) {
+            return Result.badRequest("holdUse requires held=true or held=false");
+        }
+        game.holdUse(Boolean.parseBoolean(held));
+        return Result.ok("use held = " + held.toLowerCase(Locale.ROOT));
     }
 
     private Result holdAttack(Map<String, String> p) {

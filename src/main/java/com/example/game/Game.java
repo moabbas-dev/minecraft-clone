@@ -87,6 +87,9 @@ public class Game implements GameAccess {
     private static final float SPRINT_FOV_BOOST = 5f;
     private static final float FOV_LERP_RATE = 9f;
     private static final float SWING_DURATION = 0.3f; // vanilla: 6 ticks
+    /** Seconds between a mined block's hit sounds (vanilla: every 4 ticks). */
+    private static final float MINE_HIT_INTERVAL = 0.2f;
+    private float mineHitClock = 0f;
 
     // Biome atmosphere: how strongly the biome's own fog tint nudges the time-of-day sky color
     // (see BiomeColors - these are deliberately subtle mood tints, not a sky repaint), how far
@@ -165,6 +168,7 @@ public class Game implements GameAccess {
      *  has no synthetic keyboard/mouse, so these let it drive mining and placement through the
      *  exact same code path real input takes. Both are only ever touched on the main thread. */
     private boolean forcedAttackHeld = false;
+    private boolean forcedUseHeld = false;
     private int forcedUseRequests = 0;
     /** Seconds left to show the selected-block name label above the hotbar - reset to
      *  HOTBAR_LABEL_DURATION whenever selectedIndex actually changes (see
@@ -205,6 +209,9 @@ public class Game implements GameAccess {
     private final com.example.entity.ArrowManager arrows = new com.example.entity.ArrowManager();
     private boolean hideHud;
     private boolean difficultyLocked;
+    /** Use time of the food being eaten in ticks (0 when not eating) and which hand holds it, for the hand animation. */
+    private float eatUseTicks;
+    private boolean eatingOffhand;
     private float eatTimer, eatSoundTimer;
     private int lastLevel;
     private final java.util.Map<String, com.example.engine.EntityTexture> mobSkins = new java.util.LinkedHashMap<>();
@@ -741,6 +748,7 @@ public class Game implements GameAccess {
         cookingStations = new CookingStationManager();
         resetGameplayState(new Inventory(), Difficulty.NORMAL);
         forcedAttackHeld = false;
+        forcedUseHeld = false;
         forcedUseRequests = 0;
         currentWorldFolder = null;
         currentSettings = null;
@@ -1020,7 +1028,7 @@ public class Game implements GameAccess {
             leftPressed = true;
         }
         if (leftPressed) {
-            swingTimer = SWING_DURATION; // swings even on a whiff, matching vanilla's air-punch
+            startSwing(); // swings even on a whiff, matching vanilla's air-punch
         }
 
         Vector3f eye = player.eyePosition();
@@ -1046,9 +1054,17 @@ public class Game implements GameAccess {
         if (leftPressed && (aimingAtMob || hit == null)) performPlayerAttack(aimingAtMob ? targetedMob : null);
         float miningSpeedFactor = (player.isOnGround() || player.isFlying() ? 1f : 0.2f) * (player.isHeadSubmerged() ? 0.2f : 1f);
         MiningController.Result mined = mining.tick(world, hit, attackHeld, dt, inventory.selected().type(), miningSpeedFactor);
-        if (mined.mining() && swingTimer <= 0f) {
-            swingTimer = SWING_DURATION; // repeat the punch while actively mining
-            gameAudio.playDig(hit.type(), new Vector3f(hit.x() + 0.5f, hit.y() + 0.5f, hit.z() + 0.5f)); // one hit-tick per swing
+        if (mined.mining()) {
+            // vanilla calls swing every tick while a block is being mined (a swing only restarts once it is past its half), and
+            // plays the block's hit sound every 4 ticks, starting with the first
+            startSwing();
+            mineHitClock -= dt;
+            if (mineHitClock <= 0f) {
+                mineHitClock += MINE_HIT_INTERVAL;
+                gameAudio.playDig(hit.type(), new Vector3f(hit.x() + 0.5f, hit.y() + 0.5f, hit.z() + 0.5f));
+            }
+        } else {
+            mineHitClock = 0f;
         }
         if (mined.broken()) {
             onBlockBroken(mined);
@@ -1064,8 +1080,10 @@ public class Game implements GameAccess {
         boolean eatOff = mainFood == null && offFood != null && !mainHandTakesUse(mainHeld, hit);
         ItemStack heldForEat = eatOff ? offHeld : mainHeld;
         FoodProperties eatFood = eatOff ? offFood : mainFood;
-        if (eatFood != null && held(com.example.ui.KeyBindings.Bind.USE) && survival.getHunger().canEat(eatFood)) {
+        if (eatFood != null && (held(com.example.ui.KeyBindings.Bind.USE) || forcedUseHeld) && survival.getHunger().canEat(eatFood)) {
             float duration = heldForEat.type() == BlockType.DRIED_KELP ? 0.8f : 1.6f;
+            eatUseTicks = duration * 20f;
+            eatingOffhand = eatOff;
             eatTimer += dt;
             eatSoundTimer += dt;
             if (eatSoundTimer >= 0.2f) { // vanilla: an eating sound every 4 ticks
@@ -1080,6 +1098,7 @@ public class Game implements GameAccess {
         } else {
             eatTimer = 0f;
             eatSoundTimer = 0f;
+            eatUseTicks = 0f;
         }
 
         boolean use = pressed(com.example.ui.KeyBindings.Bind.USE);
@@ -1134,7 +1153,7 @@ public class Game implements GameAccess {
         BlockPlacer.Result placed = BlockPlacer.tryPlace(world, inventory, offhand, hit, this::blockIntersectsPlayer, saplingGrowth);
         if (placed.placed()) {
             fallingBlocks.checkColumn(world, placed.x(), placed.y(), placed.z());
-            swingTimer = SWING_DURATION;
+            startSwing();
             gameAudio.playPlace(placed.type(), new Vector3f(placed.x() + 0.5f, placed.y() + 0.5f, placed.z() + 0.5f));
             CookingStationType placedStation = cookingStationTypeOf(placed.type());
             if (placedStation != null) cookingStations.create(placed.x(), placed.y(), placed.z(), placedStation);
@@ -1157,7 +1176,7 @@ public class Game implements GameAccess {
         BlockType heldType = held.isEmpty() ? null : held.type();
         float charge = com.example.combat.CombatMath.charge(attackTimer * 20f, com.example.combat.WeaponStats.periodTicks(heldType));
         attackTimer = 0f;
-        swingTimer = SWING_DURATION;
+        startSwing();
         if (target == null) return;
         boolean sprintHit = com.example.combat.CombatMath.isSprintHit(charge, player.isSprinting());
         boolean crit = com.example.combat.CombatMath.isCritical(charge, player.isOnGround(), player.getVerticalVelocity(),
@@ -1929,17 +1948,19 @@ public class Game implements GameAccess {
         for (int i = 0; i < list.size(); i++) {
             ItemEntity e = list.get(i);
             float half = itemModelFor(e.getType()).cross() ? 0.25f : 0.125f;
-            float bob = e.isOnGround() ? 0.05f + (float) Math.sin(e.getAge() * 2.6f) * 0.03f : 0f;
-            n = emitItemVisual(n, e.getType(), e.getCount(), e.position.x, e.position.y + half + bob, e.position.z, e.getAge(),
-                    System.identityHashCode(e));
+            int seed = System.identityHashCode(e);
+            float hover = droppedItemHover(e.getAge(), droppedItemPhase(seed));
+            n = emitItemVisual(n, e.getType(), e.getCount(), e.position.x, e.position.y + half + hover, e.position.z, e.getAge(), seed);
         }
         for (Pickup pk : pickups) {
             float f = Math.min(1f, pk.t / PICKUP_SECONDS);
             f *= f;
             float half = itemModelFor(pk.type).cross() ? 0.25f : 0.125f;
             Vector3f to = player.position;
-            n = emitItemVisual(n, pk.type, pk.count, pk.x + (to.x - pk.x) * f, (pk.y + half + 0.05f) + (to.y + 0.9f - (pk.y + half + 0.05f)) * f,
-                    pk.z + (to.z - pk.z) * f, pk.age + pk.t, System.identityHashCode(pk));
+            int seed = System.identityHashCode(pk);
+            float startY = pk.y + half + droppedItemHover(pk.age, droppedItemPhase(seed));
+            n = emitItemVisual(n, pk.type, pk.count, pk.x + (to.x - pk.x) * f, startY + (to.y + 0.9f - startY) * f,
+                    pk.z + (to.z - pk.z) * f, pk.age + pk.t, seed);
         }
         flushItems(n);
     }
@@ -1947,7 +1968,8 @@ public class Game implements GameAccess {
     /** Writes one dropped stack's model(s) centred on (x, cy, z), spun by its age; returns the new write index. */
     private int emitItemVisual(int n, BlockType type, int count, float x, float cy, float z, float age, int seed) {
         ItemModelBuilder.Model m = itemModelFor(type);
-        float cos = (float) Math.cos(age * 1.6f), sin = (float) Math.sin(age * 1.6f);
+        float spin = droppedItemSpin(age, droppedItemPhase(seed));
+        float cos = (float) Math.cos(spin), sin = (float) Math.sin(spin);
         float half = m.cross() ? 0.25f : 0.125f;
         int bx = (int) Math.floor(x), by = (int) Math.floor(cy), bz = (int) Math.floor(z);
         float sky = world.getSkyLight(bx, by, bz) / 15f;
@@ -1975,6 +1997,25 @@ public class Game implements GameAccess {
             }
         }
         return n;
+    }
+
+    /** A dropped item's own phase in radians: vanilla gives each item entity a random bobOffs in [0, 2 pi). */
+    static float droppedItemPhase(int seed) {
+        return new java.util.Random(seed).nextFloat() * (float) Math.PI * 2f;
+    }
+
+    /**
+     * How far the lowest point of a dropped item floats above its entity position (ItemEntityRenderer: the model's bottom sits
+     * 0.0625 up, plus a bob of sin(ageTicks / 10 + phase) * 0.1 + 0.1, so it rises and falls between 0.0625 and 0.2625).
+     * Age is in seconds (20 ticks each).
+     */
+    static float droppedItemHover(float ageSeconds, float phase) {
+        return 0.0625f + (float) Math.sin(ageSeconds * 2f + phase) * 0.1f + 0.1f;
+    }
+
+    /** The spin about the vertical axis in radians: ItemEntity.getSpin = ageTicks / 20 + phase, i.e. one radian per second. */
+    static float droppedItemSpin(float ageSeconds, float phase) {
+        return ageSeconds + phase;
     }
 
     /** How many copies of the model a dropped stack is drawn with (vanilla's ItemEntityRenderer.getRenderAmount). */
@@ -2260,7 +2301,7 @@ public class Game implements GameAccess {
         Vector3f eye = player.eyePosition();
         itemEntities.throwItem(s.type(), n, s.damage(), eye, player.frontVector(), gameplayRandom);
         inventory.removeFromSlot(slot, n);
-        swingTimer = SWING_DURATION;
+        startSwing();
     }
 
     /** Middle click: select the hotbar slot holding the targeted block, or swap it in from the main inventory. */
@@ -2357,6 +2398,21 @@ public class Game implements GameAccess {
         atlas.bind(0);
     }
 
+    /** The eating motion of the hand that is using food, or identity when that hand is not eating. */
+    private Matrix4f eatMotion(boolean offhand) {
+        if (eatUseTicks <= 0f || eatingOffhand != offhand) return new Matrix4f();
+        return HeldItemModel.eat(eatUseTicks + 1f - eatTimer * 20f, eatUseTicks, 1);
+    }
+
+    /**
+     * Starts the hand swing as vanilla's SwingState.startIfAble does: only when no swing is running or the running one is past
+     * half its duration (3 of its 6 ticks), which is why holding the mine button gives quick half swings.
+     */
+    private void startSwing() {
+        float elapsedTicks = (SWING_DURATION - swingTimer) * 20f;
+        if (swingTimer <= 0f || elapsedTicks > 3f || elapsedTicks <= 0f) swingTimer = SWING_DURATION;
+    }
+
     private void renderHeldItem() {
         BlockType shown = shownHeld;
         glClear(GL_DEPTH_BUFFER_BIT);
@@ -2372,6 +2428,8 @@ public class Game implements GameAccess {
 
         // 0..1 progress through the swing (vanilla's attackAnim); 0 when idle
         float swing = swingTimer > 0f ? 1f - swingTimer / SWING_DURATION : 0f;
+        boolean eatingMain = eatUseTicks > 0f && !eatingOffhand;
+        if (eatingMain) swing = 0f; // vanilla applies no attack motion to the hand that is using an item
 
         float drop = HeldItemModel.equipDrop(equipRaised);
         float[] verts;
@@ -2388,7 +2446,7 @@ public class Game implements GameAccess {
             verts = heldMeshCache.computeIfAbsent(shown, h -> flat ? buildFlatItemHeldVerts(h) : buildHeldItemVerts(h));
             model = flat ? HeldItemModel.flatItem(swing, drop) : HeldItemModel.block(swing, drop);
         }
-        model = new Matrix4f().translate(bobX * 0.5f, -bobY * 0.5f, 0f).mul(model);
+        model = new Matrix4f().translate(bobX * 0.5f, -bobY * 0.5f, 0f).mul(eatMotion(false)).mul(model);
 
         chunkShader.setUniform("uProjection", vmProjection);
         chunkShader.setUniform("uView", vmView);
@@ -2419,6 +2477,7 @@ public class Game implements GameAccess {
         boolean flat = ChunkMeshBuilder.isFlatIconItem(shown);
         float[] verts = heldMeshCache.computeIfAbsent(shown, h -> flat ? buildFlatItemHeldVerts(h) : buildHeldItemVerts(h));
         Matrix4f model = new Matrix4f().translate(bobX * 0.5f, -bobY * 0.5f, 0f).scale(-1f, 1f, 1f)
+                .mul(eatMotion(true))
                 .mul(flat ? HeldItemModel.flatItem(0f, drop) : HeldItemModel.block(0f, drop));
         chunkShader.setUniform("uModel", model);
         uploadLitHeld(verts);
@@ -3381,6 +3440,11 @@ public class Game implements GameAccess {
     @Override
     public void holdAttack(boolean held) {
         forcedAttackHeld = held;
+    }
+
+    @Override
+    public void holdUse(boolean held) {
+        forcedUseHeld = held;
     }
 
     @Override

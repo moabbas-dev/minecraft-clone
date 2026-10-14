@@ -69,6 +69,27 @@ final class HeldItemModel {
                 .scale(0.68f);
     }
 
+    /**
+     * The eating / drinking motion (vanilla's applyEatTransform, constants read from the 26.3 client): while the item is
+     * being used the hand bobs by |cos(f / 4 * pi)| * 0.1 until 80% of the use time has passed, and the item swings up to the
+     * mouth by f3 = 1 - progress^27 (0.6 across, 0.5 down, rotated 90 degrees about y, 10 about x and 30 about z). Applied
+     * before the normal arm transform.
+     *
+     * @param remainingTicks the use time left in ticks, counting the partial tick (vanilla: remaining - partial + 1)
+     * @param useTicks       the full use duration in ticks (32 for food, 16 for dried kelp)
+     * @param side           +1 for the right hand, -1 for the left
+     */
+    static Matrix4f eat(float remainingTicks, float useTicks, int side) {
+        float f1 = remainingTicks / useTicks;
+        Matrix4f m = new Matrix4f();
+        if (f1 < 0.8f) m.translate(0f, Math.abs((float) Math.cos(remainingTicks / 4f * (float) Math.PI) * 0.1f), 0f);
+        float f3 = 1f - (float) Math.pow(f1, 27.0);
+        return m.translate(f3 * 0.6f * side, f3 * -0.5f, 0f)
+                .rotateY(rad(side * f3 * 90f))
+                .rotateX(rad(f3 * 10f))
+                .rotateZ(rad(side * f3 * 30f));
+    }
+
     /** Full-cube blocks held in the hand. */
     static Matrix4f block(float swing) {
         return block(swing, 0f);

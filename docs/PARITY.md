@@ -328,3 +328,16 @@ Reference images: minecraft.wiki `DualWielding.png` (a real first-person iron sw
 - [x] XP orbs use the real `entity/experience/experience_orb.png` (16 icons of 16x16 chosen by value as in vanilla, 0.3-block camera-facing quads, green-yellow pulse). The tinted snow tile is gone.
 - [x] The crosshair is the real sprite with vanilla's inverting blend.
 - Tests: 747 passing (`PixelFontTest` and `UiSpritesTest` are new; the font tests use a made-up sheet so they do not depend on the real file).
+
+## 12. Held-item animations and dropped items (G12)
+
+All numbers below were read from the 26.3 client jar with `javap` (FirstPersonHandsAndItemsRenderer, ItemEntityRenderer, ItemEntity, LivingEntity$SwingState, Minecraft.continueAttack), not from memory.
+
+- [x] Eating motion (`applyEatTransform`): the item rises to the mouth by f3 = 1 - progress^27 (0.6 across, 0.5 down, rotated 90 about y, 10 about x, 30 about z) and bobs by |cos(f / 4 * pi)| * 0.1 once 20% of the use time is gone; the hand does not swing while using. Offhand food mirrors it. Shown live with cooked beef (hold use for 1.6 s). `HeldItemModel.eat`, tested.
+- [x] Hand swing restart rule (`SwingState.startIfAble`): a swing only restarts when none is running, or the running one is past half (3 of 6 ticks). Holding the mine button calls swing every tick, so it plays quick half swings every 4 ticks (0.2 s) instead of full swings every 0.3 s. Mining hit sounds now follow vanilla's every-4-ticks rhythm, starting with the first tick.
+- [x] Dropped items: the model's lowest point floats 0.0625 + (sin(ageTicks / 10 + phase) * 0.1 + 0.1) above the entity (so 0.0625 to 0.2625, always, also in the air), and spins ageTicks / 20 + phase radians (1 rad/s); the phase is per item (vanilla: random in [0, 2 pi)). Before: a 0.03 bob, only on the ground, and 1.6 rad/s with a common phase.
+- [x] Held blocks and tools use the model JSON display transforms (blocks [0,45,0] x 0.4, flat items [0,-90,25] + [1.13,3.2,1.13] x 0.68, verified earlier against a real screenshot).
+- New test-controller command `holdUse?held=true|false` (the real eating path, as a player holding right click).
+- Not done: drinking (no potions or milk exist), bow / crossbow / shield use poses (no such items), item-use cooldown overlay.
+- Tests: 751 passing.
+

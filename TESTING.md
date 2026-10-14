@@ -81,7 +81,7 @@ directly. No other part of `Game` was changed or is unit-tested this round - see
   pops a real window on a machine with a display, and does nothing useful on one without a
   display at all. Not attempted this round.
 - **A live test controller** - now exists (`-Dtest.controller=true`, see `com.example.testctl`), with
-  `giveItem`, `holdAttack`, `useItem`, `lookAt`, `openCookingScreen` and `advanceSimulationTicks` (fast-
+  `giveItem`, `holdAttack`, `holdUse`, `useItem`, `lookAt`, `openCookingScreen` and `advanceSimulationTicks` (fast-
   forwards cooking-station ticks without waiting real time) so mining, pickup, placement, and now
   cooking/smelting can be driven live through the same code path real input uses. It is a manual tool,
   not an automated test. The original

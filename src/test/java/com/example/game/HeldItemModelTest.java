@@ -17,6 +17,35 @@ class HeldItemModelTest {
     }
 
     @Test
+    void eatingStartsInPlaceBobsAndEndsAtTheMouth() {
+        // at the start (remaining = full use time) the hand has not moved: progress^27 is ~1 so f3 is ~0
+        Vector3f start = at(HeldItemModel.eat(32f, 32f, 1), 0f, 0f, 0f);
+        assertEquals(0f, start.x, 1e-4f);
+        assertEquals(0f, start.y, 1e-4f);
+        // partway through the first moments the item is travelling (progress^27 falls fast)
+        Vector3f travelling = at(HeldItemModel.eat(31f, 32f, 1), 0f, 0f, 0f);
+        assertTrue(travelling.x > 0.05f && travelling.x < 0.6f, "on its way: " + travelling.x);
+        // once 20% of the time has passed the item is at the mouth and bobs by |cos(f/4*pi)|*0.1
+        Vector3f mid = at(HeldItemModel.eat(22.4f, 32f, 1), 0f, 0f, 0f);
+        assertEquals(0.6f, mid.x, 1e-3f);
+        float bob = Math.abs((float) Math.cos(22.4f / 4f * Math.PI) * 0.1f);
+        assertEquals(-0.5f + bob, mid.y, 1e-3f);
+        // at the very end the item is 0.6 across and 0.5 down from the anchor
+        Vector3f end = at(HeldItemModel.eat(0.0001f, 32f, 1), 0f, 0f, 0f);
+        assertEquals(0.6f, end.x, 1e-3f);
+        assertEquals(-0.5f + 0.1f, end.y, 1e-3f, "0.5 down, plus the bob (cos(0) * 0.1)");
+    }
+
+    @Test
+    void theLeftHandEatsMirrored() {
+        Vector3f right = at(HeldItemModel.eat(3f, 32f, 1), 0.2f, 0.3f, 0.1f);
+        Vector3f left = at(HeldItemModel.eat(3f, 32f, -1), -0.2f, 0.3f, 0.1f);
+        assertEquals(-right.x, left.x, 1e-4f);
+        assertEquals(right.y, left.y, 1e-4f);
+        assertEquals(right.z, left.z, 1e-4f);
+    }
+
+    @Test
     void anIsolatedPixelGetsFourSidesPlusFrontAndBack() {
         boolean[] mask = new boolean[256];
         mask[5 * 16 + 5] = true;
