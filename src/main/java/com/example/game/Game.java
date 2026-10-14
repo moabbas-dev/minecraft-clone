@@ -2404,21 +2404,7 @@ public class Game implements GameAccess {
         HudTextures.draw(uiRenderer, t.hotbar, hx, hy, s);
 
         float heartsY = hy - 17 * s;
-        float health = survival.getHealth().getCurrentHealth();
-        float food = survival.getHunger().getFoodLevel();
-        for (int i = 0; i < 10; i++) {
-            float x = hx + i * 8 * s;
-            HudTextures.draw(uiRenderer, t.heartContainer, x, heartsY, s);
-            float v = health - i * 2f;
-            if (v >= 1.5f) HudTextures.draw(uiRenderer, t.heartFull, x, heartsY, s);
-            else if (v >= 0.5f) HudTextures.draw(uiRenderer, t.heartHalf, x, heartsY, s);
-
-            float fx = hx + (182 - 9) * s - i * 8 * s;
-            HudTextures.draw(uiRenderer, t.foodEmpty, fx, heartsY, s);
-            float fv = food - i * 2f;
-            if (fv >= 1.5f) HudTextures.draw(uiRenderer, t.foodFull, fx, heartsY, s);
-            else if (fv >= 0.5f) HudTextures.draw(uiRenderer, t.foodHalf, fx, heartsY, s);
-        }
+        drawHealthAndFood(t, hx, heartsY, s);
 
         int defense = survival.getArmor().totalDefense();
         if (defense > 0 && t.armorEmpty != null) {
@@ -2446,6 +2432,60 @@ public class Game implements GameAccess {
         }
         HudTextures.draw(uiRenderer, t.hotbarSelection, hx - s + 20 * sel * s, hy - s, s);
         drawHotbarLabel(hx + (3 + 20 * sel) * s, heartsY - 4 * s, 16 * s);
+    }
+
+    private long hudHealthBlinkEndTick;
+    private float hudLastHealth = -1f, hudBlinkFromHealth;
+
+    /**
+     * The heart and hunger rows with vanilla's animations (docs/vanilla-rules.md 5.2, rules in
+     * {@link com.example.ui.HudAnimation}): health is shown rounded up so any fraction still fills a half heart; after
+     * damage or healing the containers flash, with the hearts that were just lost shown in the flash colour; at 4 HP or
+     * less each heart jitters 0-1 px downwards; hunger icons jitter by -1..+1 px while saturation is 0. The jitter is
+     * seeded per game tick, so it is steady within a tick like vanilla's.
+     */
+    private void drawHealthAndFood(HudTextures t, float hx, float rowY, float s) {
+        long tick = System.nanoTime() / 50_000_000L;
+        float healthNow = survival.getHealth().getCurrentHealth();
+        if (hudLastHealth < 0f) hudLastHealth = healthNow;
+        if (healthNow < hudLastHealth) {
+            hudHealthBlinkEndTick = tick + com.example.ui.HudAnimation.DAMAGE_FLASH_TICKS;
+            hudBlinkFromHealth = hudLastHealth;
+        } else if (healthNow > hudLastHealth) {
+            hudHealthBlinkEndTick = tick + com.example.ui.HudAnimation.HEAL_FLASH_TICKS;
+            hudBlinkFromHealth = healthNow;
+        }
+        hudLastHealth = healthNow;
+        boolean blink = com.example.ui.HudAnimation.flashOn(hudHealthBlinkEndTick, tick);
+
+        int hp = (int) Math.ceil(healthNow);
+        int before = blink ? (int) Math.ceil(hudBlinkFromHealth) : 0;
+        int food = (int) Math.ceil(survival.getHunger().getFoodLevel());
+        boolean hungerShake = com.example.ui.HudAnimation.hungerShake(tick, food, survival.getHunger().getSaturation());
+        java.util.Random jitter = new java.util.Random(tick * 312871L);
+
+        for (int i = 0; i < 10; i++) {
+            float x = hx + i * 8 * s;
+            float y = com.example.ui.HudAnimation.lowHealthShake(hp) ? rowY + jitter.nextInt(2) * s : rowY;
+            HudTextures.Sprite container = blink && t.heartContainerBlink != null ? t.heartContainerBlink : t.heartContainer;
+            HudTextures.draw(uiRenderer, container, x, y, s);
+            if (blink && t.heartFullBlink != null && t.heartHalfBlink != null) {
+                int lost = before - i * 2;
+                if (lost >= 2) HudTextures.draw(uiRenderer, t.heartFullBlink, x, y, s);
+                else if (lost == 1) HudTextures.draw(uiRenderer, t.heartHalfBlink, x, y, s);
+            }
+            int v = hp - i * 2;
+            if (v >= 2) HudTextures.draw(uiRenderer, t.heartFull, x, y, s);
+            else if (v == 1) HudTextures.draw(uiRenderer, t.heartHalf, x, y, s);
+        }
+        for (int i = 0; i < 10; i++) {
+            float fx = hx + (182 - 9) * s - i * 8 * s;
+            float fy = hungerShake ? rowY + (jitter.nextInt(3) - 1) * s : rowY;
+            HudTextures.draw(uiRenderer, t.foodEmpty, fx, fy, s);
+            int v = food - i * 2;
+            if (v >= 2) HudTextures.draw(uiRenderer, t.foodFull, fx, fy, s);
+            else if (v == 1) HudTextures.draw(uiRenderer, t.foodHalf, fx, fy, s);
+        }
     }
 
     private void drawSurvivalHud(float hotbarLeftX, float hotbarRightX, float hotbarY) {
@@ -2485,8 +2525,11 @@ public class Game implements GameAccess {
         float ratio = Math.max(0f, Math.min(1f, stack.durabilityLeft() / (float) max));
         float u = slotSize / 16f;
         float bx = slotX + 2 * u, by = slotY + 13 * u;
+        // Vanilla: a black 13x2 backing and a 13-px fill whose width is rounded and whose hue runs red -> green.
+        int rgb = java.awt.Color.HSBtoRGB(ratio / 3f, 1f, 1f);
         uiRenderer.drawColorQuad(bx, by, 13 * u, 2 * u, 0f, 0f, 0f, 1f);
-        uiRenderer.drawColorQuad(bx, by, 13 * u * ratio, u, 1f - ratio, ratio, 0.1f, 1f);
+        uiRenderer.drawColorQuad(bx, by, Math.round(13 * ratio) * u, u,
+                ((rgb >> 16) & 0xFF) / 255f, ((rgb >> 8) & 0xFF) / 255f, (rgb & 0xFF) / 255f, 1f);
     }
 
     /** Quantity in the slot's bottom-right corner, with a dark drop shadow so it reads over any icon. */

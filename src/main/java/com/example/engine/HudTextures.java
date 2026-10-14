@@ -13,10 +13,9 @@ import static org.lwjgl.system.MemoryUtil.memAlloc;
 import static org.lwjgl.system.MemoryUtil.memFree;
 
 /**
- * Real Minecraft HUD sprites (hearts, hunger icons, hotbar and its selection frame), loaded from
- * {@code textures/gui/sprites/hud/} - gitignored like every other real texture here. Loading is
- * all-or-nothing: if any sprite is missing {@link #loadOrNull()} returns null and the HUD keeps its
- * plain colored-quad look, so a fresh clone without the textures still runs.
+ * HUD sprites (hearts, hunger icons, armor, air, XP bar, hotbar and its selection frame). Each sprite comes from a
+ * texture file in {@code textures/gui/sprites/hud/} when the player supplied one (gitignored), and otherwise from the
+ * built-in original art in {@link HudSprites}, so the HUD looks right on a fresh clone with no assets.
  */
 @Slf4j
 public final class HudTextures {
@@ -32,6 +31,8 @@ public final class HudTextures {
     public Sprite air, airBursting, xpBackground, xpProgress;
     public Sprite crosshairIndicatorBg, crosshairIndicatorProgress, crosshairIndicatorFull;
     public Sprite hotbarIndicatorBg, hotbarIndicatorProgress;
+    /** The white-flash variants shown for a moment after the player takes (or regains) health. */
+    public Sprite heartContainerBlink, heartFullBlink, heartHalfBlink;
     public final Sprite hotbar, hotbarSelection, heartContainer, heartFull, heartHalf, foodEmpty, foodFull, foodHalf;
 
     private HudTextures(Sprite hotbar, Sprite hotbarSelection, Sprite heartContainer, Sprite heartFull, Sprite heartHalf,
@@ -68,6 +69,9 @@ public final class HudTextures {
             t.crosshairIndicatorFull = optional("crosshair_attack_indicator_full.png");
             t.hotbarIndicatorBg = optional("hotbar_attack_indicator_background.png");
             t.hotbarIndicatorProgress = optional("hotbar_attack_indicator_progress.png");
+            t.heartContainerBlink = optional("heart/container_blinking.png");
+            t.heartFullBlink = optional("heart/full_blinking.png");
+            t.heartHalfBlink = optional("heart/half_blinking.png");
             return t;
         } catch (IOException | RuntimeException e) {
             log.info("Real HUD sprites not available ({}) - using the plain HUD", e.getMessage());
@@ -83,10 +87,24 @@ public final class HudTextures {
         }
     }
 
+    /** A texture file in {@link #DIR} if the player supplied one, otherwise the built-in original art. */
     private static Sprite load(String name) throws IOException {
-        File f = new File(DIR + name);
-        BufferedImage img = ImageIO.read(f);
-        if (img == null) throw new IOException("not an image: " + f);
+        BufferedImage img = readFile(name);
+        if (img == null) img = HudSprites.image(name);
+        if (img == null) throw new IOException("no sprite named " + name);
+        return upload(img);
+    }
+
+    private static BufferedImage readFile(String name) {
+        try {
+            File f = new File(DIR + name);
+            return f.isFile() ? ImageIO.read(f) : null;
+        } catch (IOException | RuntimeException e) {
+            return null;
+        }
+    }
+
+    private static Sprite upload(BufferedImage img) {
         int w = img.getWidth(), h = img.getHeight();
         ByteBuffer buf = memAlloc(w * h * 4);
         for (int y = 0; y < h; y++) {
