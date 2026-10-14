@@ -23,9 +23,9 @@ import java.util.Random;
 public class MiningController {
     /** Number of discrete crack overlay stages (0..CRACK_STAGES-1). */
     public static final int CRACK_STAGES = 10;
-    /** After a block breaks, the next one can't start for this long - stops a held button from
-     *  chain-breaking instant blocks (saplings, TNT) in a single burst. */
-    static final float BREAK_COOLDOWN_SECONDS = 0.2f;
+    /** After a block breaks, the next one can't start for this long (vanilla: 6 ticks) - also stops a held
+     *  button from chain-breaking instant blocks (saplings, TNT) in a single burst. */
+    static final float BREAK_COOLDOWN_SECONDS = 0.3f;
 
     public record Result(boolean mining, boolean broken, BlockType brokenType, int x, int y, int z,
                          List<BlockDrops.Resolved> drops) {
@@ -103,7 +103,7 @@ public class MiningController {
             targetType = current;
             progress = 0f;
         }
-        required = ToolEffectiveness.breakSeconds(heldTool, current) / Math.max(speedFactor, 0.001f);
+        required = ToolEffectiveness.wholeTicks(ToolEffectiveness.rawBreakSeconds(heldTool, current) / Math.max(speedFactor, 0.001f));
         progress += dt;
 
         if (progress < required) return Result.MINING;

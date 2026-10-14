@@ -84,7 +84,7 @@ public final class ToolEffectiveness {
     private static final Set<BlockType> AXE_BLOCKS = EnumSet.of(
             BlockType.OAK_LOG, BlockType.BIRCH_LOG, BlockType.SPRUCE_LOG, BlockType.JUNGLE_LOG,
             BlockType.ACACIA_LOG, BlockType.MANGROVE_LOG, BlockType.DARK_OAK_LOG, BlockType.CHERRY_LOG,
-            BlockType.OAK_PLANKS, BlockType.BOOKSHELF, BlockType.CRAFTING_TABLE, BlockType.CHEST);
+            BlockType.OAK_PLANKS, BlockType.BOOKSHELF, BlockType.CRAFTING_TABLE, BlockType.CHEST, BlockType.PUMPKIN);
 
     /** Blocks a shovel speeds up: loose/soft ground blocks. */
     private static final Set<BlockType> SHOVEL_BLOCKS = EnumSet.of(
@@ -118,10 +118,23 @@ public final class ToolEffectiveness {
      * for a correct tool and 1 otherwise. Unbreakable blocks return -1.
      */
     public static float breakSeconds(BlockType tool, BlockType block) {
+        float raw = rawBreakSeconds(tool, block);
+        return raw < 0f ? raw : wholeTicks(raw);
+    }
+
+    /** {@link #breakSeconds} before the whole-tick rounding, so airborne/underwater penalties can be applied first. */
+    public static float rawBreakSeconds(BlockType tool, BlockType block) {
         if (block == null || block.hardness < 0f) return -1f;
         if (block == BlockType.TNT) return block.handBreakSeconds();
         float base = canHarvest(tool, block) ? block.hardness * 1.5f : block.hardness * 5f;
         return base / speedMultiplier(tool, block);
+    }
+
+    /** Vanilla breaks blocks in whole game ticks (any remainder rounds up) and instantly once the per-tick damage
+     *  reaches 1, i.e. when the time is 0.05 s or less (docs/vanilla-rules.md 1.3). The epsilon absorbs float noise. */
+    public static float wholeTicks(float seconds) {
+        if (seconds <= 0.05f + 1e-4f) return 0f;
+        return (float) Math.ceil(seconds * 20f - 1e-3f) / 20f;
     }
 
     public static boolean isTool(BlockType type) {

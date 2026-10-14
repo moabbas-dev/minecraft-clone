@@ -162,6 +162,7 @@ class BlockDropsTest {
         assertFalse(com.example.world.ToolEffectiveness.canHarvest(BlockType.IRON_PICKAXE, BlockType.OBSIDIAN));
         assertTrue(com.example.world.ToolEffectiveness.canHarvest(BlockType.DIAMOND_PICKAXE, BlockType.OBSIDIAN));
         assertEquals(7.5f, com.example.world.ToolEffectiveness.breakSeconds(null, BlockType.STONE), 1e-4f, "1.5 hardness x 5 by hand");
-        assertEquals(1.5f * 1.5f / 2f, com.example.world.ToolEffectiveness.breakSeconds(BlockType.WOODEN_PICKAXE, BlockType.STONE), 1e-4f);
+        // 1.5 x 1.5 / 2 = 1.125 s, rounded up to whole ticks (23 ticks = 1.15 s) like vanilla's own break-time tables
+        assertEquals(1.15f, com.example.world.ToolEffectiveness.breakSeconds(BlockType.WOODEN_PICKAXE, BlockType.STONE), 1e-4f);
     }
 }

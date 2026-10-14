@@ -81,12 +81,11 @@ public final class BlockDrops {
         // Fragile blocks that shatter without yielding anything.
         OVERRIDES.put(BlockType.GLASS, NOTHING);
         OVERRIDES.put(BlockType.ICE, NOTHING);
-        // Iron/gold/copper/diamond ore still drop themselves: this project has no ore-block-
-        // drops-raw-material mechanic (see BlockType's own docs on RAW_IRON/RAW_GOLD/RAW_COPPER),
-        // so the ore block itself is the collectible, furnace-smeltable form.
-        // Coal ore is the one exception - real vanilla's own "Coal" item (see BlockType) needed a
-        // legitimate source for it to be usable as furnace fuel at all (this milestone's own
-        // requirement), matching real vanilla's actual behavior exactly.
+        // Vanilla 1.17+: iron and gold ore drop the raw item, copper ore drops 2-5 raw copper (the cooking
+        // registry smelts both the raw item and the ore block, as vanilla does) - docs/vanilla-rules.md 1.5.
+        OVERRIDES.put(BlockType.IRON_ORE, List.of(Drop.of(BlockType.RAW_IRON)));
+        OVERRIDES.put(BlockType.GOLD_ORE, List.of(Drop.of(BlockType.RAW_GOLD)));
+        OVERRIDES.put(BlockType.COPPER_ORE, List.of(new Drop(BlockType.RAW_COPPER, 2, 5)));
         OVERRIDES.put(BlockType.COAL_ORE, List.of(Drop.of(BlockType.COAL)));
         // Diamond ore yields the diamond item (needed for the diamond tier); an iron-or-better pickaxe is
         // still required by ToolEffectiveness.

@@ -37,9 +37,13 @@ public record ItemStack(BlockType type, int count, int damage) {
         return new ItemStack(type, newCount, damage);
     }
 
-    /** Largest stack size for this item: damageable items never stack. */
+    /** Vanilla's 16-per-stack items (docs/vanilla-rules.md 1.7). */
+    private static final java.util.Set<BlockType> STACKS_OF_16 = java.util.EnumSet.of(BlockType.EGG, BlockType.SNOWBALL);
+
+    /** Largest stack size for this item: damageable items never stack, eggs and snowballs stack to 16. */
     public static int maxStackFor(BlockType type, int inventoryMax) {
-        return Durability.isDamageable(type) ? 1 : inventoryMax;
+        if (Durability.isDamageable(type)) return 1;
+        return STACKS_OF_16.contains(type) ? Math.min(16, inventoryMax) : inventoryMax;
     }
 
     /** Two stacks can merge only if they are the same item with the same wear. */

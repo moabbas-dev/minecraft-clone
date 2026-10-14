@@ -1,0 +1,233 @@
+# Parity checklist vs vanilla Minecraft Java 1.21
+
+Reference: [`docs/vanilla-rules.md`](vanilla-rules.md) (every rule there has a source and a [V]/[P]/[U] confidence tag).
+Resume protocol: read this file top to bottom, pick the first `[ ]` row, fix it, run the game, tick the row with the commit hash.
+Status: `[x]` matches (or was fixed, commit in the last column), `[ ]` wrong or missing, `[~]` blocked or only partly fixed (reason in the notes).
+Verification in the notes column: `unit` = a unit test, `live` = checked in the running game through the test controller (screenshots in `test-output/screenshots/`).
+
+## 1. Mechanics
+
+| # | Mechanic | Vanilla (rules ref) | Code | Status | Notes / commit |
+|---|---|---|---|---|---|
+| M1 | Tool speed multipliers | wood 2, stone 4, iron 6, diamond 8, gold 12 (1.1) | wood 2, stone 4, iron 6, diamond 8; no gold tier | [x] | gold tier tracked under items (missing) |
+| M2 | Harvest levels | stone>=1 for iron/lapis, iron>=2 for gold/diamond/redstone, diamond>=3 for obsidian (1.2) | same gating via REQUIRED_HARVEST_LEVEL (shifted +1 internally) | [x] | ToolEffectiveness |
+| M3 | Break-time formula | x1.5 harvestable / x5 not, / tool speed, /5 airborne, /5 underwater (1.3) | implemented in ToolEffectiveness.breakSeconds + MiningController speedFactor | [x] | matches wiki cells for diamond ore / iron ore / cobblestone |
+| M4 | Break time rounded up to whole ticks | ticks = ceil(1/damage) (1.3) | rounded up to whole ticks, instant at <= 0.05 s (ToolEffectiveness.wholeTicks) | [x] | G1 unit VanillaRulesTest = wiki cells (1.15, 0.6, 9.4, 1.35 ...) |
+| M5 | Delay between broken blocks | 6 ticks = 0.3 s (1.3) | 0.3 s (BREAK_COOLDOWN_SECONDS) | [x] | G1 |
+| M6 | Block hardness table | 1.4 | all 40 verified blocks match (BlockType) | [x] | unit; ice, mangrove roots unverified [U] |
+| M7 | Block drops | 1.5 | stone, grass, gravel, leaves, clay, snow, glowstone, coal, diamond, glass, raw iron/gold/copper (2-5) | [x] | G1 unit + live: stone pickaxe on iron ore dropped RAW_IRON |
+| M8 | Tool durability | 1.1 / 1.7 | wood 59, stone 131, iron 250, diamond 1561; armor 55-... all match | [x] | Durability |
+| M9 | Durability use | tool -1 per block, -2 on attack; sword -1 on attack, -2 per block (1.7) | Durability.attackCost / blockBreakCost | [x] |  |
+| M10 | Stack sizes | 16: egg, snowball, ender pearl, bucket, sign; 1: tools, armor (1.7) | tools/armor 1, egg and snowball 16, everything else 64 | [x] | G1 unit + live: 40 eggs became 16/16/8 |
+| M11 | Armor defense/toughness | 1.6 | ArmorStats leather 1/3/2/1, iron 2/6/5/2, gold 2/5/3/1, diamond 3/8/6/3 tough 2 | [x] | unit CombatSystemTest |
+| M12 | Crafting recipes (existing) | 2 | planks, sticks, table, furnace, chest, sandstone, tools, swords, armor, blast furnace, smoker all match | [x] | Recipes |
+| M13 | Crafting recipes (missing) | 2 | no torch, bread, ladder, bucket, shears, bow, arrow, TNT, bricks, bookshelf, bottle, ingot/ore storage blocks | [ ] | tracked per item below |
+| M14 | Smelting time | furnace 200 t, blast/smoker 100 t (2.1) | CookingStationType | [x] | unit |
+| M15 | Fuel burn times | coal/charcoal 1600, planks/logs 300, stick 100 (2.1) | FuelRegistry; lava/blaze/coal block missing (no items) | [x] |  |
+| M16 | Smelting XP | iron 0.7, gold 1.0, glass 0.1, meat 0.35 (2.1) | CookingRecipeRegistry; coal ore and diamond ore recipes absent | [x] | missing recipes are non-vanilla-critical |
+| M17 | Hunger exhaustion values | sprint 0.1/m, jump 0.05, sprint-jump 0.2, swim 0.01/m, break 0.005, attack 0.1, damage 0.1 (3.1) | PlayerSurvival constants | [x] |  |
+| M18 | Natural regeneration | food>=18: 1 HP/80 t; food 20 + saturation: every 10 t (3.1) | PlayerSurvival.tickRegeneration | [x] |  |
+| M19 | Starvation | 80 t, floor 10 Easy / 1 Normal / 0 Hard (3.1) | PlayerSurvival.tickStarvation | [x] |  |
+| M20 | Sprint food threshold | food > 6 (3.1) | HungerComponent.canSprint | [x] |  |
+| M21 | Food values | 3.2 | all 22 foods match (raw chicken 2/1.2 kept; Perplexity's 3/1.8 contradicts the wiki, see rules doc) | [x] | carrot, cookie, melon, golden apple missing |
+| M22 | Fall damage | ceil(distance - 3), water/ladder reset (3.3) | PlayerSurvival.updateFallTracking | [x] |  |
+| M23 | Drowning | 300 air, 2 HP/s, +4 per tick recovery (3.4) | PlayerSurvival.tickAir | [x] |  |
+| M24 | Hurt invulnerability | 10 ticks, excess damage only (3.1) | HealthComponent | [x] |  |
+| M25 | Death XP drop / XP levels | min(7*level,100); 2L+7 / 5L-38 / 9L-158 | Experience | [x] |  |
+| M26 | Day length / phases | 24000 t (4) | 1200 s per day, sky colour ramps | [x] |  |
+| M27 | Weather durations | rain 12000-24000 t (4) | MIN_RAIN_SECONDS 600 (= 12000 t); others not audited | [x] |  |
+| M28 | Dropped item rules | pickup 10 t / 40 t thrown, despawn 6000 t, merge 0.5 x 0.25 x 0.5 (6) | 0.5 s / 2 s, 300 s ok; merge centre distance 0.75 = 0.25-wide boxes inflated by the wiki's 0.5 | [x] | not wrong: 0.5 is the inflate amount, not the centre distance |
+| M29 | Inventory: pick up / place / swap / half / one | 6 | InventoryMenu left/right click | [x] | unit InventoryTest |
+| M30 | Inventory: shift-click quick move | 6 | not implemented | [ ] |  |
+| M31 | Inventory: double-click gather | 6 | not implemented | [ ] |  |
+| M32 | Inventory: drag to distribute | 6 | not implemented | [ ] |  |
+| M33 | Inventory: number key swap | 6 | not implemented | [ ] |  |
+| M34 | Crafting result shift-click | crafts as many as possible | not implemented | [ ] |  |
+
+## 2. HUD
+
+| # | Element | Vanilla (rules 5) | Code | Status | Notes / commit |
+|---|---|---|---|---|---|
+| H1 | Hotbar sprite 182x22 + selection 24x23 | at (C-91, H-22), items at +3,+3 | geometry right; sprites only if textures/ exists, else plain 44 px coloured slots | [ ] | needs original sprites |
+| H2 | Hearts: 10, 9x9, step 8, y=H-39, half hearts | 5.1/5.2 | geometry right in the real-HUD path, plain red squares otherwise; fractional health not rounded up | [ ] |  |
+| H3 | Heart container + damage blink | blink 3-tick phases for 20 t (10 t when healed) | absent | [ ] | [M] source |
+| H4 | Low-health shake | <= 4 HP (wiki: 5) random 0/1 px | absent | [ ] |  |
+| H5 | Regeneration bounce | heart (tick % (max+5)) raised 2 px | absent | [ ] |  |
+| H6 | Hunger bar: 10 drumsticks, right-aligned, half icons | x = C+91-8i-9 | geometry right in real-HUD path only | [ ] |  |
+| H7 | Hunger shake at saturation 0 | tick % (food*3+1)==0, y +-1 | absent | [ ] |  |
+| H8 | Armor bar: 10 icons, only when armor>0 | row y=H-49 | geometry right in real-HUD path only | [ ] |  |
+| H9 | Air bubbles: full + popping, only underwater/refilling | right-aligned above food; 1.21 has no empty bubbles | real-HUD path only | [ ] | row y conflicts: rules say about H-59, code H-49 |
+| H10 | XP bar 182x5 + green level number | y about H-29 | real-HUD path only | [ ] |  |
+| H11 | Attack indicator (crosshair / hotbar) | 5.1 | real-HUD path only | [ ] |  |
+| H12 | Item count text, durability bar | 13 px bar green->red | present; colour ramp is linear RGB not hue | [ ] | minor |
+| H13 | Crosshair | 16x16 sprite, white inverted | two white quads | [ ] | minor |
+
+## 3. Inventory and crafting UI
+
+| # | Element | Vanilla (rules 6) | Code | Status | Notes / commit |
+|---|---|---|---|---|---|
+| U1 | Panel size and scaling | 176x166 GUI px at the GUI scale | custom 40 px slots, 4 px gap, fixed 3x scale-free layout | [ ] | InventoryLayout |
+| U2 | Slot size and spacing | 18 px pitch, slot art 16 px inside | 44 px pitch | [ ] |  |
+| U3 | Player inventory layout | armor column x=8,y=8 step 18; craft 2x2 at (98,18); out (154,28); offhand (77,62); storage (8,84); hotbar y=142 | armor is a 2x2 block left of the grid, no offhand slot, no player preview | [ ] | offhand slot missing as a feature |
+| U4 | Crafting table layout | 3x3 at (30,17), out (124,35) | same custom layout | [ ] |  |
+| U5 | Furnace layout | in (56,17), fuel (56,53), out (116,35), flame (56,36), arrow (79,34) | custom layout, plain bars | [ ] | CookingLayout |
+| U6 | Panel and slot look | light-grey panel with bevel, inset slots | dark flat panel | [ ] |  |
+| U7 | Hover highlight, held item, tooltip | white 50% square on the slot; item at cursor; dark-purple tooltip | white 28% over slot; 40 px held icon; plain dark box | [ ] |  |
+| U8 | Labels | Crafting / Inventory text colour 0x404040 | near-black | [ ] |  |
+
+## 4. Blocks and items (one row per entry in `BlockType`)
+
+Columns: stack size, durability, mining/drop result, icon. Icon status refers to the 16x16 art, which must be original pixel art in the vanilla style (outlined shapes, 3-4 tone shading, light from the top left). `Hardness` is checked against the verified table.
+
+| Item | Kind | Stack | Dur. | Hardness / mining / drop | Icon | Status | Notes / commit |
+|---|---|---:|---:|---|---|---|---|
+| Stone (`STONE`) | block | 64 |  | 1.5 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Grass Block (`GRASS_BLOCK`) | block | 64 |  | 0.6 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Dirt (`DIRT`) | block | 64 |  | 0.5 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Cobblestone (`COBBLESTONE`) | block | 64 |  | 2 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Oak Wood Planks (`OAK_PLANKS`) | block | 64 |  | 2 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Bedrock (`BEDROCK`) | block | 64 |  | -1 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Water (`WATER`) | block | 64 |  | -1 [U] | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Sand (`SAND`) | block | 64 |  | 0.5 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Gravel (`GRAVEL`) | block | 64 |  | 0.6 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Gold Ore (`GOLD_ORE`) | block | 64 |  | 3 ok | wrong: noise fill, no vanilla pattern | [ ] | drops raw item (G1) |
+| Iron Ore (`IRON_ORE`) | block | 64 |  | 3 ok | wrong: noise fill, no vanilla pattern | [ ] | drops raw item (G1) |
+| Coal Ore (`COAL_ORE`) | block | 64 |  | 3 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Oak Wood (`OAK_LOG`) | block | 64 |  | 2 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Oak Leaves (`OAK_LEAVES`) | block | 64 |  | 0.2 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Glass (`GLASS`) | block | 64 |  | 0.3 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Sandstone (`SANDSTONE`) | block | 64 |  | 0.8 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Block of Gold (`GOLD_BLOCK`) | block | 64 |  | 3 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Block of Iron (`IRON_BLOCK`) | block | 64 |  | 5 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Bricks (`BRICKS`) | block | 64 |  | 2 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
+| TNT (`TNT`) | block | 64 |  | 0 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Bookshelf (`BOOKSHELF`) | block | 64 |  | 1.5 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Mossy Cobblestone (`MOSSY_COBBLESTONE`) | block | 64 |  | 2 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Obsidian (`OBSIDIAN`) | block | 64 |  | 50 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Chest (`CHEST`) | block | 64 |  | 2.5 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Diamond Ore (`DIAMOND_ORE`) | block | 64 |  | 3 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Block of Diamond (`DIAMOND_BLOCK`) | block | 64 |  | 5 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Crafting Table (`CRAFTING_TABLE`) | block | 64 |  | 2.5 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Furnace (`FURNACE`) | block | 64 |  | 3.5 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Ice (`ICE`) | block | 64 |  | 0.5 [U] | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Snow Block (`SNOW_BLOCK`) | block | 64 |  | 0.2 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Clay (`CLAY`) | block | 64 |  | 0.6 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Pumpkin (`PUMPKIN`) | block | 64 |  | 1 ok | wrong: noise fill, no vanilla pattern | [ ] | axe is the fast tool (G1) |
+| Netherrack (`NETHERRACK`) | block | 64 |  | 0.4 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Glowstone (`GLOWSTONE`) | block | 64 |  | 0.3 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Terracotta (`TERRACOTTA`) | block | 64 |  | 1.25 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Red Sand (`RED_SAND`) | block | 64 |  | 0.5 [U] | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Birch Wood (`BIRCH_LOG`) | block | 64 |  | 2 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Birch Leaves (`BIRCH_LEAVES`) | block | 64 |  | 0.2 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Spruce Wood (`SPRUCE_LOG`) | block | 64 |  | 2 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Spruce Leaves (`SPRUCE_LEAVES`) | block | 64 |  | 0.2 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Jungle Wood (`JUNGLE_LOG`) | block | 64 |  | 2 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Jungle Leaves (`JUNGLE_LEAVES`) | block | 64 |  | 0.2 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Acacia Wood (`ACACIA_LOG`) | block | 64 |  | 2 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Acacia Leaves (`ACACIA_LEAVES`) | block | 64 |  | 0.2 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Mangrove Wood (`MANGROVE_LOG`) | block | 64 |  | 2 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Mangrove Leaves (`MANGROVE_LEAVES`) | block | 64 |  | 0.2 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Dark Oak Wood (`DARK_OAK_LOG`) | block | 64 |  | 2 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Dark Oak Leaves (`DARK_OAK_LEAVES`) | block | 64 |  | 0.2 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Cherry Wood (`CHERRY_LOG`) | block | 64 |  | 2 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Cherry Leaves (`CHERRY_LEAVES`) | block | 64 |  | 0.2 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Mud (`MUD`) | block | 64 |  | 0.5 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Mangrove Roots (`MANGROVE_ROOTS`) | block | 64 |  | 0.7 [U] | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Oak Sapling (`OAK_SAPLING_STAGE_0`) | block | 64 |  | 0 [U] | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Stick (`STICK`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
+| Wooden Pickaxe (`WOODEN_PICKAXE`) | item | 1 | 59 | item | wrong: placeholder shape | [ ] |  |
+| Stone Pickaxe (`STONE_PICKAXE`) | item | 1 | 131 | item | wrong: placeholder shape | [ ] |  |
+| Iron Pickaxe (`IRON_PICKAXE`) | item | 1 | 250 | item | wrong: placeholder shape | [ ] |  |
+| Wooden Axe (`WOODEN_AXE`) | item | 1 | 59 | item | wrong: placeholder shape | [ ] |  |
+| Stone Axe (`STONE_AXE`) | item | 1 | 131 | item | wrong: placeholder shape | [ ] |  |
+| Iron Axe (`IRON_AXE`) | item | 1 | 250 | item | wrong: placeholder shape | [ ] |  |
+| Wooden Shovel (`WOODEN_SHOVEL`) | item | 1 | 59 | item | wrong: placeholder shape | [ ] |  |
+| Stone Shovel (`STONE_SHOVEL`) | item | 1 | 131 | item | wrong: placeholder shape | [ ] |  |
+| Iron Shovel (`IRON_SHOVEL`) | item | 1 | 250 | item | wrong: placeholder shape | [ ] |  |
+| Apple (`APPLE`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
+| Bread (`BREAD`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
+| Cooked Beef (`COOKED_BEEF`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
+| Blast Furnace (`BLAST_FURNACE`) | block | 64 |  | 3.5 ok | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Smoker (`SMOKER`) | block | 64 |  | 3.5 [U] | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Copper Ore (`COPPER_ORE`) | block | 64 |  | 3 [U] | wrong: noise fill, no vanilla pattern | [ ] | drops raw item (G1) |
+| Smooth Stone (`SMOOTH_STONE`) | block | 64 |  | 2 [U] | wrong: noise fill, no vanilla pattern | [ ] |  |
+| Coal (`COAL`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
+| Charcoal (`CHARCOAL`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
+| Iron Ingot (`IRON_INGOT`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
+| Gold Ingot (`GOLD_INGOT`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
+| Copper Ingot (`COPPER_INGOT`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
+| Iron Nugget (`IRON_NUGGET`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
+| Brick (`BRICK`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
+| Raw Iron (`RAW_IRON`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
+| Raw Gold (`RAW_GOLD`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
+| Raw Copper (`RAW_COPPER`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
+| Raw Beef (`RAW_BEEF`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
+| Raw Porkchop (`RAW_PORKCHOP`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
+| Cooked Porkchop (`COOKED_PORKCHOP`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
+| Raw Chicken (`RAW_CHICKEN`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
+| Cooked Chicken (`COOKED_CHICKEN`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
+| Raw Mutton (`RAW_MUTTON`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
+| Cooked Mutton (`COOKED_MUTTON`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
+| Raw Rabbit (`RAW_RABBIT`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
+| Cooked Rabbit (`COOKED_RABBIT`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
+| Raw Cod (`COD`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
+| Cooked Cod (`COOKED_COD`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
+| Raw Salmon (`SALMON`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
+| Cooked Salmon (`COOKED_SALMON`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
+| Potato (`POTATO`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
+| Baked Potato (`BAKED_POTATO`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
+| Kelp (`KELP`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
+| Dried Kelp (`DRIED_KELP`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
+| Rotten Flesh (`ROTTEN_FLESH`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
+| Wooden Sword (`WOODEN_SWORD`) | item | 1 | 59 | item | wrong: placeholder shape | [ ] |  |
+| Stone Sword (`STONE_SWORD`) | item | 1 | 131 | item | wrong: placeholder shape | [ ] |  |
+| Iron Sword (`IRON_SWORD`) | item | 1 | 250 | item | wrong: placeholder shape | [ ] |  |
+| Leather (`LEATHER`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
+| Feather (`FEATHER`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
+| Egg (`EGG`) | item | 16 |  | item | wrong: placeholder shape | [ ] | stack 16 fixed (G1) |
+| Leather Cap (`LEATHER_HELMET`) | item | 1 | 55 | item | wrong: placeholder shape | [ ] |  |
+| Leather Tunic (`LEATHER_CHESTPLATE`) | item | 1 | 80 | item | wrong: placeholder shape | [ ] |  |
+| Leather Pants (`LEATHER_LEGGINGS`) | item | 1 | 75 | item | wrong: placeholder shape | [ ] |  |
+| Leather Boots (`LEATHER_BOOTS`) | item | 1 | 65 | item | wrong: placeholder shape | [ ] |  |
+| Iron Helmet (`IRON_HELMET`) | item | 1 | 165 | item | wrong: placeholder shape | [ ] |  |
+| Iron Chestplate (`IRON_CHESTPLATE`) | item | 1 | 240 | item | wrong: placeholder shape | [ ] |  |
+| Iron Leggings (`IRON_LEGGINGS`) | item | 1 | 225 | item | wrong: placeholder shape | [ ] |  |
+| Iron Boots (`IRON_BOOTS`) | item | 1 | 195 | item | wrong: placeholder shape | [ ] |  |
+| Golden Helmet (`GOLD_HELMET`) | item | 1 | 77 | item | wrong: placeholder shape | [ ] |  |
+| Golden Chestplate (`GOLD_CHESTPLATE`) | item | 1 | 112 | item | wrong: placeholder shape | [ ] |  |
+| Golden Leggings (`GOLD_LEGGINGS`) | item | 1 | 105 | item | wrong: placeholder shape | [ ] |  |
+| Golden Boots (`GOLD_BOOTS`) | item | 1 | 91 | item | wrong: placeholder shape | [ ] |  |
+| Diamond (`DIAMOND`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
+| Diamond Sword (`DIAMOND_SWORD`) | item | 1 | 1561 | item | wrong: placeholder shape | [ ] |  |
+| Diamond Axe (`DIAMOND_AXE`) | item | 1 | 1561 | item | wrong: placeholder shape | [ ] |  |
+| Diamond Pickaxe (`DIAMOND_PICKAXE`) | item | 1 | 1561 | item | wrong: placeholder shape | [ ] |  |
+| Diamond Shovel (`DIAMOND_SHOVEL`) | item | 1 | 1561 | item | wrong: placeholder shape | [ ] |  |
+| Diamond Helmet (`DIAMOND_HELMET`) | item | 1 | 363 | item | wrong: placeholder shape | [ ] |  |
+| Diamond Chestplate (`DIAMOND_CHESTPLATE`) | item | 1 | 528 | item | wrong: placeholder shape | [ ] |  |
+| Diamond Leggings (`DIAMOND_LEGGINGS`) | item | 1 | 495 | item | wrong: placeholder shape | [ ] |  |
+| Diamond Boots (`DIAMOND_BOOTS`) | item | 1 | 429 | item | wrong: placeholder shape | [ ] |  |
+| Flint (`FLINT`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
+| Clay Ball (`CLAY_BALL`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
+| Snowball (`SNOWBALL`) | item | 16 |  | item | wrong: placeholder shape | [ ] | stack 16 fixed (G1) |
+| Glowstone Dust (`GLOWSTONE_DUST`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
+| Book (`BOOK`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
+| Gunpowder (`GUNPOWDER`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
+| Bone (`BONE`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
+| Arrow (`ARROW`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
+| String (`STRING`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
+| Spider Eye (`SPIDER_EYE`) | item | 64 |  | item | wrong: placeholder shape | [ ] |  |
+
+### Items and blocks vanilla has that the clone lacks (missing, tracked, not all will be built)
+
+- [ ] gold pickaxe/axe/shovel/sword (tier gold: speed 12, level 0, durability 32)
+- [ ] hoes (all tiers) and farmland
+- [ ] chainmail armor
+- [ ] torch
+- [ ] bread recipe (wheat), wheat, carrot, melon slice, cookie, golden apple
+- [ ] bucket, shears, flint and steel, bow, fishing rod
+- [ ] ladder, door, fence, bed
+- [ ] glass bottle
+- [ ] coal/iron/gold/diamond/emerald/redstone/lapis storage blocks and their 9-item recipes
+- [ ] redstone, lapis, emerald ores
+- [ ] TNT crafting recipe, bricks crafting recipe, bookshelf crafting recipe, book recipe
+- [ ] ender pearl, sign, banner, saddle, boat, minecart
