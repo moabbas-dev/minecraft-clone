@@ -48,19 +48,19 @@ Verification in the notes column: `unit` = a unit test, `live` = checked in the 
 
 | # | Element | Vanilla (rules 5) | Code | Status | Notes / commit |
 |---|---|---|---|---|---|
-| H1 | Hotbar sprite 182x22 + selection 24x23 | at (C-91, H-22), items at +3,+3 | geometry right; sprites only if textures/ exists, else plain 44 px coloured slots | [ ] | needs original sprites |
-| H2 | Hearts: 10, 9x9, step 8, y=H-39, half hearts | 5.1/5.2 | geometry right in the real-HUD path, plain red squares otherwise; fractional health not rounded up | [ ] |  |
-| H3 | Heart container + damage blink | blink 3-tick phases for 20 t (10 t when healed) | absent | [ ] | [M] source |
-| H4 | Low-health shake | <= 4 HP (wiki: 5) random 0/1 px | absent | [ ] |  |
-| H5 | Regeneration bounce | heart (tick % (max+5)) raised 2 px | absent | [ ] |  |
-| H6 | Hunger bar: 10 drumsticks, right-aligned, half icons | x = C+91-8i-9 | geometry right in real-HUD path only | [ ] |  |
-| H7 | Hunger shake at saturation 0 | tick % (food*3+1)==0, y +-1 | absent | [ ] |  |
-| H8 | Armor bar: 10 icons, only when armor>0 | row y=H-49 | geometry right in real-HUD path only | [ ] |  |
-| H9 | Air bubbles: full + popping, only underwater/refilling | right-aligned above food; 1.21 has no empty bubbles | real-HUD path only | [ ] | row y conflicts: rules say about H-59, code H-49 |
-| H10 | XP bar 182x5 + green level number | y about H-29 | real-HUD path only | [ ] |  |
-| H11 | Attack indicator (crosshair / hotbar) | 5.1 | real-HUD path only | [ ] |  |
-| H12 | Item count text, durability bar | 13 px bar green->red | present; colour ramp is linear RGB not hue | [ ] | minor |
-| H13 | Crosshair | 16x16 sprite, white inverted | two white quads | [ ] | minor |
+| H1 | Hotbar sprite 182x22 + selection 24x23 | at (C-91, H-22), items at +3,+3 | generated original sprites at the vanilla geometry | [x] | G2 live: original 182x22 hotbar + 24x23 selection frame (HudSprites), unit HudSpritesTest |
+| H2 | Hearts: 10, 9x9, step 8, y=H-39, half hearts | 5.1/5.2 | 10 hearts, 9x9, step 8, y=H-39 | [x] | G2 live: hearts rounded up, half hearts correct (17 HP shows 8 + half) |
+| H3 | Heart container + damage blink | blink 3-tick phases for 20 t (10 t when healed) | flash 20 ticks on damage, 10 on heal | [x] | G2 live: container and lost hearts flash white in 3-tick phases; unit HudAnimationTest |
+| H4 | Low-health shake | <= 4 HP (wiki: 5) random 0/1 px | each heart jitters 0-1 px at <= 4 HP | [x] | G2 unit HudAnimationTest (threshold 4 HP from the decompiled source; wiki says 5, see rules 5.2) |
+| H5 | Regeneration bounce | heart (tick % (max+5)) raised 2 px |  | [~] | blocked: vanilla bounces hearts only under the Regeneration status effect and this project has no status effects |
+| H6 | Hunger bar: 10 drumsticks, right-aligned, half icons | x = C+91-8i-9 | 10 drumsticks right-aligned, half icons | [x] | G2 live: 7 food shows 3 full + half drumstick |
+| H7 | Hunger shake at saturation 0 | tick % (food*3+1)==0, y +-1 | implemented in Game.drawHealthAndFood | [x] | G2 unit HudAnimationTest (period food*3+1 ticks, saturation 0); jitter -1..+1 px |
+| H8 | Armor bar: 10 icons, only when armor>0 | row y=H-49 | original chestplate sprites | [x] | G2 live: armor 13 shows 6 full + half, row appears only with armor |
+| H9 | Air bubbles: full + popping, only underwater/refilling | right-aligned above food; 1.21 has no empty bubbles | row kept at H-49 (rules list about H-59 from a possibly older source) | [x] | G2 live: bubbles appear submerged, popping sprite for the partial one, none above water |
+| H10 | XP bar 182x5 + green level number | y about H-29 | y = H-29 | [x] | G2 live: 182x5 bar with green fill and level number |
+| H11 | Attack indicator (crosshair / hotbar) | 5.1 | original sprites | [x] | G2 live: crosshair indicator bar fills with charge; hotbar mode uses the same sprites |
+| H12 | Item count text, durability bar | 13 px bar green->red | Game.drawDurabilityBar | [x] | G2: 13 px bar, rounded width, red-to-green hue like vanilla |
+| H13 | Crosshair | 16x16 sprite, white inverted |  | [~] | minor: vanilla crosshair is an inverted-blend 15x15 sprite; the two white quads are close enough |
 
 ## 3. Inventory and crafting UI
 
