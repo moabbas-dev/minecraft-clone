@@ -23,6 +23,27 @@ final class MobModelBuilder {
     static final int ZOMBIE_TEX_W = 64, ZOMBIE_TEX_H = 64;
     static final int ANIMAL_TEX_W = 64, ANIMAL_TEX_H = 32;
 
+    private static final java.util.Map<String, int[]> SKIN_SIZES = new java.util.HashMap<>();
+
+    /**
+     * Records the real pixel size of a loaded skin so the box UVs are normalised by it. Minecraft 1.21.5 made the pig and
+     * cow skins larger than the old 64x32; a box UV is a pixel position, so dividing by the real size keeps it pointing at
+     * the same pixel (it assumes the old layout still anchors at the top-left).
+     */
+    static void setSkinSize(String species, int w, int h) {
+        SKIN_SIZES.put(species, new int[]{w, h});
+    }
+
+    static int skinW(String species) {
+        int[] s = SKIN_SIZES.get(species);
+        return s == null ? ANIMAL_TEX_W : s[0];
+    }
+
+    static int skinH(String species) {
+        int[] s = SKIN_SIZES.get(species);
+        return s == null ? ANIMAL_TEX_H : s[1];
+    }
+
     // Corner signs per face (bottom-left, bottom-right, top-right, top-left), as in ItemModelBuilder.
     // Face order: +Y, -Y, +Z, -Z, +X, -X.
     private static final int[][][] FACES = {
@@ -296,7 +317,7 @@ final class MobModelBuilder {
 
     static int emitPig(float[] out, int n, float px, float py, float pz, float yaw, float tilt, float walkPhase,
                        float walkAmount, float sky, float blockLight, float[] tint) {
-        Writer w = new Writer(out, n, px, py, pz, yaw, tilt, sky, blockLight, tint, ANIMAL_TEX_W, ANIMAL_TEX_H);
+        Writer w = new Writer(out, n, px, py, pz, yaw, tilt, sky, blockLight, tint, skinW("pig"), skinH("pig"));
         float swing = (float) Math.sin(walkPhase) * 3f * walkAmount;
         float lift = Math.max(0f, (float) Math.sin(walkPhase)) * 1.5f * walkAmount, liftB = Math.max(0f, -(float) Math.sin(walkPhase)) * 1.5f * walkAmount;
         w.box(0, 12, -10, 8, 8, 8, 0, 0, 0, false);                    // head
@@ -311,7 +332,7 @@ final class MobModelBuilder {
 
     static int emitCow(float[] out, int n, float px, float py, float pz, float yaw, float tilt, float walkPhase,
                        float walkAmount, float sky, float blockLight, float[] tint) {
-        Writer w = new Writer(out, n, px, py, pz, yaw, tilt, sky, blockLight, tint, ANIMAL_TEX_W, ANIMAL_TEX_H);
+        Writer w = new Writer(out, n, px, py, pz, yaw, tilt, sky, blockLight, tint, skinW("cow"), skinH("cow"));
         float swing = (float) Math.sin(walkPhase) * 3f * walkAmount;
         float lift = Math.max(0f, (float) Math.sin(walkPhase)) * 1.5f * walkAmount, liftB = Math.max(0f, -(float) Math.sin(walkPhase)) * 1.5f * walkAmount;
         w.box(0, 4, -11, 8, 8, 6, 0, 0, 0, false);                     // head
@@ -328,7 +349,7 @@ final class MobModelBuilder {
 
     static int emitChicken(float[] out, int n, float px, float py, float pz, float yaw, float tilt, float walkPhase,
                            float walkAmount, boolean airborne, float sky, float blockLight, float[] tint) {
-        Writer w = new Writer(out, n, px, py, pz, yaw, tilt, sky, blockLight, tint, ANIMAL_TEX_W, ANIMAL_TEX_H);
+        Writer w = new Writer(out, n, px, py, pz, yaw, tilt, sky, blockLight, tint, skinW("chicken"), skinH("chicken"));
         float swing = (float) Math.sin(walkPhase) * 2f * walkAmount;
         w.box(0, 12, -4.5f, 4, 6, 3, 0, 0, 0, false);                  // head
         w.box(0, 12, -7, 4, 2, 2, 14, 0, 0, false);                    // beak

@@ -56,3 +56,7 @@ minecraft-sounds/
 .DS_Store
 # Per-user menu settings written by the Options screens.
 options.txt
+
+# JVM crash dumps
+hs_err_pid*.log
+replay_pid*.log

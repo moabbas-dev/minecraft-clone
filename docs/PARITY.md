@@ -234,3 +234,23 @@ Columns: stack size, durability, mining/drop result, icon. Icon status refers to
 - [ ] ender pearl, sign, banner, saddle, boat, minecart
 - [ ] offhand slot (inventory (77,62), F to swap) and the player-model preview in the inventory screen
 - [ ] ghost armor icons in empty armor slots
+
+## 5. Session status (resume here)
+
+Phase 3 task picked: **finish the asset restore** (README / `scripts/restore-assets.py` / `docs/ASSETS.md` were never committed and the
+live pass of the restored assets had not been run). It was the last unfinished request: the script existed but the download had been
+blocked on the work network. The assets have since been restored on this machine (2,860 textures, 228 sounds).
+
+Verified live (G7, 2026-10-14): all 228 sounds are Ogg Vorbis, all 2,702 PNGs have a valid header, the game log shows no texture decode
+or sound-load warnings after breaking and placing blocks, the real item icons / hearts / hunger / hotbar render, and `options.txt`
+applies (render distance 12 loaded 441 chunks, 3 loaded 29).
+
+- [~] **Pig, cow and chicken skins**: Minecraft 1.21.5+ renamed them (`entity/pig/temperate_pig.png`, `entity/cow/temperate_cow.png`,
+  `entity/chicken/temperate_chicken.png`, source: Mojang's 1.21.5 changelog via Perplexity). The game and the script now accept both names, but
+  the three files are not on disk yet, so those mobs still draw flat placeholder colours. **Next step:** on an unfiltered network run
+  `python scripts/restore-assets.py` (idempotent), then look at the real file sizes: the pig and cow got larger and may have a different UV layout,
+  in which case the box UVs in `MobModelBuilder` (pig/cow/chicken) need re-mapping. Not verifiable without the files.
+- Precedence note: files in `textures/` override the original art in `ItemIcons` / `BlockArt` / `HudSprites`. To see the original art (what
+  groups G2-G5 verified), rename `textures/` away. The folders are gitignored.
+- Still missing features (not wrong, not built): offhand slot and player preview, ghost armor icons, regeneration heart bounce (no status
+  effects), gold tools/hoes/torch/bucket/bow and their recipes, the remaining unverified numbers listed in `docs/vanilla-rules.md` section 7.

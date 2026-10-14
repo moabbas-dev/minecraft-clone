@@ -1799,9 +1799,16 @@ public class Game implements GameAccess {
         if (list.isEmpty()) return;
         if (mobSkins.isEmpty()) {
             mobSkins.put("zombie", com.example.engine.EntityTexture.load("textures/entity/zombie/zombie.png", 64, 64, 0x5E874C));
-            mobSkins.put("pig", com.example.engine.EntityTexture.load("textures/entity/pig/pig.png", 64, 32, 0xECA0A0));
-            mobSkins.put("cow", com.example.engine.EntityTexture.load("textures/entity/cow/cow.png", 64, 32, 0x694628));
-            mobSkins.put("chicken", com.example.engine.EntityTexture.load("textures/entity/chicken.png", 64, 32, 0xF0F0F0));
+            // Minecraft 1.21.5 renamed these to the "temperate" variants (chicken also gained its own folder); older names stay as a fallback.
+            mobSkins.put("pig", com.example.engine.EntityTexture.loadFirst(
+                    new String[]{"textures/entity/pig/temperate_pig.png", "textures/entity/pig/pig.png"}, 64, 32, 0xECA0A0));
+            mobSkins.put("cow", com.example.engine.EntityTexture.loadFirst(
+                    new String[]{"textures/entity/cow/temperate_cow.png", "textures/entity/cow/cow.png"}, 64, 32, 0x694628));
+            mobSkins.put("chicken", com.example.engine.EntityTexture.loadFirst(
+                    new String[]{"textures/entity/chicken/temperate_chicken.png", "textures/entity/chicken.png"}, 64, 32, 0xF0F0F0));
+            for (String species : new String[]{"pig", "cow", "chicken"}) {
+                MobModelBuilder.setSkinSize(species, mobSkins.get(species).width(), mobSkins.get(species).height());
+            }
             mobSkins.put("creeper", com.example.engine.EntityTexture.load("textures/entity/creeper/creeper.png", 64, 32, 0x4FA13A));
             mobSkins.put("skeleton", com.example.engine.EntityTexture.load("textures/entity/skeleton/skeleton.png", 64, 32, 0xC9C9C9));
             mobSkins.put("spider", com.example.engine.EntityTexture.load("textures/entity/spider/spider.png", 64, 32, 0x3A2F28));

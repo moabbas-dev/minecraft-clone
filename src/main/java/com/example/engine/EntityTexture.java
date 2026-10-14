@@ -37,6 +37,21 @@ public final class EntityTexture {
         return height;
     }
 
+    /**
+     * The first path in {@code candidates} that is an existing file, or the first candidate when none exists (so the
+     * "not found" warning names the preferred path). Lets one skin be found under both its current and older file name,
+     * e.g. Minecraft 1.21.5 moved the pig, cow and chicken skins to {@code temperate_*.png}.
+     */
+    public static String firstExisting(String... candidates) {
+        for (String c : candidates) if (new File(c).isFile()) return c;
+        return candidates[0];
+    }
+
+    /** {@link #load(String, int, int, int)} for a skin that has several possible file names, newest first. */
+    public static EntityTexture loadFirst(String[] candidates, int fallbackW, int fallbackH, int fallbackRgb) {
+        return load(firstExisting(candidates), fallbackW, fallbackH, fallbackRgb);
+    }
+
     public static EntityTexture load(String path, int fallbackW, int fallbackH, int fallbackRgb) {
         BufferedImage img = null;
         File file = new File(path);
