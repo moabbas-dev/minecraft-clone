@@ -28,7 +28,7 @@ URLs are all under `https://minecraft.wiki/w/` unless shown in full.
 | Diamond | 3 | 1561 | 8 | 3 |
 | Netherite | 3 | 2031 | 9 | 4 |
 
-Damage-bonus column: stone/iron/diamond rows [V] from `Tiers`; wood/gold/netherite values are [U] (standard values, not shown in the snippet).
+Damage-bonus column: all rows [V] (stone/iron/diamond from `Tiers`; wood 0, gold 0, netherite 4 confirmed in the 26.3 client `ToolMaterial`).
 Mining-level rule [V]: blocks tagged `needs_stone_tool` need level >= 1, `needs_iron_tool` level >= 2, `needs_diamond_tool` level >= 3.
 A golden pickaxe has level 0, so it cannot harvest gold (level 2). Shears: speed 2 (5 on wool, 15 on cobweb and leaves). Sword: 1.5 (15 on cobweb).
 Hoes have the same durability as the other tools of the tier [P].
@@ -90,7 +90,7 @@ All **[V]** from the per-block pages unless tagged.
 | TNT | 0 | instant | | | | | | | `TNT` |
 | Mud | 0.5 | 0.75 | 0.4 | 0.2 | 0.15 | 0.1 | 0.1 | 0.1 | ja.minecraft.wiki `Mud` |
 | Bedrock | -1 (unbreakable) | | | | | | | | `Bedrock` |
-| Ice | 0.5 | | | | | | | | **[U]** (not returned by the search) |
+| Ice | 0.5 | | | | | | | | [V] read from the 26.3 client (`Blocks`) |
 
 Break-time cells in the "ore" rows that read "cannot harvest" are the penalised x5 times from the wiki table.
 
@@ -179,7 +179,7 @@ Repair by combining two damaged items: sum of remaining durability + 5% of max, 
 ### 3.2 Food table [P] (`Food`) - hunger / saturation
 Apple 4/2.4, bread 5/6.0, cooked beef 8/12.8, cooked porkchop 8/12.8, cooked chicken 6/7.2, raw beef/porkchop/chicken 3/1.8 (raw chicken [U] 2/1.2 in current versions - the answer lists 3/1.8 for all three),
 carrot 3/3.6, potato 1/0.6, baked potato 5/6.0, cookie 2/0.4, melon slice 2/1.2, golden apple 4/9.6, rotten flesh 4/0.8.
-**CONFLICT / [U]:** raw chicken is 2 hunger / 1.2 saturation in 1.21 according to commonly cited tables; the Perplexity answer grouped it with raw beef. Double-check before changing the code.
+**Resolved [V]:** raw chicken is 2 hunger / 1.2 saturation (nutrition 2, saturation modifier 0.3 in the 26.3 client `Foods`); the code already uses it.
 
 ### 3.3 Fall damage [V] (`Damage`, `Hay_Bale`)
 - damage = ceil(fallDistance - safeFallDistance) where safe distance is 3 for the player (about 1 HP per block over 3).
@@ -189,8 +189,8 @@ carrot 3/3.6, potato 1/0.6, baked potato 5/6.0, cookie 2/0.4, melon slice 2/1.2,
 ### 3.4 Other damage [V/P] (`Damage`, `Void`)
 - Drowning: 300 air ticks; at air = -20 take 2 HP, reset air to 0 (so 2 HP per second) [P]. Air refills 4 per tick out of water [P].
 - Fire / cactus / suffocation: 1 HP every 10 ticks [P]. Lava: 4 HP every 10 ticks and sets on fire [P]. Burn duration is source dependent (the "8 s / 15 s" figures were **not supported**).
-- Void: about 4 HP every 10 ticks below y = -64 in 1.18+ worlds; Perplexity said "-128 in the Overworld" which **CONFLICTS** with 1.18+ (the build limit is -64) - treat as [U].
-- Lightning damage, respawn reset values and the death XP-drop formula (min(7 x level, 100)) were **not confirmed** by the search [U].
+- Void [V, 26.3 client `Entity.checkBelowWorld`]: 4 damage whenever the hurt cooldown allows (about every 10 ticks) below (world minimum height - 64), which is y = -128 in the 1.18+ overworld whose minimum is -64.
+- Death XP drop min(7 x level, 100) [V, `Player.getBaseExperienceReward`]. Lightning damage and the respawn reset values were not checked.
 
 ---
 
@@ -261,5 +261,5 @@ Item entities [P] (`Item_(entity)`): pickup delay 10 ticks (40 for player-thrown
 
 ---
 
-## 7. Items the search could not settle (kept as [U])
-Ice hardness, bookshelf default time, damage bonus for wood/gold/netherite, raw chicken food values, lightning damage, death XP drop, respawn resets, exact hostile light-level rule, GUI label offsets, shift-click crafting rules.
+## 7. Items the search could not settle
+Resolved from the 26.3 client jar (see docs/PARITY.md section 15): ice hardness, bookshelf hardness, damage bonus for wood / gold / netherite, raw chicken food values, death XP drop, the void rule, the hostile light-level rule (block light 0 and sky light at most a random 0-7). Still open: lightning damage, respawn resets, GUI label offsets, shift-click crafting rules.

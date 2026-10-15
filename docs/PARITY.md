@@ -14,7 +14,7 @@ Verification in the notes column: `unit` = a unit test, `live` = checked in the 
 | M3 | Break-time formula | x1.5 harvestable / x5 not, / tool speed, /5 airborne, /5 underwater (1.3) | implemented in ToolEffectiveness.breakSeconds + MiningController speedFactor | [x] | matches wiki cells for diamond ore / iron ore / cobblestone |
 | M4 | Break time rounded up to whole ticks | ticks = ceil(1/damage) (1.3) | rounded up to whole ticks, instant at <= 0.05 s (ToolEffectiveness.wholeTicks) | [x] | G1 unit VanillaRulesTest = wiki cells (1.15, 0.6, 9.4, 1.35 ...) |
 | M5 | Delay between broken blocks | 6 ticks = 0.3 s (1.3) | 0.3 s (BREAK_COOLDOWN_SECONDS) | [x] | G1 |
-| M6 | Block hardness table | 1.4 | all 40 verified blocks match (BlockType) | [x] | unit; ice, mangrove roots unverified [U] |
+| M6 | Block hardness table | 1.4 | all 40 verified blocks match (BlockType) | [x] | unit; ice and mangrove roots now read from the client jar [V] (G15) |
 | M7 | Block drops | 1.5 | stone, grass, gravel, leaves, clay, snow, glowstone, coal, diamond, glass, raw iron/gold/copper (2-5) | [x] | G1 unit + live: stone pickaxe on iron ore dropped RAW_IRON |
 | M8 | Tool durability | 1.1 / 1.7 | wood 59, stone 131, iron 250, diamond 1561; armor 55-... all match | [x] | Durability |
 | M9 | Durability use | tool -1 per block, -2 on attack; sword -1 on attack, -2 per block (1.7) | Durability.attackCost / blockBreakCost | [x] |  |
@@ -88,7 +88,7 @@ Columns: stack size, durability, mining/drop result, icon. Icon status refers to
 | Cobblestone (`COBBLESTONE`) | block | 64 | | 2 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
 | Oak Wood Planks (`OAK_PLANKS`) | block | 64 | | 2 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
 | Bedrock (`BEDROCK`) | block | 64 | | -1 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
-| Water (`WATER`) | block | 64 | | -1 [U] | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Water (`WATER`) | block | 64 | | -1 (vanilla 100, never targeted) [V] | real texture | [x] | G4 live (world wall, trees, inventory). |
 | Sand (`SAND`) | block | 64 | | 0.5 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
 | Gravel (`GRAVEL`) | block | 64 | | 0.6 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
 | Gold Ore (`GOLD_ORE`) | block | 64 | | 3 ok | real texture | [x] | G4 live (world wall, trees, inventory). drops raw item (G1) |
@@ -110,14 +110,14 @@ Columns: stack size, durability, mining/drop result, icon. Icon status refers to
 | Block of Diamond (`DIAMOND_BLOCK`) | block | 64 | | 5 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
 | Crafting Table (`CRAFTING_TABLE`) | block | 64 | | 2.5 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
 | Furnace (`FURNACE`) | block | 64 | | 3.5 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
-| Ice (`ICE`) | block | 64 | | 0.5 [U] | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Ice (`ICE`) | block | 64 | | 0.5 [V] | real texture | [x] | G4 live (world wall, trees, inventory). |
 | Snow Block (`SNOW_BLOCK`) | block | 64 | | 0.2 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
 | Clay (`CLAY`) | block | 64 | | 0.6 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
 | Pumpkin (`PUMPKIN`) | block | 64 | | 1 ok | real texture | [x] | G4 live (world wall, trees, inventory). axe is the fast tool (G1) |
 | Netherrack (`NETHERRACK`) | block | 64 | | 0.4 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
 | Glowstone (`GLOWSTONE`) | block | 64 | | 0.3 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
 | Terracotta (`TERRACOTTA`) | block | 64 | | 1.25 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
-| Red Sand (`RED_SAND`) | block | 64 | | 0.5 [U] | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Red Sand (`RED_SAND`) | block | 64 | | 0.5 [V] | real texture | [x] | G4 live (world wall, trees, inventory). |
 | Birch Wood (`BIRCH_LOG`) | block | 64 | | 2 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
 | Birch Leaves (`BIRCH_LEAVES`) | block | 64 | | 0.2 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
 | Spruce Wood (`SPRUCE_LOG`) | block | 64 | | 2 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
@@ -133,8 +133,8 @@ Columns: stack size, durability, mining/drop result, icon. Icon status refers to
 | Cherry Wood (`CHERRY_LOG`) | block | 64 | | 2 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
 | Cherry Leaves (`CHERRY_LEAVES`) | block | 64 | | 0.2 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
 | Mud (`MUD`) | block | 64 | | 0.5 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
-| Mangrove Roots (`MANGROVE_ROOTS`) | block | 64 | | 0.7 [U] | real texture | [x] | G4 live (world wall, trees, inventory). |
-| Oak Sapling (`OAK_SAPLING_STAGE_0`) | block | 64 | | 0 [U] | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Mangrove Roots (`MANGROVE_ROOTS`) | block | 64 | | 0.7 [V] | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Oak Sapling (`OAK_SAPLING_STAGE_0`) | block | 64 | | 0 (instabreak) [V] | real texture | [x] | G4 live (world wall, trees, inventory). |
 | Stick (`STICK`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
 | Wooden Pickaxe (`WOODEN_PICKAXE`) | item | 1 | 59 | item | real texture | [x] | G3 live (inventory + hotbar). |
 | Stone Pickaxe (`STONE_PICKAXE`) | item | 1 | 131 | item | real texture | [x] | G3 live (inventory + hotbar). |
@@ -149,9 +149,9 @@ Columns: stack size, durability, mining/drop result, icon. Icon status refers to
 | Bread (`BREAD`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
 | Cooked Beef (`COOKED_BEEF`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
 | Blast Furnace (`BLAST_FURNACE`) | block | 64 | | 3.5 ok | real texture | [x] | G4 live (world wall, trees, inventory). |
-| Smoker (`SMOKER`) | block | 64 | | 3.5 [U] | real texture | [x] | G4 live (world wall, trees, inventory). |
-| Copper Ore (`COPPER_ORE`) | block | 64 | | 3 [U] | real texture | [x] | G4 live (world wall, trees, inventory). drops raw item (G1) |
-| Smooth Stone (`SMOOTH_STONE`) | block | 64 | | 2 [U] | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Smoker (`SMOKER`) | block | 64 | | 3.5 [V] | real texture | [x] | G4 live (world wall, trees, inventory). |
+| Copper Ore (`COPPER_ORE`) | block | 64 | | 3 (a copy of iron ore) [V] | real texture | [x] | G4 live (world wall, trees, inventory). drops raw item (G1) |
+| Smooth Stone (`SMOOTH_STONE`) | block | 64 | | 2 [V] | real texture | [x] | G4 live (world wall, trees, inventory). |
 | Coal (`COAL`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
 | Charcoal (`CHARCOAL`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
 | Iron Ingot (`IRON_INGOT`) | item | 64 | | item | real texture | [x] | G3 live (inventory + hotbar). |
@@ -365,4 +365,17 @@ All numbers from the 26.3 client (SkyRenderer.buildStars, CloudRenderer, `clouds
 - Moon phase quad: each phase is its own real sprite under `celestial/moon/`, so the quad's texture orientation does not depend on the phase (the reversed axes found earlier apply to all of them).
 - Not done: rain / snow particles for snow biomes, lava and campfire smoke in the rain, the rain sound variants by position, thunder flash tweaks, the sunrise / sunset glow (`sunrise_sunset_color` keyframes) and the real sky colour keyframes (the sky colour is still this game's own blend).
 - Tests: 784 passing (`SkyDetailsTest`, `RainSplashesTest`).
+
+## 15. Gold tools, hoes, void and the open numbers (G15)
+
+- [x] Gold sword, axe, pickaxe and shovel and the wooden, stone, iron, gold and diamond hoes: new items with the real icons, recipes (hoes in both orientations), durability (gold 32, hoes by tier) and attack stats. Read from `Items` / `ToolMaterial` in the client: damage = 1 + tier bonus + the tool's own value, speed = 4 + the tool's own value. Gold sword 4 / 1.6, axe 7 / 1.0, pickaxe 2 / 1.2, shovel 2.5 / 1.0; every hoe deals 1 and swings at 1 / 2 / 3 / 4 (wood, stone, iron, diamond), gold 1. Gold mines at x12 but has mining level 0 (cannot harvest iron). Hoes mine nothing faster (no hay or sculk) and cannot till: there is no farmland yet. The 26.x client also has copper tools (190 uses, speed 5, bonus 1) and spears: not added.
+- [x] Tier damage bonuses confirmed (wood 0, stone 1, iron 2, diamond 3, gold 0, netherite 4), as are the durabilities and speeds in docs/vanilla-rules.md 1.1.
+- [x] Block hardness [U] rows resolved from `Blocks`: ice 0.5, red sand 0.5, mangrove roots 0.7, bookshelf 1.5, smoker 3.5, smooth stone 2 (resistance 6), sapling instant, copper ore = a copy of iron ore (3), water 100 (we use -1, the same in practice since water is never targeted).
+- [x] Raw chicken is 2 hunger / 1.2 saturation (nutrition 2, saturation modifier 0.3): the code already had it. The other foods match too (beef 3 / 1.8, cooked beef 8 / 12.8, bread 5 / 6, rotten flesh 4 / 0.8, spider eye 2 / 3.2).
+- [x] Death drops 7 x level experience, at most 100 (`Player.getBaseExperienceReward`), as the doc says.
+- [x] Void: below y = (world minimum - 64) a living thing takes 4 damage whenever the hurt cooldown allows (`Entity.checkBelowWorld`, `LivingEntity.onBelowWorld`). Now wired for the player at y < -64 (this world's minimum is 0), `DamageSource.VOID`; the doc's "-128" was the 1.17 value.
+- [x] Hostile spawning: the overworld dimension data has `monster_spawn_block_light_limit` 0 and `monster_spawn_light_level` uniform 0..7, i.e. block light 0 and sky light at most a random 0-7, as in docs/vanilla-rules.md 5.
+- **Still not modeled:** lightning damage and fire (bolts are only a flash), torches, buckets and the bow (they need new systems: block light sources, fluids, projectiles with charge), status effects (so no regeneration heart bounce).
+- **JVM crash log `hs_err_pid27744.log`** (2026-10-14 12:54): an EXCEPTION_ACCESS_VIOLATION inside `jvm.dll` on the "C2 CompilerThread1" thread while it was compiling `Game.renderHeldItem` (OpenJDK 25.0.2+10). The crash is in HotSpot's optimizing compiler, not in this game's Java or in LWJGL / OpenGL (no Java or native game frame is on the stack), and it has not come back in many runs since. Workarounds if it returns: a newer JDK 25 update, or `-XX:CompileCommand=exclude,com.example.game.Game::renderHeldItem` for the run.
+- Tests: 790 passing (`GoldToolsAndHoesTest`, the void test).
 
