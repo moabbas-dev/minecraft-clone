@@ -34,6 +34,11 @@ final class LightmapColors {
      * @param gamma       the Brightness option, 0 (moody) .. 1 (bright)
      */
     static Params params(float dayTick, float rainLevel, float thunderLevel, float flicker, float gamma) {
+        return params(dayTick, rainLevel, thunderLevel, flicker, gamma, false);
+    }
+
+    /** As above; {@code flashing} is a lightning flash, which sets the sky light factor to 1 whatever the time and weather. */
+    static Params params(float dayTick, float rainLevel, float thunderLevel, float flicker, float gamma, boolean flashing) {
         float factor = SkyDetails.cyclic(SKY_FACTOR, dayTick);
         float[] color = {SkyDetails.cyclic(SKY_COLOR_R, dayTick), SkyDetails.cyclic(SKY_COLOR_G, dayTick), SkyDetails.cyclic(SKY_COLOR_B, dayTick)};
         // the weather layers, alpha-blended toward night by their strength
@@ -44,6 +49,7 @@ final class LightmapColors {
             color[i] = lerp(color[i], NIGHT_SKY_LIGHT_COLOR[i], rain);
             color[i] = lerp(color[i], NIGHT_SKY_LIGHT_COLOR[i], thunder);
         }
+        if (flashing) factor = 1f;
         return new Params(factor, color, 1.4f + flicker, gamma);
     }
 

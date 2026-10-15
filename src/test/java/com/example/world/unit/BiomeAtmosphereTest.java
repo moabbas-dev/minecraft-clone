@@ -107,10 +107,10 @@ class BiomeAtmosphereTest {
         float[] weights = new float[Biome.values().length];
         weights[Biome.OCEAN.ordinal()] = 1f;
         float[] sky = colors.blendSkyTint(weights);
-        // 0x7FB8E0 - this project's own adapted Ocean sky tint (see BiomeColors).
-        assertEquals(0x7F / 255f, sky[0], 1e-5f);
-        assertEquals(0xB8 / 255f, sky[1], 1e-5f);
-        assertEquals(0xE0 / 255f, sky[2], 1e-5f);
+        // 0x7BA4FF - the ocean biome's own visual/sky_color in the 26.3 client jar (see BiomeColors).
+        assertEquals(0x7B / 255f, sky[0], 1e-5f);
+        assertEquals(0xA4 / 255f, sky[1], 1e-5f);
+        assertEquals(0xFF / 255f, sky[2], 1e-5f);
     }
 
     @Test
@@ -155,53 +155,44 @@ class BiomeAtmosphereTest {
     }
 
     @Test
-    void oceanFrozenOceanAndMangroveHaveDistinctSkyTints() {
-        float[] ocean = pureBiomeColor(Biome.OCEAN, colors::blendSkyTint);
-        float[] frozen = pureBiomeColor(Biome.FROZEN_OCEAN, colors::blendSkyTint);
-        float[] mangrove = pureBiomeColor(Biome.MANGROVE, colors::blendSkyTint);
-        float[] swamp = pureBiomeColor(Biome.SWAMP, colors::blendSkyTint);
-        float[] jungle = pureBiomeColor(Biome.JUNGLE, colors::blendSkyTint);
+    void biomeSkyTintsAreTheRealBiomeFileValues() {
+        assertArrayEquals(rgb(0x78A7FF), pureBiomeColor(Biome.PLAINS, colors::blendSkyTint), 1e-5f);
+        assertArrayEquals(rgb(0x6EB1FF), pureBiomeColor(Biome.DESERT, colors::blendSkyTint), 1e-5f);
+        assertArrayEquals(rgb(0x7FA1FF), pureBiomeColor(Biome.SNOWY_TUNDRA, colors::blendSkyTint), 1e-5f);
+        assertArrayEquals(rgb(0x7BA4FF), pureBiomeColor(Biome.CHERRY_GROVE, colors::blendSkyTint), 1e-5f);
+        assertArrayEquals(rgb(0x7AA5FF), pureBiomeColor(Biome.BIRCH_FOREST, colors::blendSkyTint), 1e-5f);
+    }
 
-        assertFalse(java.util.Arrays.equals(ocean, frozen), "Ocean and Frozen Ocean sky tints must differ");
-        assertFalse(java.util.Arrays.equals(mangrove, swamp), "Mangrove sky tint must differ from Swamp's");
-        assertFalse(java.util.Arrays.equals(mangrove, jungle), "Mangrove sky tint must differ from Jungle's");
+    @Test
+    void waterColoursAreTheRealBiomeFileValues() {
+        assertArrayEquals(rgb(0x3F76E4), pureBiomeColor(Biome.PLAINS, colors::blendWater), 1e-5f);
+        assertArrayEquals(rgb(0x3938C9), pureBiomeColor(Biome.FROZEN_OCEAN, colors::blendWater), 1e-5f);
+        assertArrayEquals(rgb(0x3A7A6A), pureBiomeColor(Biome.MANGROVE, colors::blendWater), 1e-5f);
+        assertArrayEquals(rgb(0x617B64), pureBiomeColor(Biome.SWAMP, colors::blendWater), 1e-5f);
+        assertArrayEquals(rgb(0x5DB7EF), pureBiomeColor(Biome.CHERRY_GROVE, colors::blendWater), 1e-5f);
+    }
+
+    @Test
+    void underwaterFogColoursAreTheRealBiomeFileValues() {
+        assertArrayEquals(rgb(0x050533), pureBiomeColor(Biome.PLAINS, colors::blendUnderwaterFog), 1e-5f);
+        assertArrayEquals(rgb(0x232317), pureBiomeColor(Biome.SWAMP, colors::blendUnderwaterFog), 1e-5f);
+        assertArrayEquals(rgb(0x4D7A60), pureBiomeColor(Biome.MANGROVE, colors::blendUnderwaterFog), 1e-5f);
+    }
+
+    @Test
+    void everyOverworldBiomeHereUsesTheDimensionFogColour() {
+        for (Biome b : Biome.values()) {
+            assertArrayEquals(rgb(0xC0D8FF), pureBiomeColor(b, colors::blendFog), 1e-5f, b + " fog");
+        }
+    }
+
+    private static float[] rgb(int hex) {
+        return new float[]{((hex >> 16) & 0xFF) / 255f, ((hex >> 8) & 0xFF) / 255f, (hex & 0xFF) / 255f};
     }
 
     private float[] pureBiomeColor(Biome biome, java.util.function.Function<float[], float[]> blend) {
         float[] weights = new float[Biome.values().length];
         weights[biome.ordinal()] = 1f;
         return blend.apply(weights);
-    }
-
-    // --- Birch Forest / Dark Forest / Cherry Grove (this round's new Forest-family biomes) ---
-
-    @Test
-    void newForestFamilyBiomesHaveSkyTintsDistinctFromForestAndFromEachOther() {
-        float[] forest = pureBiomeColor(Biome.FOREST, colors::blendSkyTint);
-        float[] birch = pureBiomeColor(Biome.BIRCH_FOREST, colors::blendSkyTint);
-        float[] dark = pureBiomeColor(Biome.DARK_FOREST, colors::blendSkyTint);
-        float[] cherry = pureBiomeColor(Biome.CHERRY_GROVE, colors::blendSkyTint);
-
-        assertFalse(java.util.Arrays.equals(birch, forest), "Birch Forest sky tint must differ from Forest's");
-        assertFalse(java.util.Arrays.equals(dark, forest), "Dark Forest sky tint must differ from Forest's");
-        assertFalse(java.util.Arrays.equals(cherry, forest), "Cherry Grove sky tint must differ from Forest's");
-        assertFalse(java.util.Arrays.equals(birch, dark), "Birch Forest and Dark Forest sky tints must differ");
-        assertFalse(java.util.Arrays.equals(dark, cherry), "Dark Forest and Cherry Grove sky tints must differ");
-        assertFalse(java.util.Arrays.equals(birch, cherry), "Birch Forest and Cherry Grove sky tints must differ");
-    }
-
-    @Test
-    void newForestFamilyBiomesHaveFogColorsDistinctFromForestAndFromEachOther() {
-        float[] forest = pureBiomeColor(Biome.FOREST, colors::blendFog);
-        float[] birch = pureBiomeColor(Biome.BIRCH_FOREST, colors::blendFog);
-        float[] dark = pureBiomeColor(Biome.DARK_FOREST, colors::blendFog);
-        float[] cherry = pureBiomeColor(Biome.CHERRY_GROVE, colors::blendFog);
-
-        assertFalse(java.util.Arrays.equals(birch, forest), "Birch Forest fog must differ from Forest's");
-        assertFalse(java.util.Arrays.equals(dark, forest), "Dark Forest fog must differ from Forest's");
-        assertFalse(java.util.Arrays.equals(cherry, forest), "Cherry Grove fog must differ from Forest's");
-        assertFalse(java.util.Arrays.equals(birch, dark), "Birch Forest and Dark Forest fog must differ");
-        assertFalse(java.util.Arrays.equals(dark, cherry), "Dark Forest and Cherry Grove fog must differ");
-        assertFalse(java.util.Arrays.equals(birch, cherry), "Birch Forest and Cherry Grove fog must differ");
     }
 }

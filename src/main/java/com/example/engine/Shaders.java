@@ -34,6 +34,7 @@ public final class Shaders {
             out vec3 vPos;
             out float vDistance;
             out vec3 vTint;
+            out float vFan;
 
             void main() {
                 vec4 worldPos = uModel * vec4(aPos, 1.0);
@@ -70,7 +71,8 @@ public final class Shaders {
                 // aBlockLight carry level / 15, fractional where smooth lighting averaged four cells) pick a point between
                 // the texel centres of the 16 x 16 map, and the linear filter blends the neighbours.
                 vec3 light = vec3(1.0);
-                if (uLitMode != 1) {
+                vFan = uLitMode == 5 ? aSkyShade : 1.0; // mode 5: the sunrise fan, whose alpha rides in the sky-light slot
+                if (uLitMode != 1 && uLitMode != 5) {
                     vec2 level = uLitMode == 4 ? vec2(15.0) : clamp(vec2(aBlockLight, aSkyShade) * 15.0, 0.0, 15.0);
                     light = textureLod(uLightmap, (level + 0.5) / 16.0, 0.0).rgb;
                 }
@@ -88,12 +90,18 @@ public final class Shaders {
             in vec3 vPos;
             in float vDistance;
             in vec3 vTint;
+            in float vFan;
 
             uniform sampler2D uTexture;
             uniform float uAlpha;
             uniform vec3 uFogColor;
             uniform float uFogStart;
             uniform float uFogEnd;
+            // The second, environmental fog (rain thickens it): a linear fog from uEnvFogStart to uEnvFogEnd, scaled by uEnvFogStrength.
+            // A draw whose uFogEnd is the unfogged sentinel (>= 100000) gets neither.
+            uniform float uEnvFogStart;
+            uniform float uEnvFogEnd;
+            uniform float uEnvFogStrength;
             uniform int uLitMode;
 
             out vec4 FragColor;
@@ -127,8 +135,12 @@ public final class Shaders {
                 // cardinal shade and the ambient occlusion into it.
                 vec3 shaded = texColor.rgb * vTint * vLight * directional;
                 float fogFactor = clamp((vDistance - uFogStart) / (uFogEnd - uFogStart), 0.0, 1.0);
+                if (uFogEnd < 100000.0 && uEnvFogEnd > uEnvFogStart) {
+                    float envFog = clamp((vDistance - uEnvFogStart) / (uEnvFogEnd - uEnvFogStart), 0.0, 1.0) * uEnvFogStrength;
+                    fogFactor = max(fogFactor, envFog);
+                }
                 vec3 finalColor = mix(shaded, uFogColor, fogFactor);
-                FragColor = vec4(finalColor, texColor.a * uAlpha);
+                FragColor = vec4(finalColor, texColor.a * uAlpha * vFan);
             }
             """;
 

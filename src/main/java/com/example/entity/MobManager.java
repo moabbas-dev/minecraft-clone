@@ -36,12 +36,10 @@ public class MobManager {
     public void setXpOrbs(XpOrbManager orbs) {
         this.xpOrbs = orbs;
     }
-    private float daylightFactor = 0f;
     private boolean raining;
 
     /** Fed by the game each frame so zombies know whether the sun reaches them. */
-    public void setEnvironment(float daylightFactor, boolean raining) {
-        this.daylightFactor = daylightFactor;
+    public void setRaining(boolean raining) {
         this.raining = raining;
     }
 

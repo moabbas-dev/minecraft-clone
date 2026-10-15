@@ -26,6 +26,77 @@ final class SkyDetails {
         return ((t % 24000f) + 24000f) % 24000f;
     }
 
+    /**
+     * The sun angle in degrees (0 at noon, 90 at the sunset horizon, 180 at midnight, 270 at the sunrise horizon): the timeline's
+     * {@code visual/sun_angle} track, one 0 -> 360 degree turn per day eased by cubic_bezier(0.362, 0.241, 0.638, 0.759), so the sun
+     * is slowest around noon and midnight. With it the sun crosses the horizon at ticks ~12542 and ~23460, where the other tracks
+     * (monsters_burn, the dusk and dawn colours) switch.
+     */
+    static float sunAngleDegrees(float tick) {
+        float u = ((tick - 6000f) % 24000f + 24000f) % 24000f / 24000f;
+        return 360f * easeSun(u);
+    }
+
+    private static float easeSun(float x) {
+        // solve x(t) = x on the bezier, then return y(t)
+        float lo = 0f, hi = 1f;
+        for (int i = 0; i < 40; i++) {
+            float mid = (lo + hi) * 0.5f;
+            if (bezier(mid, 0.362f, 0.638f) < x) lo = mid;
+            else hi = mid;
+        }
+        float t = (lo + hi) * 0.5f;
+        return bezier(t, 0.241f, 0.759f);
+    }
+
+    private static float bezier(float t, float p1, float p2) {
+        float s = 1f - t;
+        return 3f * s * s * t * p1 + 3f * s * t * t * p2 + t * t * t;
+    }
+
+    /** The sky disc of SkyRenderer.buildSkyDisc as triangles: centre (0, 16, 0), a rim of 8 segments at radius 512, coloured {@code rgb}. */
+    static float[] skyDisc(float[] rgb) {
+        float[] out = new float[8 * 3 * FLOATS_PER_VERTEX];
+        int n = 0;
+        for (int i = 0; i < 8; i++) {
+            double a0 = Math.toRadians(-180 + i * 45), a1 = Math.toRadians(-180 + (i + 1) * 45);
+            n = vertex(out, n, 0f, 16f, 0f, 1f, rgb[0], rgb[1], rgb[2]);
+            n = vertex(out, n, (float) (512 * Math.cos(a1)), 16f, (float) (512 * Math.sin(a1)), 1f, rgb[0], rgb[1], rgb[2]);
+            n = vertex(out, n, (float) (512 * Math.cos(a0)), 16f, (float) (512 * Math.sin(a0)), 1f, rgb[0], rgb[1], rgb[2]);
+        }
+        return out;
+    }
+
+    /**
+     * The sunrise / sunset glow as triangles (the fan of {@link SkyColors#sunriseFan}), coloured {@code rgb}; the alpha 1 in the middle
+     * and 0 on the rim travels in the sky-light slot of each vertex (the shader's fan mode multiplies it into the alpha).
+     */
+    static float[] sunriseFanTriangles(float[] rgb) {
+        float[] fan = SkyColors.sunriseFan();
+        float[] out = new float[16 * 3 * FLOATS_PER_VERTEX];
+        int n = 0;
+        for (int i = 1; i <= 16; i++) {
+            int[] idx = {0, i, i + 1};
+            for (int k : idx) n = fanVertex(out, n, fan, k, rgb);
+        }
+        return out;
+    }
+
+    private static int fanVertex(float[] a, int i, float[] fan, int k, float[] rgb) {
+        a[i++] = fan[k * 4];
+        a[i++] = fan[k * 4 + 1];
+        a[i++] = fan[k * 4 + 2];
+        a[i++] = 0.5f;
+        a[i++] = 0.5f;
+        a[i++] = fan[k * 4 + 3]; // the fan alpha rides in the sky-light slot
+        a[i++] = 0f;
+        a[i++] = rgb[0];
+        a[i++] = rgb[1];
+        a[i++] = rgb[2];
+        a[i++] = 0f;
+        return i;
+    }
+
     private static final float[][] STAR_BRIGHTNESS = {
             {92, 0.037f}, {627, 0f}, {11373, 0f}, {11732, 0.016f}, {11959, 0.044f}, {12399, 0.143f}, {12729, 0.258f},
             {13228, 0.5f}, {22772, 0.5f}, {23032, 0.364f}, {23356, 0.225f}, {23758, 0.101f}};

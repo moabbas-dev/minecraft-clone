@@ -66,10 +66,12 @@ public class BiomeColors {
     //     underwater-fog values directly (one consistent "cold water" identity, not a second
     //     invented number). Mangrove gets its own distinct adapted values - explicitly not
     //     identical to Swamp's or Ocean's, per the request's own color-consistency requirement.
+    // Every number below is read from the biome files and the overworld dimension type of the 26.3 client jar
+    // (worldgen/biome/*.json: water_color, visual/sky_color, visual/water_fog_color; dimension_type/overworld.json:
+    // visual/fog_color #c0d8ff; EnvironmentAttributes: the default water fog colour #050533).
     private static final int DEFAULT_WATER = 0x3F76E4;
-    private static final int DEFAULT_UNDERWATER_FOG = 0x051A33;
-    private static final int COLD_WATER = 0x3D57D6; // Snowy Tundra's adapted cold water, reused by Frozen Ocean
-    private static final int COLD_UNDERWATER_FOG = 0x0A1A40; // same reuse, see above
+    private static final int DEFAULT_UNDERWATER_FOG = 0x050533;
+    private static final int OVERWORLD_FOG = 0xC0D8FF;
 
     private static final int[] WATER_BY_ORDINAL = {
             DEFAULT_WATER,   // PLAINS
@@ -77,38 +79,23 @@ public class BiomeColors {
             DEFAULT_WATER,   // DESERT
             DEFAULT_WATER,   // SAVANNA
             DEFAULT_WATER,   // TAIGA
-            COLD_WATER,      // SNOWY_TUNDRA - adapted cooler tint, not a verified vanilla value
+            DEFAULT_WATER,   // SNOWY_TUNDRA (snowy_plains)
             DEFAULT_WATER,   // JUNGLE
-            0x617B64,        // SWAMP - verified vanilla swamp water color
-            DEFAULT_WATER,   // MOUNTAINS
+            0x617B64,        // SWAMP
+            DEFAULT_WATER,   // MOUNTAINS (windswept_hills)
             DEFAULT_WATER,   // BADLANDS
-            DEFAULT_WATER,   // OCEAN - real vanilla ocean also uses the default water color
-            COLD_WATER,      // FROZEN_OCEAN - reuses Snowy Tundra's cold water, see note above
-            0x4E7A5A,        // MANGROVE - adapted, distinct from Swamp (0x617B64) and Ocean
-            DEFAULT_WATER,   // BIRCH_FOREST - ordinary temperate-forest water, no special body
-            DEFAULT_WATER,   // DARK_FOREST - same
-            DEFAULT_WATER,   // CHERRY_GROVE - same
+            DEFAULT_WATER,   // OCEAN
+            0x3938C9,        // FROZEN_OCEAN
+            0x3A7A6A,        // MANGROVE (mangrove_swamp)
+            DEFAULT_WATER,   // BIRCH_FOREST
+            DEFAULT_WATER,   // DARK_FOREST
+            0x5DB7EF,        // CHERRY_GROVE
     };
 
-    // Subtle - these lerp with the existing time-of-day sky color, so they're meant to nudge
-    // the mood, not repaint the sky. All adapted/artistic, see the note above.
+    /** The surface fog colour: no overworld biome here overrides the dimension's {@code #c0d8ff}. */
     private static final int[] FOG_BY_ORDINAL = {
-            0xC8E0F0,        // PLAINS
-            0xB8D0B0,        // FOREST
-            0xE8D9A8,        // DESERT
-            0xE0D6A0,        // SAVANNA
-            0xC0D4CC,        // TAIGA
-            0xE8F0F5,        // SNOWY_TUNDRA
-            0xA8CBA0,        // JUNGLE
-            0x8FA089,        // SWAMP
-            0xCCDCE8,        // MOUNTAINS
-            0xE0B888,        // BADLANDS
-            0xC5E4EC,        // OCEAN - clear, cool, faintly cyan sea-mist tint
-            0xE4F2F8,        // FROZEN_OCEAN - pale icy tint
-            0xA8C2A0,        // MANGROVE - humid green haze, distinct from Jungle's/Swamp's
-            0xC8DCC0,        // BIRCH_FOREST - pale, brighter green than Forest's own fog
-            0x6E8064,        // DARK_FOREST - dim, muted green - the "reduced light" mood
-            0xE8C8D4,        // CHERRY_GROVE - soft pink-tinted haze
+            OVERWORLD_FOG, OVERWORLD_FOG, OVERWORLD_FOG, OVERWORLD_FOG, OVERWORLD_FOG, OVERWORLD_FOG, OVERWORLD_FOG, OVERWORLD_FOG,
+            OVERWORLD_FOG, OVERWORLD_FOG, OVERWORLD_FOG, OVERWORLD_FOG, OVERWORLD_FOG, OVERWORLD_FOG, OVERWORLD_FOG, OVERWORLD_FOG,
     };
 
     private static final int[] UNDERWATER_FOG_BY_ORDINAL = {
@@ -117,40 +104,37 @@ public class BiomeColors {
             DEFAULT_UNDERWATER_FOG, // DESERT
             DEFAULT_UNDERWATER_FOG, // SAVANNA
             DEFAULT_UNDERWATER_FOG, // TAIGA
-            COLD_UNDERWATER_FOG,    // SNOWY_TUNDRA - adapted, slightly lighter icy blue
+            DEFAULT_UNDERWATER_FOG, // SNOWY_TUNDRA
             DEFAULT_UNDERWATER_FOG, // JUNGLE
-            0x232317,               // SWAMP - adapted murky olive-brown
+            0x232317,               // SWAMP
             DEFAULT_UNDERWATER_FOG, // MOUNTAINS
             DEFAULT_UNDERWATER_FOG, // BADLANDS
-            DEFAULT_UNDERWATER_FOG, // OCEAN - same default deep-water murk as everywhere else
-            COLD_UNDERWATER_FOG,    // FROZEN_OCEAN - reuses Snowy Tundra's cold underwater fog
-            0x1E3B2A,               // MANGROVE - adapted dark murky green, distinct from Swamp's olive-brown
-            DEFAULT_UNDERWATER_FOG, // BIRCH_FOREST - ordinary water, no special underwater identity
-            DEFAULT_UNDERWATER_FOG, // DARK_FOREST - same
-            DEFAULT_UNDERWATER_FOG, // CHERRY_GROVE - same
+            DEFAULT_UNDERWATER_FOG, // OCEAN
+            DEFAULT_UNDERWATER_FOG, // FROZEN_OCEAN
+            0x4D7A60,               // MANGROVE
+            DEFAULT_UNDERWATER_FOG, // BIRCH_FOREST
+            DEFAULT_UNDERWATER_FOG, // DARK_FOREST
+            0x5DB7EF,               // CHERRY_GROVE
     };
 
-    // Overworld sky color is normally uniform in vanilla - there is no verified per-biome sky
-    // color to draw from, so every value here is explicitly adapted/artistic (same honesty
-    // convention as the fog table above), meant to nudge mood rather than repaint the sky (see
-    // SKY_TINT_BLEND_STRENGTH in Game.renderWorld).
+    /** The biome's {@code visual/sky_color} (the dimension's {@code #78a7ff} where the biome gives none). */
     private static final int[] SKY_TINT_BY_ORDINAL = {
-            0xA9CDEA,        // PLAINS
-            0x9CC2D8,        // FOREST
-            0xCBD9A0,        // DESERT - faint dusty-warm sky
-            0xC7D6A0,        // SAVANNA
-            0x9AC0C4,        // TAIGA
-            0xD8E8F2,        // SNOWY_TUNDRA
-            0x7FC0C8,        // JUNGLE - humid, slightly teal
-            0x8CAE96,        // SWAMP - muted green-gray
-            0xB8D2E8,        // MOUNTAINS - thin, pale blue
-            0xD8C79A,        // BADLANDS - dusty orange-tan
-            0x7FB8E0,        // OCEAN - clear, saturated sea blue
-            0xC8E2EE,        // FROZEN_OCEAN - pale icy blue
-            0x86B894,        // MANGROVE - humid green, distinct from Swamp/Jungle
-            0xB8D4D0,        // BIRCH_FOREST - pale, warm-toned blue-green
-            0x7A9078,        // DARK_FOREST - dim, muted green-gray - matches its darker fog
-            0xD8C4D8,        // CHERRY_GROVE - soft pink-blue pastel
+            0x78A7FF,        // PLAINS
+            0x79A6FF,        // FOREST
+            0x6EB1FF,        // DESERT
+            0x6EB1FF,        // SAVANNA
+            0x7DA3FF,        // TAIGA
+            0x7FA1FF,        // SNOWY_TUNDRA (snowy_plains)
+            0x77A8FF,        // JUNGLE
+            0x78A7FF,        // SWAMP
+            0x7DA2FF,        // MOUNTAINS (windswept_hills)
+            0x6EB1FF,        // BADLANDS
+            0x7BA4FF,        // OCEAN
+            0x7FA1FF,        // FROZEN_OCEAN
+            0x78A7FF,        // MANGROVE
+            0x7AA5FF,        // BIRCH_FOREST
+            0x79A6FF,        // DARK_FOREST
+            0x7BA4FF,        // CHERRY_GROVE
     };
 
     private final SimplexNoise swampNoise;

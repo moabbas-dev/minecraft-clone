@@ -32,6 +32,11 @@ public class Weather {
     /** 0..1, spikes to 1 on a lightning strike and decays back to 0 - drive a screen flash with it. */
     @Getter
     private float lightningFlash = 0f;
+    /** Seconds the sky stays lit by the current flash, the flashes still to come in this strike, and the pause before the next one. */
+    private float flashRemaining, gapRemaining;
+    private int flashesLeft;
+    /** A flash holds the sky lit for 3 ticks (LightningBolt keeps ClientLevel.skyFlashTime at 2 while its life is 2, 1, 0 and it counts down). */
+    private static final float FLASH_SECONDS = 0.15f;
     /**
      * 0..1, eased toward 1 while raining/thundering and toward 0 otherwise - unlike
      * {@link #isRaining()} (an instant flag flip the moment the state timer expires), this fades
@@ -57,6 +62,20 @@ public class Weather {
             if (lightningTimer <= 0) {
                 lightningFlash = 1f;
                 lightningTimer = randomBetween(LIGHTNING_MIN_INTERVAL, LIGHTNING_MAX_INTERVAL);
+                // LightningBolt: 1 to 3 flashes, each after a random 0-9 tick pause
+                flashesLeft = 1 + random.nextInt(3);
+                gapRemaining = 0f;
+                flashRemaining = 0f;
+            }
+        }
+        if (flashRemaining > 0f) {
+            flashRemaining -= dt;
+        } else if (flashesLeft > 0) {
+            gapRemaining -= dt;
+            if (gapRemaining <= 0f) {
+                flashesLeft--;
+                flashRemaining = FLASH_SECONDS;
+                gapRemaining = random.nextInt(10) * 0.05f;
             }
         }
         lightningFlash = Math.max(0f, lightningFlash - dt * FLASH_DECAY_PER_SECOND);
@@ -77,6 +96,11 @@ public class Weather {
 
     private float randomBetween(float min, float max) {
         return min + random.nextFloat() * (max - min);
+    }
+
+    /** True while a lightning flash lights the sky (its colour and the lightmap's sky factor jump for a few ticks). */
+    public boolean isSkyFlashing() {
+        return flashRemaining > 0f;
     }
 
     public boolean isRaining() {
