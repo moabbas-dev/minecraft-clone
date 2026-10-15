@@ -118,17 +118,24 @@ public class ChunkMeshBuilder {
                     BlockType type = chunk.getLocal(lx, ly, lz);
                     if (type.isAir()) continue;
 
+                    if (BlockSupport.isTorch(type)) {
+                        emitTorch(opaque, chunk, world, lx, ly, lz, type);
+                        continue;
+                    }
+
                     if (isCrossShapedPlant(type)) {
                         // A real plant model (two crossing diagonal quads), not a cube - see
                         // emitCrossPlant. Unconditional: a plant never occludes anything and is
                         // never occluded by a neighboring cube face the way a real cube face is,
                         // so none of the up/down/north/south/east/west culling below applies to it.
-                        emitCrossPlant(transparent, chunk, world, lx, ly, lz, atlas.getUv(textureMap.facesFor(type).side()));
+                        emitCrossPlant(opaque, chunk, world, lx, ly, lz, atlas.getUv(textureMap.facesFor(type).side()));
                         continue;
                     }
 
                     BlockTextureMap.Faces faces = textureMap.facesFor(type);
-                    FloatBuffer target = type.isTransparentRender() ? transparent : opaque;
+                    // Only the blends (water, ice) go to the translucent pass, with the alpha of their own textures (water 180, ice 190);
+                    // glass, plants and torches are cutouts and draw in the opaque pass like vanilla's.
+                    FloatBuffer target = isTranslucent(type) ? transparent : opaque;
 
                     BlockType up = sampleBlock(chunk, world, lx, ly + 1, lz);
                     BlockType down = sampleBlock(chunk, world, lx, ly - 1, lz);
@@ -138,7 +145,11 @@ public class ChunkMeshBuilder {
                     BlockType west = sampleBlock(chunk, world, lx - 1, ly, lz);
 
                     boolean isWater = type == BlockType.WATER;
-                    float topY = isWater ? WATER_TOP_HEIGHT : 1f;
+                    boolean farmland = BlockSupport.isFarmland(type);
+                    float topY = isWater ? WATER_TOP_HEIGHT : farmland ? FARMLAND_HEIGHT : 1f;
+                    float[] sideUv = atlas.getUv(faces.side());
+                    // template_cube_bottom_top_indented: the sides show rows 1-15 of the texture (uv 0,1,16,16) on a 15/16 high block
+                    if (farmland) sideUv = new float[]{sideUv[0], sideUv[1] + (sideUv[3] - sideUv[1]) / 16f, sideUv[2], sideUv[3]};
                     // Leaves are tinted on every face; grass only on its top face (the side/bottom
                     // textures are real, already-colored images - see TextureAtlas); water is
                     // tinted on every face, same as leaves, from the biome-blended color baked
@@ -164,22 +175,22 @@ public class ChunkMeshBuilder {
                         emitFace(target, Face.BOTTOM, lx, ly, lz, atlas.getUv(faces.bottom()), faceLight(Face.BOTTOM, type, chunk, world, lx, ly, lz), topY, sideTint, windWeight, 0f);
                     if (shouldDrawFace(type, north)) {
                         FaceLight light = faceLight(Face.NORTH, type, chunk, world, lx, ly, lz);
-                        emitFace(target, Face.NORTH, lx, ly, lz, atlas.getUv(faces.side()), light, topY, sideTint, windWeight, 0f);
+                        emitFace(target, Face.NORTH, lx, ly, lz, sideUv, light, topY, sideTint, windWeight, 0f);
                         if (overlayUv != null) emitFace(target, Face.NORTH, lx, ly, lz, overlayUv, light, topY, topTint, windWeight, OVERLAY_OFFSET);
                     }
                     if (shouldDrawFace(type, south)) {
                         FaceLight light = faceLight(Face.SOUTH, type, chunk, world, lx, ly, lz);
-                        emitFace(target, Face.SOUTH, lx, ly, lz, atlas.getUv(faces.side()), light, topY, sideTint, windWeight, 0f);
+                        emitFace(target, Face.SOUTH, lx, ly, lz, sideUv, light, topY, sideTint, windWeight, 0f);
                         if (overlayUv != null) emitFace(target, Face.SOUTH, lx, ly, lz, overlayUv, light, topY, topTint, windWeight, OVERLAY_OFFSET);
                     }
                     if (shouldDrawFace(type, east)) {
                         FaceLight light = faceLight(Face.EAST, type, chunk, world, lx, ly, lz);
-                        emitFace(target, Face.EAST, lx, ly, lz, atlas.getUv(faces.side()), light, topY, sideTint, windWeight, 0f);
+                        emitFace(target, Face.EAST, lx, ly, lz, sideUv, light, topY, sideTint, windWeight, 0f);
                         if (overlayUv != null) emitFace(target, Face.EAST, lx, ly, lz, overlayUv, light, topY, topTint, windWeight, OVERLAY_OFFSET);
                     }
                     if (shouldDrawFace(type, west)) {
                         FaceLight light = faceLight(Face.WEST, type, chunk, world, lx, ly, lz);
-                        emitFace(target, Face.WEST, lx, ly, lz, atlas.getUv(faces.side()), light, topY, sideTint, windWeight, 0f);
+                        emitFace(target, Face.WEST, lx, ly, lz, sideUv, light, topY, sideTint, windWeight, 0f);
                         if (overlayUv != null) emitFace(target, Face.WEST, lx, ly, lz, overlayUv, light, topY, topTint, windWeight, OVERLAY_OFFSET);
                     }
                 }
@@ -187,6 +198,17 @@ public class ChunkMeshBuilder {
         }
 
         return new MeshData(opaque.toArray(), transparent.toArray());
+    }
+
+    static final float FARMLAND_HEIGHT = 15f / 16f;
+
+    /** Blocks drawn with blending: water and ice carry their own alpha in the texture. */
+    public static boolean isTranslucentForTest(BlockType type) {
+        return isTranslucent(type);
+    }
+
+    static boolean isTranslucent(BlockType type) {
+        return type == BlockType.WATER || type == BlockType.ICE;
     }
 
     private static boolean inChunk(int lx, int lz) {
@@ -298,6 +320,60 @@ public class ChunkMeshBuilder {
             for (float[] c : plane) {
                 buf.add(lx + c[0], ly + c[1], lz + c[2], c[3], c[4], skyShade, blockLight, 1f, 1f, 1f, c[5]);
             }
+        }
+    }
+
+    /**
+     * A torch as models/block/template_torch (and template_torch_wall) draw it: a 2 x 10 x 2 pixel box in the middle of its cell for a
+     * floor torch, and for a wall torch the same box leaning 22.5 degrees away from the wall, turned to its facing. No ambient
+     * occlusion and no directional shade (shade_direction_override up), lit by its own cell; the down face of a floor torch is skipped
+     * when it stands on an opaque block (cullface down).
+     */
+    private void emitTorch(FloatBuffer buf, Chunk chunk, World world, int lx, int ly, int lz, BlockType type) {
+        float[] tile = atlas.getUv(textureMap.facesFor(type).side());
+        float sky = sampleSkyLight(chunk, world, lx, ly, lz) / 15f;
+        float block = Math.max(sampleBlockLight(chunk, world, lx, ly, lz), LightProperties.emission(type)) / 15f;
+        boolean wall = BlockSupport.isWallTorch(type);
+        // box in 1/16 block units
+        float x0 = wall ? -1f : 7f, x1 = wall ? 1f : 9f, y0 = wall ? 3.5f : 0f, y1 = wall ? 13.5f : 10f, z0 = 7f, z1 = 9f;
+        double lean = wall ? Math.toRadians(-22.5) : 0.0;
+        double turn = 0.0;
+        if (wall) {
+            int[] f = BlockSupport.facingOf(type);
+            // blockstate rotations: facing east = 0, south = 90, west = 180, north = 270, clockwise seen from above
+            turn = Math.toRadians(f[0] == 1 ? 0 : f[1] == 1 ? 90 : f[0] == -1 ? 180 : 270);
+        }
+        float[][] c = new float[8][];
+        for (int i = 0; i < 8; i++) {
+            float px = (i & 1) == 0 ? x0 : x1, py = (i & 2) == 0 ? y0 : y1, pz = (i & 4) == 0 ? z0 : z1;
+            if (wall) { // rotate about the z axis through (0, 3.5, 8), then turn about the cell's vertical axis
+                float rx = px, ry = py - 3.5f;
+                px = (float) (rx * Math.cos(lean) - ry * Math.sin(lean));
+                py = (float) (rx * Math.sin(lean) + ry * Math.cos(lean)) + 3.5f;
+                float tx = px - 8f, tz = pz - 8f;
+                px = (float) (tx * Math.cos(turn) - tz * Math.sin(turn)) + 8f;
+                pz = (float) (tx * Math.sin(turn) + tz * Math.cos(turn)) + 8f;
+            }
+            c[i] = new float[]{lx + px / 16f, ly + py / 16f, lz + pz / 16f};
+        }
+        // corner index = x | y << 1 | z << 2 (0 = min, 1 = max)
+        boolean skipDown = !wall && world.getBlock(chunk.worldOriginX() + lx, ly - 1, chunk.worldOriginZ() + lz).isOpaqueCube();
+        if (!skipDown) torchFace(buf, tile, new float[][]{c[0], c[4], c[5], c[1]}, 7, 13, 9, 15, sky, block); // down
+        torchFace(buf, tile, new float[][]{c[2], c[6], c[7], c[3]}, 7, 6, 9, 8, sky, block);                   // up
+        torchFace(buf, tile, new float[][]{c[0], c[2], c[3], c[1]}, 7, 6, 9, 16, sky, block);                  // north (z min)
+        torchFace(buf, tile, new float[][]{c[4], c[6], c[7], c[5]}, 7, 6, 9, 16, sky, block);                  // south (z max)
+        torchFace(buf, tile, new float[][]{c[0], c[2], c[6], c[4]}, 7, 6, 9, 16, sky, block);                  // west (x min)
+        torchFace(buf, tile, new float[][]{c[1], c[3], c[7], c[5]}, 7, 6, 9, 16, sky, block);                  // east (x max)
+    }
+
+    /** One torch quad from four corners (the u axis runs along corners 0 to 3, the v axis from 0 to 1) and a pixel rectangle of the tile. */
+    private static void torchFace(FloatBuffer buf, float[] tile, float[][] p, float pu0, float pv0, float pu1, float pv1, float sky, float block) {
+        float u0 = tile[0] + (tile[2] - tile[0]) * pu0 / 16f, u1 = tile[0] + (tile[2] - tile[0]) * pu1 / 16f;
+        float v0 = tile[1] + (tile[3] - tile[1]) * pv0 / 16f, v1 = tile[1] + (tile[3] - tile[1]) * pv1 / 16f;
+        float[][] uv = {{u0, v1}, {u0, v0}, {u1, v0}, {u1, v1}};
+        int[] order = {0, 1, 2, 0, 2, 3};
+        for (int k : order) {
+            buf.add(p[k][0], p[k][1], p[k][2], uv[k][0], uv[k][1], sky, block, 1f, 1f, 1f, 0f);
         }
     }
 

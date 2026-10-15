@@ -20,10 +20,12 @@ public final class LightProperties {
             if (t == BlockType.AIR) d = 0;
             else if (t == BlockType.WATER || t == BlockType.ICE || t == BlockType.MANGROVE_ROOTS || ChunkMeshBuilder.isAnyLeaves(t)) d = 1;
             else if (t == BlockType.CHEST) d = 0; // not a full block: light passes
+            else if (t == BlockType.FARMLAND || t == BlockType.FARMLAND_MOIST) d = 1; // not solid to rendering and no skylight passage: 1
             else d = t.isOpaqueCube() ? 15 : 0;
             DAMPENING[t.ordinal()] = (byte) d;
             boolean fullCollision = t.isSolidCollision() && t != BlockType.CHEST;
-            SHADE[t.ordinal()] = !fullCollision || t == BlockType.GLASS || t == BlockType.MUD ? 1.0f : 0.2f;
+            boolean notFull = t == BlockType.FARMLAND || t == BlockType.FARMLAND_MOIST; // 15/16 high, so not a full collision shape
+            SHADE[t.ordinal()] = !fullCollision || notFull || t == BlockType.GLASS || t == BlockType.MUD ? 1.0f : 0.2f;
         }
     }
 

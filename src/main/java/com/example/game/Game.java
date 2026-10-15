@@ -144,6 +144,8 @@ public class Game implements GameAccess {
     /** Real vanilla's own rate - 20 simulated ticks per second, independent of render FPS (see
      *  updateInGame's accumulator loop and CookingStationManager/CookingStationState). */
     private static final float TICK_SECONDS = 1f / 20f;
+    /** Chunks around the player whose blocks get random ticks (the simulation distance). */
+    private static final int RANDOM_TICK_RADIUS_CHUNKS = 8;
     /** Health/hunger/damage state - see resetGameplayState for when a fresh one replaces this. */
     private PlayerSurvival survival = new PlayerSurvival(Difficulty.NORMAL);
     private final Random gameplayRandom = new Random();
@@ -472,6 +474,7 @@ public class Game implements GameAccess {
                 ? new FlatWorldGenerator()
                 : new TerrainGenerator(seed);
         world = new World(seed, generator);
+        installWorldHooks();
 
         currentWorldFolder = uniqueFolderName(WorldIO.sanitizeFolderName(settings.name()));
         currentSettings = settings;
@@ -534,6 +537,7 @@ public class Game implements GameAccess {
                 ? new FlatWorldGenerator()
                 : new TerrainGenerator(meta.seed());
         world = new World(meta.seed(), generator);
+        installWorldHooks();
         world.setSaveDir(dir);
         currentWorldFolder = saved.folderName();
         currentSettings = meta.settings();
@@ -1132,6 +1136,15 @@ public class Game implements GameAccess {
         if (use && !useHand(false, hit, forcedUse)) useHand(true, hit, forcedUse);
     }
 
+    /** What the world reports back to the game: torches that lost their support drop as items. */
+    private void installWorldHooks() {
+        world.setDetachListener((x, y, z, type) -> {
+            Vector3f center = new Vector3f(x + 0.5f, y + 0.5f, z + 0.5f);
+            if (type == BlockType.TORCH || type.name().startsWith("WALL_TORCH")) itemEntities.spawn(BlockType.TORCH, 1, center, gameplayRandom);
+            gameAudio.playDig(type, center);
+        });
+    }
+
     /** Whether the main hand would take a right click (so the offhand is not tried): armor to wear, a block to place or open. */
     private boolean mainHandTakesUse(ItemStack held, Raycast.Hit hit) {
         boolean opensScreen = hit != null && !player.isSneaking()
@@ -1171,6 +1184,9 @@ public class Game implements GameAccess {
             openCookingScreenAt(hit.x(), hit.y(), hit.z());
             return true;
         }
+        if (com.example.world.ToolEffectiveness.kindOf(held.type()) == com.example.world.ToolEffectiveness.Kind.HOE && tillSoil(hit, offhand)) {
+            return true;
+        }
         BlockPlacer.Result placed = BlockPlacer.tryPlace(world, inventory, offhand, hit, this::blockIntersectsPlayer, saplingGrowth);
         if (placed.placed()) {
             fallingBlocks.checkColumn(world, placed.x(), placed.y(), placed.z());
@@ -1181,6 +1197,27 @@ public class Game implements GameAccess {
             return true;
         }
         return placed.outcome() == BlockPlacer.Outcome.INVALID_TARGET; // a refused placement ends the click; no item means pass
+    }
+
+    /**
+     * HoeItem.useOn: a hoe turns grass or dirt into farmland when the face clicked is not the underside and the block above is
+     * free, and loses one use.
+     */
+    private boolean tillSoil(Raycast.Hit hit, boolean offhand) {
+        if (hit.placeY() < hit.y()) return false;
+        if (hit.type() != BlockType.GRASS_BLOCK && hit.type() != BlockType.DIRT) return false;
+        if (world.getBlock(hit.x(), hit.y() + 1, hit.z()) != BlockType.AIR) return false;
+        world.setBlock(hit.x(), hit.y(), hit.z(), BlockType.FARMLAND);
+        gameAudio.playDig(BlockType.FARMLAND, new Vector3f(hit.x() + 0.5f, hit.y() + 0.5f, hit.z() + 0.5f));
+        startSwing();
+        if (offhand) {
+            ItemStack s = inventory.getOffhand();
+            inventory.setOffhand(s.damaged(1));
+            if (inventory.getOffhand().isEmpty()) gameAudio.play("item.break", null);
+        } else {
+            damageSelectedItem(1);
+        }
+        return true;
     }
 
     /** F: the selected hotbar stack and the offhand stack trade places. */
@@ -1559,6 +1596,9 @@ public class Game implements GameAccess {
             tickAccumulator -= TICK_SECONDS;
             lightFlicker = LightmapColors.nextFlicker(lightFlicker, lightFlickerRandom);
             cookingStations.tickAll(world);
+            com.example.world.RandomTicks.tick(world, gameplayRandom, World.worldToChunk((int) Math.floor(player.position.x)),
+                    World.worldToChunk((int) Math.floor(player.position.z)), RANDOM_TICK_RADIUS_CHUNKS,
+                    (x, y, z) -> weather.isRaining() && world.getSkyLight(x, y, z) >= 15);
         }
     }
 
@@ -1930,7 +1970,7 @@ public class Game implements GameAccess {
             chunkShader.setUniform("uModel", model);
             rd.opaqueMesh.draw();
         }
-        chunkShader.setUniform("uAlpha", 0.85f);
+        chunkShader.setUniform("uAlpha", 1f); // water and ice carry their own alpha (180 and 190 of 255) in their textures
         for (ChunkRenderData rd : renderData.values()) {
             Matrix4f model = new Matrix4f().translation(rd.chunkX * (float) Chunk.SIZE_X, 0, rd.chunkZ * (float) Chunk.SIZE_Z);
             chunkShader.setUniform("uModel", model);

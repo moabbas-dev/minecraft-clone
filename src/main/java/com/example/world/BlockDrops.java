@@ -78,6 +78,13 @@ public final class BlockDrops {
             OVERRIDES.put(stage, List.of(Drop.of(BlockType.OAK_SAPLING_STAGE_0)));
         }
 
+        // Wall torches are the torch item; farmland is dirt.
+        for (BlockType wall : new BlockType[]{BlockType.WALL_TORCH_EAST, BlockType.WALL_TORCH_WEST, BlockType.WALL_TORCH_NORTH, BlockType.WALL_TORCH_SOUTH}) {
+            OVERRIDES.put(wall, List.of(Drop.of(BlockType.TORCH)));
+        }
+        OVERRIDES.put(BlockType.FARMLAND, List.of(Drop.of(BlockType.DIRT)));
+        OVERRIDES.put(BlockType.FARMLAND_MOIST, List.of(Drop.of(BlockType.DIRT)));
+
         // Fragile blocks that shatter without yielding anything.
         OVERRIDES.put(BlockType.GLASS, NOTHING);
         OVERRIDES.put(BlockType.ICE, NOTHING);

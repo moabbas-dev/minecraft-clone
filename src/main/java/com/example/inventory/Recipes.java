@@ -117,6 +117,10 @@ public final class Recipes {
             tool(new String[]{"HH", "S.", "S."}, BlockType.GOLD_INGOT, new ItemStack(BlockType.GOLD_HOE, 1)),
             tool(new String[]{"HH", ".S", ".S"}, BlockType.DIAMOND, new ItemStack(BlockType.DIAMOND_HOE, 1)),
             tool(new String[]{"HH", "S.", "S."}, BlockType.DIAMOND, new ItemStack(BlockType.DIAMOND_HOE, 1)),
+            // Torches: coal or charcoal over a stick, four at a time (recipe/torch.json).
+            new Recipe(new String[]{"X", "S"}, Map.of('X', c -> c == BlockType.COAL || c == BlockType.CHARCOAL, 'S', only(BlockType.STICK)),
+                    new ItemStack(BlockType.TORCH, 4)),
+
             // Copper tools (copper ingots) and the six spears (a head item at the top corner over two sticks on a diagonal, either way round).
             tool(new String[]{"HHH", ".S.", ".S."}, BlockType.COPPER_INGOT, new ItemStack(BlockType.COPPER_PICKAXE, 1)),
             tool(new String[]{"HH", "HS", ".S"}, BlockType.COPPER_INGOT, new ItemStack(BlockType.COPPER_AXE, 1)),

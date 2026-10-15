@@ -25,7 +25,7 @@ public enum BlockType {
     COAL_ORE(16, "Coal Ore", true, false, 3.0f, 0f),
     OAK_LOG(17, "Oak Log", true, false, 2.0f, 0f),
     OAK_LEAVES(18, "Oak Leaves", true, false, 0.2f, 0f),
-    GLASS(20, "Glass", false, true, 0.3f, 0f),
+    GLASS(20, "Glass", true, true, 0.3f, 0f),
     SANDSTONE(24, "Sandstone", true, false, 0.8f, 0f),
     GOLD_BLOCK(41, "Block of Gold", true, false, 3.0f, 0f),
     IRON_BLOCK(42, "Block of Iron", true, false, 5.0f, 0f),
@@ -215,7 +215,16 @@ public enum BlockType {
     COPPER_SPEAR(210, "Copper Spear", false, true, -1f, 0f),
     IRON_SPEAR(211, "Iron Spear", false, true, -1f, 0f),
     GOLD_SPEAR(212, "Golden Spear", false, true, -1f, 0f),
-    DIAMOND_SPEAR(213, "Diamond Spear", false, true, -1f, 0f);
+    DIAMOND_SPEAR(213, "Diamond Spear", false, true, -1f, 0f),
+    // Torches (light 14): a floor torch, and a wall torch per facing (the direction its flame leans, away from the wall); only TORCH is an
+    // item. Farmland and wet farmland: a full collision block here (vanilla's is 15/16 high), non-occluding like vanilla's.
+    TORCH(214, "Torch", false, true, 0f, 14f),
+    WALL_TORCH_EAST(215, "Torch", false, true, 0f, 14f),
+    WALL_TORCH_WEST(216, "Torch", false, true, 0f, 14f),
+    WALL_TORCH_NORTH(217, "Torch", false, true, 0f, 14f),
+    WALL_TORCH_SOUTH(218, "Torch", false, true, 0f, 14f),
+    FARMLAND(219, "Farmland", true, true, 0.6f, 0f),
+    FARMLAND_MOIST(220, "Farmland", true, true, 0.6f, 0f);
 
     public final int id;
     public final String displayName;
@@ -277,7 +286,7 @@ public enum BlockType {
             BIRCH_LOG, BIRCH_LEAVES, SPRUCE_LOG, SPRUCE_LEAVES, JUNGLE_LOG, JUNGLE_LEAVES,
             ACACIA_LOG, ACACIA_LEAVES, MANGROVE_LOG, MANGROVE_LEAVES,
             DARK_OAK_LOG, DARK_OAK_LEAVES, CHERRY_LOG, CHERRY_LEAVES, MUD, MANGROVE_ROOTS,
-            OAK_SAPLING_STAGE_0,
+            OAK_SAPLING_STAGE_0, TORCH,
             SAND, GRAVEL, SANDSTONE, GLASS, BRICKS, MOSSY_COBBLESTONE, OBSIDIAN,
             COAL_ORE, IRON_ORE, GOLD_ORE, DIAMOND_ORE, COPPER_ORE, IRON_BLOCK, GOLD_BLOCK, DIAMOND_BLOCK,
             SMOOTH_STONE, BOOKSHELF, CRAFTING_TABLE, FURNACE, BLAST_FURNACE, SMOKER, CHEST, TNT, ICE, SNOW_BLOCK, CLAY,

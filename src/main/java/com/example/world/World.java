@@ -171,6 +171,22 @@ public class World {
         LightEngine.onEmissionChanged(this, x, y, z);
     }
 
+    /** Told when a block that needed support (a torch) lost it and was removed, so the game can drop its item. */
+    @FunctionalInterface
+    public interface DetachListener {
+        void detached(int x, int y, int z, BlockType type);
+    }
+
+    private DetachListener detachListener;
+
+    public void setDetachListener(DetachListener listener) {
+        this.detachListener = listener;
+    }
+
+    void notifyDetached(int x, int y, int z, BlockType type) {
+        if (detachListener != null) detachListener.detached(x, y, z, type);
+    }
+
     public void setBlock(int x, int y, int z, BlockType type) {
         if (y < 0 || y >= Chunk.SIZE_Y) return;
         int cx = worldToChunk(x);
@@ -185,6 +201,7 @@ public class World {
             int oldOverride = lightEmissionOverride(x, y, z);
             if (oldOverride > 0) emissionOverrides.remove(posKey(x, y, z)); // the burning furnace is gone
             if (c.isGenerated() && c.isLightComputed()) LightEngine.onBlockChanged(this, x, y, z, previous, type, oldOverride);
+            if (c.isGenerated()) BlockSupport.blockChanged(this, x, y, z);
         }
         // If the edit is on a chunk border, the neighboring chunk's mesh must be rebuilt too.
         if (lx == 0) markNeighborDirty(cx - 1, cz);

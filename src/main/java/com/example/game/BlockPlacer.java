@@ -2,6 +2,7 @@ package com.example.game;
 
 import com.example.inventory.Inventory;
 import com.example.inventory.ItemStack;
+import com.example.world.BlockSupport;
 import com.example.world.BlockType;
 import com.example.world.Chunk;
 import com.example.world.Raycast;
@@ -61,6 +62,14 @@ public final class BlockPlacer {
         if (!PLACEABLE.contains(block)) return Result.failed(Outcome.NOT_PLACEABLE);
 
         int x = hit.placeX(), y = hit.placeY(), z = hit.placeZ();
+        if (block == BlockType.TORCH) {
+            // A torch stands on the top of a sturdy block or is stuck to the side of one (never the underside), and needs a free cell.
+            if (!BlockSupport.isSturdy(hit.type()) || world.getBlock(x, y, z) != BlockType.AIR) return Result.failed(Outcome.INVALID_TARGET);
+            int nx = x - hit.x(), ny = y - hit.y(), nz = z - hit.z();
+            if (ny < 0) return Result.failed(Outcome.INVALID_TARGET);
+            block = ny > 0 ? BlockType.TORCH : BlockSupport.wallTorchFacing(nx, nz);
+            if (block == null) return Result.failed(Outcome.INVALID_TARGET);
+        }
         // World.setBlock silently ignores out-of-range Y - without this check the item would be
         // consumed for a block that was never written.
         if (y < 0 || y >= Chunk.SIZE_Y) return Result.failed(Outcome.INVALID_TARGET);
@@ -71,7 +80,7 @@ public final class BlockPlacer {
                 return Result.failed(Outcome.INVALID_TARGET);
             }
         }
-        if (playerOverlap.overlaps(x, y, z)) return Result.failed(Outcome.INVALID_TARGET);
+        if (block.isSolidCollision() && playerOverlap.overlaps(x, y, z)) return Result.failed(Outcome.INVALID_TARGET);
 
         world.setBlock(x, y, z, block);
         if (sapling != null) saplingGrowth.registerPlanted(x, y, z, sapling);
