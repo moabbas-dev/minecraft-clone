@@ -75,7 +75,7 @@ public final class Explosions {
                         BlockType b = world.getBlock(bx, by, bz);
                         if (b != BlockType.AIR) {
                             strength -= (blastResistance(b) + 0.3f) * 0.3f;
-                            if (strength > 0f && b != BlockType.BEDROCK && b != BlockType.WATER) out.add(pack(bx, by, bz));
+                            if (strength > 0f && b != BlockType.BEDROCK && !b.isFluid()) out.add(pack(bx, by, bz));
                         }
                         strength -= 0.225f;
                         x += dx * 0.3f;

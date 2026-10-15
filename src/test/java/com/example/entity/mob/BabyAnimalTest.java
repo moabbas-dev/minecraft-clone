@@ -91,6 +91,10 @@ class BabyAnimalTest {
         assertNotNull(pig);
         assertTrue(pig.isBaby());
         assertEquals("pig", pig.typeId());
-        assertNull(MobTypes.create("zombie_baby", AT, 0f, null), "only the farm animals have a baby model");
+        Mob zombie = MobTypes.create("zombie_baby", AT, 0f, () -> com.example.world.Difficulty.NORMAL);
+        assertNotNull(zombie, "the baby zombie has its own model now");
+        assertTrue(zombie.isBaby());
+        assertEquals("zombie", zombie.typeId());
+        assertNull(MobTypes.create("creeper_baby", AT, 0f, null), "the other hostile mobs have no baby");
     }
 }

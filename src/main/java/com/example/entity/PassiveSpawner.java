@@ -80,7 +80,7 @@ public class PassiveSpawner {
             Integer y = MobSpawner.findSpawnY(world, x, z, top, 6);
             if (y == null) continue;
             BlockType ground = world.getBlock(x, y - 1, z);
-            if (ground == BlockType.WATER || ground.name().endsWith("LEAVES")) continue;
+            if (ground.isFluid() || ground.name().endsWith("LEAVES")) continue;
             if (requireGrassAndLight) {
                 if (ground != BlockType.GRASS_BLOCK) continue;
                 // Animal.isBrightEnoughToSpawn: getRawBrightness(pos, 0) > 8 - the sky light is not dimmed for it

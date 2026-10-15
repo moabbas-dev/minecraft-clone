@@ -1241,6 +1241,17 @@ public class Game implements GameAccess {
 
     /** What the world reports back to the game: torches that lost their support drop as items. */
     private void installWorldHooks() {
+        world.fluids().setListener(new com.example.world.FluidSim.Listener() {
+            @Override
+            public void destroyed(int x, int y, int z, BlockType old) {
+                dropReplaced(x, y, z, old);
+            }
+
+            @Override
+            public void fizz(int x, int y, int z) {
+                // no lava-extinguish sound among the user's files, so none is played
+            }
+        });
         world.setDetachListener((x, y, z, type) -> {
             Vector3f center = new Vector3f(x + 0.5f, y + 0.5f, z + 0.5f);
             if (type == BlockType.TORCH || type.name().startsWith("WALL_TORCH")) itemEntities.spawn(BlockType.TORCH, 1, center, gameplayRandom);
@@ -1277,6 +1288,7 @@ public class Game implements GameAccess {
             return true;
         }
         if (held.type() == BlockType.BOW && !offhand) return true; // drawing the bow is handled while the button is held
+        if ((held.type() == BlockType.BUCKET || held.type() == BlockType.WATER_BUCKET || held.type() == BlockType.LAVA_BUCKET) && useBucket(offhand, held)) return true;
         if (hit == null) return false;
         // Using a crafting table opens the 3x3 crafting screen instead of placing a block (sneaking still places, like vanilla).
         if (hit.type() == BlockType.CRAFTING_TABLE && !player.isSneaking()) {
@@ -1301,6 +1313,54 @@ public class Game implements GameAccess {
             return true;
         }
         return placed.outcome() == BlockPlacer.Outcome.INVALID_TARGET; // a refused placement ends the click; no item means pass
+    }
+
+    /**
+     * BucketItem.use: an empty bucket aimed at a still water or lava source (the ray stops at sources) scoops it up; a full one
+     * pours a source into the cell it is aimed at - the clicked block itself when that is something fluid can replace (a plant),
+     * otherwise the cell in front of the clicked face. The bucket then becomes the other kind.
+     */
+    private boolean useBucket(boolean offhand, ItemStack held) {
+        Vector3f eye = player.eyePosition(), dir = player.frontVector();
+        BlockType result;
+        if (held.type() == BlockType.BUCKET) {
+            Raycast.Hit h = Raycast.cast(world, eye, dir, REACH_DISTANCE, true);
+            if (h == null || !h.type().isFluidSource()) return false;
+            result = h.type().isLava() ? BlockType.LAVA_BUCKET : BlockType.WATER_BUCKET;
+            world.setBlock(h.x(), h.y(), h.z(), BlockType.AIR);
+        } else {
+            Raycast.Hit h = Raycast.cast(world, eye, dir, REACH_DISTANCE);
+            if (h == null) return false;
+            boolean lava = held.type() == BlockType.LAVA_BUCKET;
+            int tx = h.placeX(), ty = h.placeY(), tz = h.placeZ();
+            if (!h.type().isSolidCollision()) {
+                tx = h.x();
+                ty = h.y();
+                tz = h.z();
+            }
+            BlockType existing = world.getBlock(tx, ty, tz);
+            if (existing.isSolidCollision() || (existing.isFluidSource() && existing.isLava() == lava)) return false;
+            if (!existing.isAir() && !existing.isFluid()) dropReplaced(tx, ty, tz, existing);
+            world.setBlock(tx, ty, tz, lava ? BlockType.LAVA : BlockType.WATER);
+            result = BlockType.BUCKET;
+        }
+        ItemStack rest = held.count() > 1 ? held.withCount(held.count() - 1) : ItemStack.EMPTY;
+        if (offhand) inventory.setOffhand(rest);
+        else inventory.set(inventory.getSelectedSlot(), rest);
+        if (rest.isEmpty()) {
+            if (offhand) inventory.setOffhand(new ItemStack(result, 1));
+            else inventory.set(inventory.getSelectedSlot(), new ItemStack(result, 1));
+        } else if (inventory.add(result, 1) < 1) {
+            itemEntities.spawn(result, 1, player.eyePosition(), gameplayRandom);
+        }
+        startSwing();
+        return true;
+    }
+
+    /** What flowing fluid washing away a plant or a torch leaves behind (the block's own drops). */
+    private void dropReplaced(int x, int y, int z, BlockType old) {
+        Vector3f center = new Vector3f(x + 0.5f, y + 0.5f, z + 0.5f);
+        for (BlockDrops.Resolved d : BlockDrops.resolve(old, gameplayRandom)) itemEntities.spawn(d.item(), d.count(), center, gameplayRandom);
     }
 
     /**
@@ -1719,11 +1779,16 @@ public class Game implements GameAccess {
             tickAccumulator -= TICK_SECONDS;
             lightFlicker = LightmapColors.nextFlicker(lightFlicker, lightFlickerRandom);
             cookingStations.tickAll(world);
+            world.fluids().tick(world);
+            if (player.isInLava() && survival.getHealth().isAlive()) {
+                survival.ignite(15f);
+                survival.damage(4f, com.example.survival.DamageSource.LAVA);
+            }
             tickLightning();
             if (survival.isBurning()) {
                 int fx = (int) Math.floor(player.position.x), fz = (int) Math.floor(player.position.z);
                 int fy = (int) Math.floor(player.position.y + 0.3f), hy = (int) Math.floor(player.eyePosition().y);
-                if (world.getBlock(fx, fy, fz) == BlockType.WATER || (weather.isRaining() && world.getSkyLight(fx, hy, fz) >= 15)) survival.extinguish();
+                if (world.getBlock(fx, fy, fz).isWater() || (weather.isRaining() && world.getSkyLight(fx, hy, fz) >= 15)) survival.extinguish();
             }
             com.example.world.RandomTicks.tick(world, gameplayRandom, World.worldToChunk((int) Math.floor(player.position.x)),
                     World.worldToChunk((int) Math.floor(player.position.z)), RANDOM_TICK_RADIUS_CHUNKS,
@@ -1964,7 +2029,7 @@ public class Game implements GameAccess {
 
     /** Pure, exercised directly by tests in this package - see the wrapper above for real use. */
     static boolean isSubmerged(World world, Vector3f eyePos) {
-        return world.getBlock((int) Math.floor(eyePos.x), (int) Math.floor(eyePos.y), (int) Math.floor(eyePos.z)) == BlockType.WATER;
+        return world.getBlock((int) Math.floor(eyePos.x), (int) Math.floor(eyePos.y), (int) Math.floor(eyePos.z)).isWater();
     }
 
     private boolean blockIntersectsPlayer(int bx, int by, int bz) {
@@ -2066,6 +2131,12 @@ public class Game implements GameAccess {
         float underwaterEnd = UNDERWATER_FOG_END * Math.max(0.25f, vision);
         float fogStart = surfaceFogStart + (UNDERWATER_FOG_START - surfaceFogStart) * underwaterBlend;
         float fogEnd = surfaceFogEnd + (underwaterEnd - surfaceFogEnd) * underwaterBlend;
+        if (player.isHeadInLava()) { // LavaFogEnvironment: dark red, seen from 0.25 to 1 block
+            fogColor.set(0.6f, 0f, 0f);
+            fogStart = 0.25f;
+            fogEnd = 1f;
+            envFogStrength = 0f;
+        }
         float skyFogEnd = Math.min(renderDistanceBlocks, 512f);
         // Vanilla clears to the fog colour; the sky disc then fades into it toward the horizon.
         glClearColor(fogColor.x, fogColor.y, fogColor.z, 1f);

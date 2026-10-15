@@ -18,7 +18,7 @@ final class StrollTargets {
         int z = (int) Math.floor(from.z) + random.nextInt(horizontal * 2 + 1) - horizontal;
         Integer y = MobSpawner.findSpawnY(world, x, z, (int) Math.floor(from.y), vertical);
         if (y == null) return null;
-        if (world.getBlock(x, y - 1, z) == BlockType.WATER || world.getBlock(x, y, z) == BlockType.WATER) return null;
+        if (world.getBlock(x, y - 1, z).isFluid() || world.getBlock(x, y, z).isFluid()) return null;
         return new Vector3f(x + 0.5f, y, z + 0.5f);
     }
 
@@ -29,7 +29,7 @@ final class StrollTargets {
             int x = (int) Math.floor(from.x + Math.cos(angle) * distance);
             int z = (int) Math.floor(from.z + Math.sin(angle) * distance);
             Integer y = MobSpawner.findSpawnY(world, x, z, (int) Math.floor(from.y), 4);
-            if (y != null && world.getBlock(x, y - 1, z) != BlockType.WATER) return new Vector3f(x + 0.5f, y, z + 0.5f);
+            if (y != null && !world.getBlock(x, y - 1, z).isFluid()) return new Vector3f(x + 0.5f, y, z + 0.5f);
         }
         return null;
     }

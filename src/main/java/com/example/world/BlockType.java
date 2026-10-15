@@ -236,7 +236,26 @@ public enum BlockType {
     WHEAT_SEEDS(227, "Wheat Seeds", false, true, -1f, 0f),
     CARROT(228, "Carrot", false, true, -1f, 0f),
     BEETROOT(229, "Beetroot", false, true, -1f, 0f),
-    BEETROOT_SEEDS(230, "Beetroot Seeds", false, true, -1f, 0f);
+    BEETROOT_SEEDS(230, "Beetroot Seeds", false, true, -1f, 0f),
+    // Flowing fluids. Vanilla keeps a fluid's amount (1-8) and a "falling" flag in the block state; here every combination
+    // that can occur is its own block id. Water: source (WATER, 9), amounts 1-7 and falling; it loses 1 per block. Lava loses 2
+    // per block in the overworld, so it only has the amounts 6, 4 and 2 (and falling). Lava is lit (15) and drawn without blending.
+    WATER_FLOW_1(231, "Water", false, true, -1f, 0f),
+    WATER_FLOW_2(232, "Water", false, true, -1f, 0f),
+    WATER_FLOW_3(233, "Water", false, true, -1f, 0f),
+    WATER_FLOW_4(234, "Water", false, true, -1f, 0f),
+    WATER_FLOW_5(235, "Water", false, true, -1f, 0f),
+    WATER_FLOW_6(236, "Water", false, true, -1f, 0f),
+    WATER_FLOW_7(237, "Water", false, true, -1f, 0f),
+    WATER_FALLING(238, "Water", false, true, -1f, 0f),
+    LAVA(239, "Lava", false, true, -1f, 15f),
+    LAVA_FLOW_2(240, "Lava", false, true, -1f, 15f),
+    LAVA_FLOW_4(241, "Lava", false, true, -1f, 15f),
+    LAVA_FLOW_6(242, "Lava", false, true, -1f, 15f),
+    LAVA_FALLING(243, "Lava", false, true, -1f, 15f),
+    BUCKET(244, "Bucket", false, true, -1f, 0f),
+    WATER_BUCKET(245, "Water Bucket", false, true, -1f, 0f),
+    LAVA_BUCKET(246, "Lava Bucket", false, true, -1f, 0f);
 
     public final int id;
     public final String displayName;
@@ -270,6 +289,47 @@ public enum BlockType {
 
     public boolean isAir() {
         return this == AIR;
+    }
+
+    /** Any water: the source (id 9), the seven flowing amounts and the falling column. */
+    public boolean isWater() {
+        return this == WATER || (id >= 231 && id <= 238);
+    }
+
+    public boolean isLava() {
+        return id >= 239 && id <= 243;
+    }
+
+    public boolean isFluid() {
+        return isWater() || isLava();
+    }
+
+    /** A still source block of water or lava (amount 8, not falling). */
+    public boolean isFluidSource() {
+        return this == WATER || this == LAVA;
+    }
+
+    /** The falling column of a fluid: full height, amount 8 (vanilla's FALLING flag). */
+    public boolean isFluidFalling() {
+        return this == WATER_FALLING || this == LAVA_FALLING;
+    }
+
+    /** FluidState.getAmount: 8 for a source and for a falling column, 1-7 for flowing water, 2, 4 or 6 for flowing lava, 0 for no fluid. */
+    public int fluidAmount() {
+        if (this == WATER || this == LAVA || isFluidFalling()) return 8;
+        if (id >= 231 && id <= 237) return id - 230;
+        if (id >= 240 && id <= 242) return (id - 239) * 2;
+        return 0;
+    }
+
+    /** The fluid block with this amount (1-8; lava rounds down to an even amount) or the falling column. */
+    public static BlockType fluidBlock(boolean lava, int amount, boolean falling) {
+        if (falling) return lava ? LAVA_FALLING : WATER_FALLING;
+        if (amount >= 8) return lava ? LAVA : WATER;
+        if (amount <= 0) return AIR;
+        if (!lava) return byId(230 + amount);
+        int even = amount / 2;
+        return even <= 0 ? AIR : byId(239 + even);
     }
 
     /** Approximate vanilla "hand break time" = hardness * 1.5 seconds; unbreakable blocks return -1. */

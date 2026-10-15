@@ -1,6 +1,7 @@
 package com.example.world;
 
 import lombok.Getter;
+import lombok.Setter;
 
 public class Chunk {
     public static final int SIZE_X = 16;
@@ -30,6 +31,8 @@ public class Chunk {
     @Getter
     private volatile boolean generated = false;
     /** True when terrain was freshly generated (not restored from a save): passive animals pack-spawn only then. */
+    @Getter
+    @Setter
     private volatile boolean freshlyGenerated = false;
     @Getter
     private volatile boolean meshDirty = true;
@@ -154,14 +157,6 @@ public class Chunk {
             }
         }
         meshDirty = true;
-    }
-
-    public boolean isFreshlyGenerated() {
-        return freshlyGenerated;
-    }
-
-    public void setFreshlyGenerated(boolean v) {
-        freshlyGenerated = v;
     }
 
     public int worldOriginX() {

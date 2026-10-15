@@ -108,8 +108,7 @@ public abstract class Entity {
         }
         if (position.y < VOID_Y) kill();
 
-        if (world.getBlock((int) Math.floor(position.x), (int) Math.floor(position.y), (int) Math.floor(position.z))
-                == com.example.world.BlockType.WATER) {
+        if (world.getBlock((int) Math.floor(position.x), (int) Math.floor(position.y), (int) Math.floor(position.z)).isWater()) {
             fallDistance = 0f; // landing in water is safe
         } else if (position.y < startY) {
             fallDistance += startY - position.y;

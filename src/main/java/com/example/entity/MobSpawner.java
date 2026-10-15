@@ -87,7 +87,7 @@ public class MobSpawner {
         for (int dy = 0; dy < 2; dy++) {
             if (world.isSolidCollision(x, y + dy, z)) return false;
         }
-        if (world.getBlock(x, y, z) == com.example.world.BlockType.WATER) return false;
+        if (world.getBlock(x, y, z).isFluid()) return false;
         float dx = x + 0.5f - playerPos.x, dz = z + 0.5f - playerPos.z;
         if (dx * dx + dz * dz < MIN_DISTANCE * MIN_DISTANCE) return false; // never on top of the player
         return isDarkEnoughToSpawn(world, x, y, z, thundering, random);

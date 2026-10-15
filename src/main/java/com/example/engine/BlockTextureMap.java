@@ -23,7 +23,14 @@ public class BlockTextureMap {
         uniform(BlockType.COBBLESTONE, Tile.COBBLESTONE);
         uniform(BlockType.OAK_PLANKS, Tile.PLANKS);
         uniform(BlockType.BEDROCK, Tile.BEDROCK);
-        uniform(BlockType.WATER, Tile.WATER);
+        // vanilla: the surface shows the still sprite, the sides the flowing one
+        for (BlockType w : BlockType.values()) {
+            if (w.isWater()) put(w, Tile.WATER, Tile.WATER_FLOW, Tile.WATER_FLOW);
+            else if (w.isLava()) put(w, Tile.LAVA, Tile.LAVA_FLOW, Tile.LAVA_FLOW);
+        }
+        uniform(BlockType.BUCKET, Tile.BUCKET);
+        uniform(BlockType.WATER_BUCKET, Tile.WATER_BUCKET);
+        uniform(BlockType.LAVA_BUCKET, Tile.LAVA_BUCKET);
         uniform(BlockType.SAND, Tile.SAND);
         uniform(BlockType.GRAVEL, Tile.GRAVEL);
         uniform(BlockType.GOLD_ORE, Tile.GOLD_ORE);

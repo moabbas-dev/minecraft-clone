@@ -31,8 +31,6 @@ public class ChunkMeshBuilder {
     private static final float SHADE_BOTTOM = 0.5f;
     private static final float SHADE_NORTH_SOUTH = 0.8f;
     private static final float SHADE_EAST_WEST = 0.6f;
-    /** Water's surface sits slightly below a full block, matching Minecraft's water visual height. */
-    private static final float WATER_TOP_HEIGHT = 14f / 16f;
     /** No-op tint multiplier for every face except grass-top/leaves - reused to avoid allocating per face. */
     private static final float[] NEUTRAL_TINT = {1f, 1f, 1f};
     /** Real vanilla spruce foliage is a fixed color, not colormap-sampled like oak/birch/jungle/
@@ -132,6 +130,11 @@ public class ChunkMeshBuilder {
                         continue;
                     }
 
+                    if (type.isFluid()) {
+                        emitFluid(opaque, transparent, chunk, world, lx, ly, lz, type);
+                        continue;
+                    }
+
                     BlockTextureMap.Faces faces = textureMap.facesFor(type);
                     // Only the blends (water, ice) go to the translucent pass, with the alpha of their own textures (water 180, ice 190);
                     // glass, plants and torches are cutouts and draw in the opaque pass like vanilla's.
@@ -144,9 +147,8 @@ public class ChunkMeshBuilder {
                     BlockType east = sampleBlock(chunk, world, lx + 1, ly, lz);
                     BlockType west = sampleBlock(chunk, world, lx - 1, ly, lz);
 
-                    boolean isWater = type == BlockType.WATER;
                     boolean farmland = BlockSupport.isFarmland(type);
-                    float topY = isWater ? WATER_TOP_HEIGHT : farmland ? FARMLAND_HEIGHT : 1f;
+                    float topY = farmland ? FARMLAND_HEIGHT : 1f;
                     float[] sideUv = atlas.getUv(faces.side());
                     // template_cube_bottom_top_indented: the sides show rows 1-15 of the texture (uv 0,1,16,16) on a 15/16 high block
                     if (farmland) sideUv = new float[]{sideUv[0], sideUv[1] + (sideUv[3] - sideUv[1]) / 16f, sideUv[2], sideUv[3]};
@@ -162,8 +164,8 @@ public class ChunkMeshBuilder {
                     float[] sideTint = isBiomeTintedLeaves ? chunk.getFoliageTint(lx, lz)
                             : isSpruceLeaves ? SPRUCE_TINT
                             : isCherryLeaves ? CHERRY_TINT
-                            : isWater ? chunk.getWaterTint(lx, lz) : NEUTRAL_TINT;
-                    float[] topTint = isBiomeTintedLeaves || isWater || isSpruceLeaves || isCherryLeaves ? sideTint
+                            : NEUTRAL_TINT;
+                    float[] topTint = isBiomeTintedLeaves || isSpruceLeaves || isCherryLeaves ? sideTint
                             : type == BlockType.GRASS_BLOCK ? chunk.getGrassTint(lx, lz) : NEUTRAL_TINT;
                     float windWeight = windWeightFor(type);
                     // Grass: the side's tintable fringe overlay (biome-colored, same tint as the top face).
@@ -202,13 +204,144 @@ public class ChunkMeshBuilder {
 
     static final float FARMLAND_HEIGHT = 15f / 16f;
 
+    // ---- fluids ----
+
+    private static final float FLUID_INSET = 0.001f;
+
+    private static boolean sameFluid(BlockType a, boolean lava) {
+        return lava ? a.isLava() : a.isWater();
+    }
+
+    /** FluidRenderer.getHeight for one cell: 1 with the same fluid above, its own height (amount / 9) otherwise, -1 for a solid block, 0 for the rest. */
+    private float fluidCellHeight(Chunk chunk, World world, int x, int y, int z, boolean lava) {
+        BlockType b = sampleBlock(chunk, world, x, y, z);
+        if (sameFluid(b, lava)) return sameFluid(sampleBlock(chunk, world, x, y + 1, z), lava) ? 1f : FluidSim.ownHeight(b);
+        return b.isSolidCollision() ? -1f : 0f;
+    }
+
+    /**
+     * The height of the fluid surface at the corner (cx, cz) in {0, 1} of the block at (lx, ly, lz): the average over the four
+     * cells that meet there, a cell that is nearly full counting ten times (FluidRenderer.calculateAverageHeight and
+     * addWeightedHeight), 1 as soon as one of them has the fluid above it, and solid cells left out.
+     */
+    private float fluidCorner(Chunk chunk, World world, int lx, int ly, int lz, int cx, int cz, boolean lava) {
+        float sum = 0f, weight = 0f;
+        for (int i = 0; i < 4; i++) {
+            float h = fluidCellHeight(chunk, world, lx + cx - 1 + (i & 1), ly, lz + cz - 1 + (i >> 1), lava);
+            if (h >= 1f) return 1f;
+            if (h < 0f) continue;
+            if (h >= 0.8f) {
+                sum += h * 10f;
+                weight += 10f;
+            } else {
+                sum += h;
+                weight += 1f;
+            }
+        }
+        return weight == 0f ? 0f : sum / weight;
+    }
+
+    /** FluidState.getFlow, horizontally: towards where the surface is lower (a drop beside it counts as the lowest). */
+    private float[] fluidFlow(Chunk chunk, World world, int lx, int ly, int lz, BlockType self) {
+        boolean lava = self.isLava();
+        float own = FluidSim.ownHeight(self), fx = 0f, fz = 0f;
+        int[][] dirs = {{0, -1}, {1, 0}, {0, 1}, {-1, 0}};
+        for (int[] d : dirs) {
+            BlockType n = sampleBlock(chunk, world, lx + d[0], ly, lz + d[1]);
+            float g = 0f;
+            if (sameFluid(n, lava)) {
+                g = own - FluidSim.ownHeight(n);
+            } else if (!n.isSolidCollision() && !n.isFluid()) {
+                BlockType nb = sampleBlock(chunk, world, lx + d[0], ly - 1, lz + d[1]);
+                if (sameFluid(nb, lava)) g = own - (FluidSim.ownHeight(nb) - 0.8888889f);
+            }
+            fx += d[0] * g;
+            fz += d[1] * g;
+        }
+        return new float[]{fx, fz};
+    }
+
+    /**
+     * A fluid block as FluidRenderer draws it: a surface whose four corners sit at their own averaged heights (so flowing water
+     * slopes), side faces whose top follows the corner heights, and no face against the same fluid. The surface shows the still
+     * sprite (the flowing one, turned to the flow, where it moves); the sides always show the flowing sprite, cut off at the
+     * surface. Water goes to the blended pass tinted by the biome, lava to the opaque one.
+     */
+    private void emitFluid(FloatBuffer opaque, FloatBuffer transparent, Chunk chunk, World world, int lx, int ly, int lz, BlockType type) {
+        boolean lava = type.isLava();
+        FloatBuffer buf = lava ? opaque : transparent;
+        BlockTextureMap.Faces faces = textureMap.facesFor(type);
+        float[] stillUv = atlas.getUv(faces.top()), flowUv = atlas.getUv(faces.side());
+        float[] tint = lava ? NEUTRAL_TINT : chunk.getWaterTint(lx, lz);
+        BlockType up = sampleBlock(chunk, world, lx, ly + 1, lz), down = sampleBlock(chunk, world, lx, ly - 1, lz);
+        BlockType north = sampleBlock(chunk, world, lx, ly, lz - 1), south = sampleBlock(chunk, world, lx, ly, lz + 1);
+        BlockType east = sampleBlock(chunk, world, lx + 1, ly, lz), west = sampleBlock(chunk, world, lx - 1, ly, lz);
+        float hNW = fluidCorner(chunk, world, lx, ly, lz, 0, 0, lava), hSW = fluidCorner(chunk, world, lx, ly, lz, 0, 1, lava);
+        float hSE = fluidCorner(chunk, world, lx, ly, lz, 1, 1, lava), hNE = fluidCorner(chunk, world, lx, ly, lz, 1, 0, lava);
+
+        if (!sameFluid(up, lava) && !up.isOpaqueCube()) {
+            float[] flow = fluidFlow(chunk, world, lx, ly, lz, type);
+            boolean still = flow[0] == 0f && flow[1] == 0f;
+            float[] uv = still ? stillUv : flowUv;
+            // the flow's angle snapped to quarter turns (the atlas tile cannot be sampled at other angles without bleeding)
+            int turns = still ? 0 : Math.floorMod(Math.round((float) ((Math.atan2(flow[1], flow[0]) - Math.PI / 2) / (Math.PI / 2))), 4);
+            float[][] corner = {{0, 0, hNW}, {0, 1, hSW}, {1, 1, hSE}, {1, 0, hNE}};
+            float[][] cuv = {{uv[0], uv[1]}, {uv[0], uv[3]}, {uv[2], uv[3]}, {uv[2], uv[1]}};
+            FaceLight light = faceLight(Face.TOP, type, chunk, world, lx, ly, lz);
+            int[] tri = {0, 1, 2, 0, 2, 3};
+            for (int k : tri) {
+                float[] c = corner[k], t = cuv[(k + turns) & 3];
+                fluidVertex(buf, lx + c[0], ly + c[2], lz + c[1], t[0], t[1], light, tint, c[0] > 0.5f ? 1 : 0, 1, c[1] > 0.5f ? 1 : 0);
+            }
+        }
+        if (!sameFluid(down, lava) && !down.isOpaqueCube()) {
+            FaceLight light = faceLight(Face.BOTTOM, type, chunk, world, lx, ly, lz);
+            float[][] c = {{0, 0}, {1, 0}, {1, 1}, {0, 0}, {1, 1}, {0, 1}};
+            for (float[] p : c) {
+                fluidVertex(buf, lx + p[0], ly + FLUID_INSET, lz + p[1], stillUv[0] + p[0] * (stillUv[2] - stillUv[0]),
+                        stillUv[1] + p[1] * (stillUv[3] - stillUv[1]), light, tint, (int) p[0], 0, (int) p[1]);
+            }
+        }
+        // sides: north (z = 0), south (z = 1), west (x = 0), east (x = 1); each between two corner heights
+        Object[][] sides = {
+                {Face.NORTH, north, 0f, 0f, 1f, 0f, hNW, hNE, true},
+                {Face.SOUTH, south, 1f, 1f, 0f, 1f, hSE, hSW, false},
+                {Face.WEST, west, 0f, 1f, 0f, 0f, hSW, hNW, false},
+                {Face.EAST, east, 1f, 0f, 1f, 1f, hNE, hSE, true}};
+        for (Object[] s : sides) {
+            BlockType n = (BlockType) s[1];
+            if (sameFluid(n, lava) || n.isOpaqueCube()) continue;
+            Face face = (Face) s[0];
+            FaceLight light = faceLight(face, type, chunk, world, lx, ly, lz);
+            boolean alongX = face == Face.NORTH || face == Face.SOUTH;
+            float fixed = alongX ? ((Face) s[0] == Face.NORTH ? FLUID_INSET : 1f - FLUID_INSET) : (face == Face.WEST ? FLUID_INSET : 1f - FLUID_INSET);
+            float a0 = (float) s[2], a1 = (float) s[3], b0 = (float) s[4], b1 = (float) s[5];
+            float ha = (float) s[6], hb = (float) s[7];
+            // the edge runs from (a0, a1) to (b0, b1) in (x, z); a is the first corner, b the second
+            float va = flowUv[1] + (1f - ha) * (flowUv[3] - flowUv[1]), vb = flowUv[1] + (1f - hb) * (flowUv[3] - flowUv[1]);
+            float[][] q = {{a0, a1, 0f, flowUv[0], flowUv[3]}, {b0, b1, 0f, flowUv[2], flowUv[3]}, {b0, b1, hb, flowUv[2], vb},
+                    {a0, a1, 0f, flowUv[0], flowUv[3]}, {b0, b1, hb, flowUv[2], vb}, {a0, a1, ha, flowUv[0], va}};
+            for (float[] p : q) {
+                float x = alongX ? p[0] : fixed, z = alongX ? fixed : p[1];
+                fluidVertex(buf, lx + x, ly + p[2], lz + z, p[3], p[4], light, tint, x > 0.5f ? 1 : 0, p[2] > 0.5f ? 1 : 0, z > 0.5f ? 1 : 0);
+            }
+        }
+    }
+
+    private static void fluidVertex(FloatBuffer buf, float x, float y, float z, float u, float v, FaceLight light, float[] tint,
+                                    int kx, int ky, int kz) {
+        int k = kx | (ky << 1) | (kz << 2);
+        float shade = light.shade[k];
+        buf.add(x, y, z, u, v, light.sky[k] / 15f, light.block[k] / 15f, tint[0] * shade, tint[1] * shade, tint[2] * shade, 0f);
+    }
+
     /** Blocks drawn with blending: water and ice carry their own alpha in the texture. */
     public static boolean isTranslucentForTest(BlockType type) {
         return isTranslucent(type);
     }
 
     static boolean isTranslucent(BlockType type) {
-        return type == BlockType.WATER || type == BlockType.ICE;
+        return type.isWater() || type == BlockType.ICE;
     }
 
     private static boolean inChunk(int lx, int lz) {
@@ -286,7 +419,7 @@ public class ChunkMeshBuilder {
             BlockType.GUNPOWDER, BlockType.BONE, BlockType.ARROW, BlockType.STRING, BlockType.SPIDER_EYE);
 
     public static boolean isFlatIconItem(BlockType type) {
-        return isCrossShapedPlant(type) || type == BlockType.TORCH || type == BlockType.GOLDEN_APPLE || type == BlockType.WHEAT || type == BlockType.WHEAT_SEEDS
+        return isCrossShapedPlant(type) || type == BlockType.TORCH || type == BlockType.GOLDEN_APPLE || type == BlockType.BUCKET || type == BlockType.WATER_BUCKET || type == BlockType.LAVA_BUCKET || type == BlockType.WHEAT || type == BlockType.WHEAT_SEEDS
                 || type == BlockType.CARROT || type == BlockType.BEETROOT || type == BlockType.BEETROOT_SEEDS || type == BlockType.BOW
                 || type == BlockType.BOW_PULLING_0 || type == BlockType.BOW_PULLING_1 || type == BlockType.BOW_PULLING_2 || ToolEffectiveness.isTool(type) || FoodRegistry.isFood(type)
                 || SMELTING_ITEMS.contains(type);
@@ -427,7 +560,7 @@ public class ChunkMeshBuilder {
         float dir = DIRECTIONAL[f];
         int[] n = NORMAL[f];
         int bx = lx + n[0], by = ly + n[1], bz = lz + n[2];
-        if (type == BlockType.WATER) {
+        if (type.isFluid()) {
             int sky = Math.max(sampleSkyLight(chunk, world, lx, ly, lz), sampleSkyLight(chunk, world, lx, ly + 1, lz));
             int block = Math.max(sampleBlockLight(chunk, world, lx, ly, lz), sampleBlockLight(chunk, world, lx, ly + 1, lz));
             return flat(sky, block, dir);

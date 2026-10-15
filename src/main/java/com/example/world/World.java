@@ -16,6 +16,13 @@ public class World {
     @Getter
     private File saveDir;
 
+    /** Water and lava: scheduled flow ticks, driven by the game's 20 Hz loop. */
+    private final FluidSim fluids = new FluidSim();
+
+    public FluidSim fluids() {
+        return fluids;
+    }
+
     public World(long seed, WorldGenerator generator) {
         this.seed = seed;
         this.generator = generator;
@@ -213,6 +220,7 @@ public class World {
             if (oldOverride > 0) emissionOverrides.remove(posKey(x, y, z)); // the burning furnace is gone
             if (c.isGenerated() && c.isLightComputed()) LightEngine.onBlockChanged(this, x, y, z, previous, type, oldOverride);
             if (c.isGenerated()) BlockSupport.blockChanged(this, x, y, z);
+            if (c.isGenerated()) fluids.blockChanged(this, x, y, z);
         }
         // If the edit is on a chunk border, the neighboring chunk's mesh must be rebuilt too.
         if (lx == 0) markNeighborDirty(cx - 1, cz);

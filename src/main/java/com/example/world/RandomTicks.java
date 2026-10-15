@@ -63,7 +63,7 @@ public final class RandomTicks {
         for (int dx = -4; dx <= 4; dx++) {
             for (int dz = -4; dz <= 4; dz++) {
                 for (int dy = 0; dy <= 1; dy++) {
-                    if (world.getBlock(x + dx, y + dy, z + dz) == BlockType.WATER) return true;
+                    if (world.getBlock(x + dx, y + dy, z + dz).isWater()) return true;
                 }
             }
         }

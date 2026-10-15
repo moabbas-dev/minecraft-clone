@@ -165,7 +165,25 @@ public abstract class Mob extends LivingEntity {
         return fireSeconds > 0f;
     }
 
+    private float lavaTimer;
+
+    /** Entity.lavaHurt: a mob standing in lava is set alight for 15 seconds and takes 4 damage every half second (the hurt cooldown). */
+    private void tickLava(World world, float dt) {
+        int x = (int) Math.floor(position.x), y = (int) Math.floor(position.y + 0.1f), z = (int) Math.floor(position.z);
+        if (!world.getBlock(x, y, z).isLava()) {
+            lavaTimer = 0f;
+            return;
+        }
+        setOnFire(15f);
+        lavaTimer -= dt;
+        if (lavaTimer <= 0f) {
+            lavaTimer = 0.5f;
+            damage(4f, com.example.survival.DamageSource.LAVA);
+        }
+    }
+
     private void tickFire(World world, float dt) {
+        tickLava(world, dt);
         if (fireSeconds <= 0f) return;
         if (isInWater(world)) {
             fireSeconds = 0f;
@@ -215,8 +233,11 @@ public abstract class Mob extends LivingEntity {
     }
 
     public boolean isInWater(World world) {
-        return world.getBlock((int) Math.floor(position.x), (int) Math.floor(position.y + 0.1f), (int) Math.floor(position.z))
-                == com.example.world.BlockType.WATER;
+        int x = (int) Math.floor(position.x), y = (int) Math.floor(position.y + 0.1f), z = (int) Math.floor(position.z);
+        com.example.world.BlockType b = world.getBlock(x, y, z);
+        if (!b.isWater()) return false;
+        // a thin flow (its surface barely above the feet) is waded, not swum
+        return world.getBlock(x, y + 1, z).isWater() || y + com.example.world.FluidSim.ownHeight(b) > position.y + 0.3f;
     }
 
     /** Drop-handling hook: what this mob yields on death. {@code MobManager} rolls it exactly

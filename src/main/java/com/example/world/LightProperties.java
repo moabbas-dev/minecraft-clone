@@ -18,7 +18,7 @@ public final class LightProperties {
         for (BlockType t : BlockType.values()) {
             int d;
             if (t == BlockType.AIR) d = 0;
-            else if (t == BlockType.WATER || t == BlockType.ICE || t == BlockType.MANGROVE_ROOTS || ChunkMeshBuilder.isAnyLeaves(t)) d = 1;
+            else if (t.isFluid() || t == BlockType.ICE || t == BlockType.MANGROVE_ROOTS || ChunkMeshBuilder.isAnyLeaves(t)) d = 1;
             else if (t == BlockType.CHEST) d = 0; // not a full block: light passes
             else if (t == BlockType.FARMLAND || t == BlockType.FARMLAND_MOIST) d = 1; // not solid to rendering and no skylight passage: 1
             else d = t.isOpaqueCube() ? 15 : 0;

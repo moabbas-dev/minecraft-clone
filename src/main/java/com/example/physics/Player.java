@@ -107,6 +107,11 @@ public class Player {
     /** Feet in water (possibly only partially submerged) - see {@link #updateWaterState}. */
     @Getter
     private boolean swimming = false;
+    /** Feet in lava (swimming physics at {@link #LAVA_SWIM_FACTOR} of the water speed) and the eye in lava (the red fog). */
+    private boolean inLava = false;
+    private boolean headInLava = false;
+    /** Lava's drag (0.5 a tick against water's 0.8) leaves a swimmer at about this share of the water speed. */
+    private static final float LAVA_SWIM_FACTOR = 0.4f;
     /** Eye/camera position specifically inside a water block - fully submerged. */
     @Getter
     private boolean headSubmerged = false;
@@ -315,7 +320,7 @@ public class Player {
         // a multiplier, avoiding a discontinuity at the moment the base speed itself would
         // otherwise switch.
         float targetSpeed = waterActive
-                ? SWIM_SPEED * (sprinting ? SWIM_SPRINT_MULTIPLIER : 1f)
+                ? SWIM_SPEED * (sprinting ? SWIM_SPRINT_MULTIPLIER : 1f) * (inLava ? LAVA_SWIM_FACTOR : 1f)
                 : WALK_SPEED * (sprinting ? SPRINT_MULTIPLIER : 1f) * (sneaking ? SNEAK_MULTIPLIER : 1f);
         currentSpeed += (targetSpeed - currentSpeed) * Math.min(1f, SPEED_LERP_RATE * dt);
         float speed = currentSpeed;
@@ -366,10 +371,11 @@ public class Player {
             // control - this is a plain if/else, so these can never stack into an unbounded
             // combined speed.
             float target;
-            if (input.isKeyDown(keyJump)) target = SWIM_UP_SPEED;
-            else if (sneaking) target = -SWIM_DOWN_SPEED;
+            float lavaFactor = inLava ? LAVA_SWIM_FACTOR : 1f;
+            if (input.isKeyDown(keyJump)) target = SWIM_UP_SPEED * lavaFactor;
+            else if (sneaking) target = -SWIM_DOWN_SPEED * lavaFactor;
             else if (wDown) target = front.y * speed;
-            else target = BUOYANCY_DRIFT_SPEED;
+            else target = inLava ? -0.3f : BUOYANCY_DRIFT_SPEED; // lava does not carry a swimmer up
 
             if (verticalVelocity < target) {
                 verticalVelocity = Math.min(target, verticalVelocity + WATER_VERTICAL_ACCEL * dt);
@@ -440,17 +446,42 @@ public class Player {
     private void updateWaterState(World world) {
         int bx = (int) Math.floor(position.x);
         int bz = (int) Math.floor(position.z);
-        boolean atFeet = world.getBlock(bx, (int) Math.floor(position.y), bz) == BlockType.WATER;
-        boolean aboveFeet = world.getBlock(bx, (int) Math.floor(position.y + SWIM_ENTRY_SAMPLE_HEIGHT), bz) == BlockType.WATER;
+        boolean atFeet = deepWater(world, bx, (int) Math.floor(position.y), bz);
+        boolean aboveFeet = deepWater(world, bx, (int) Math.floor(position.y + SWIM_ENTRY_SAMPLE_HEIGHT), bz);
         if (atFeet || aboveFeet) {
             swimming = true;
         } else {
-            boolean belowFeet = world.getBlock(bx, (int) Math.floor(position.y - 0.05f), bz) == BlockType.WATER;
+            boolean belowFeet = deepWater(world, bx, (int) Math.floor(position.y - 0.05f), bz);
             if (!belowFeet) swimming = false;
         }
 
+        inLava = world.getBlock(bx, (int) Math.floor(position.y), bz).isLava()
+                || world.getBlock(bx, (int) Math.floor(position.y + SWIM_ENTRY_SAMPLE_HEIGHT), bz).isLava();
+        if (inLava) swimming = true;
+
         Vector3f eye = eyePosition();
-        headSubmerged = world.getBlock((int) Math.floor(eye.x), (int) Math.floor(eye.y), (int) Math.floor(eye.z)) == BlockType.WATER;
+        BlockType atEye = world.getBlock((int) Math.floor(eye.x), (int) Math.floor(eye.y), (int) Math.floor(eye.z));
+        headSubmerged = atEye.isWater();
+        headInLava = atEye.isLava();
+    }
+
+    /** How far above the feet the surface of a shallow flow must reach for it to count as swimming water: thin streams are waded. */
+    private static final float WADE_DEPTH = 0.3f;
+
+    /** Water in this cell that is deep enough to swim in: water above it, or a surface (the cell's height, amount / 9) over the feet by {@link #WADE_DEPTH}. */
+    private boolean deepWater(World world, int bx, int cellY, int bz) {
+        BlockType b = world.getBlock(bx, cellY, bz);
+        if (!b.isWater()) return false;
+        if (world.getBlock(bx, cellY + 1, bz).isWater()) return true;
+        return cellY + com.example.world.FluidSim.ownHeight(b) > position.y + WADE_DEPTH;
+    }
+
+    public boolean isInLava() {
+        return inLava;
+    }
+
+    public boolean isHeadInLava() {
+        return headInLava;
     }
 
     private void moveWithCollision(World world, float dx, float dy, float dz, boolean sneaking) {

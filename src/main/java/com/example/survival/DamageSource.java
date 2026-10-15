@@ -37,7 +37,9 @@ public enum DamageSource {
     /** A lightning bolt: 5 damage, reduced by armor. */
     LIGHTNING,
     /** Burning (1 damage a second while alight): ignores armor. */
-    ON_FIRE;
+    ON_FIRE,
+    /** Standing in lava: 4 damage whenever the hurt cooldown allows, reduced by armor (damage_type lava is not in bypasses_armor). */
+    LAVA;
 
     /** Sources ordinary armor does not reduce (research: docs/research/armor.md). GENERIC is the test
      *  controller's exact-amount damage. */

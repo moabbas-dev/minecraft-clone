@@ -17,6 +17,11 @@ public class Raycast {
     }
 
     public static Hit cast(World world, Vector3f origin, Vector3f direction, float maxDistance) {
+        return cast(world, origin, direction, maxDistance, false);
+    }
+
+    /** As {@link #cast(World, Vector3f, Vector3f, float)}; with {@code fluidSources} a still water or lava source also stops the ray (an empty bucket's aim). */
+    public static Hit cast(World world, Vector3f origin, Vector3f direction, float maxDistance, boolean fluidSources) {
         Vector3f dir = new Vector3f(direction).normalize();
 
         int x = (int) Math.floor(origin.x);
@@ -67,7 +72,7 @@ public class Raycast {
             }
 
             BlockType type = world.getBlock(x, y, z);
-            if (!type.isAir() && type != BlockType.WATER) {
+            if (!type.isAir() && (!type.isFluid() || (fluidSources && type.isFluidSource()))) {
                 return new Hit(x, y, z, prevX, prevY, prevZ, type);
             }
         }

@@ -123,6 +123,9 @@ public final class Recipes {
             new Recipe(new String[]{".SX", "S.X", ".SX"}, Map.of('S', only(BlockType.STICK), 'X', only(BlockType.STRING)), new ItemStack(BlockType.BOW, 1)),
             new Recipe(new String[]{"XS.", "X.S", "XS."}, Map.of('S', only(BlockType.STICK), 'X', only(BlockType.STRING)), new ItemStack(BlockType.BOW, 1)),
 
+            // Bucket: three iron ingots in a V (recipe/bucket.json).
+            new Recipe(new String[]{"I.I", ".I."}, Map.of('I', only(BlockType.IRON_INGOT)), new ItemStack(BlockType.BUCKET, 1)),
+
             // Golden apple: an apple in a ring of eight gold ingots.
             new Recipe(new String[]{"GGG", "GAG", "GGG"}, Map.of('G', only(BlockType.GOLD_INGOT), 'A', only(BlockType.APPLE)),
                     new ItemStack(BlockType.GOLDEN_APPLE, 1)),
