@@ -62,21 +62,9 @@ class WeatherTest {
     @Test
     void lightningFlashDecaysBackToZero() {
         Weather w = new Weather(4L);
-        // Drive until we observe at least one lightning strike (flash > 0), which only happens
-        // during THUNDER - a long run makes this a near-certainty without hardcoding a seed's
-        // exact schedule.
-        boolean sawFlash = false;
-        for (int i = 0; i < (int) (72000 / DT); i++) {
-            w.update(DT);
-            if (w.getLightningFlash() > 0f) {
-                sawFlash = true;
-                break;
-            }
-        }
-        assertTrue(sawFlash, "expected at least one lightning flash over a long simulated run");
-
-        // Now step forward with no further state changes possible within this short window and
-        // confirm the flash decays to exactly 0, never negative, never stuck above 0 forever.
+        assertEquals(0f, w.getLightningFlash(), 0f, "no strike happens by itself: bolts are spawned by the game");
+        w.strike();
+        assertEquals(1f, w.getLightningFlash(), 0f);
         for (int i = 0; i < 20; i++) {
             w.update(DT);
         }

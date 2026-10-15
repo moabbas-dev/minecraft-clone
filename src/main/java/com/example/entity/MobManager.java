@@ -54,7 +54,7 @@ public class MobManager {
     }
 
     private boolean sunReaches(World world, Mob m) {
-        if (!world.isBrightOutside() || raining || m.isInWater(world)) return false;
+        if (!world.monstersBurn() || raining || m.isInWater(world)) return false;
         int x = (int) Math.floor(m.position.x), z = (int) Math.floor(m.position.z);
         int headY = (int) Math.floor(m.position.y + m.getHeight() - 0.1f);
         return world.getSkyLight(x, headY, z) >= 15;

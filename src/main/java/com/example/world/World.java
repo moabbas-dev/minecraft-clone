@@ -133,6 +133,17 @@ public class World {
         this.skyDarken = Math.max(0, Math.min(15, skyDarken));
     }
 
+    private boolean monstersBurn;
+
+    /** The timeline's gameplay/monsters_burn: true by day, from tick 23460 to tick 12542 of the next day. */
+    public boolean monstersBurn() {
+        return monstersBurn;
+    }
+
+    public void setMonstersBurn(boolean burn) {
+        this.monstersBurn = burn;
+    }
+
     /** {@code Level.isBrightOutside}: the sky is dimmed by less than 4. */
     public boolean isBrightOutside() {
         return skyDarken < 4;

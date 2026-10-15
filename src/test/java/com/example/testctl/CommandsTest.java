@@ -290,6 +290,19 @@ class CommandsTest {
             difficultyLevel = level;
         }
 
+        String effectGiven;
+        float[] lightningAt;
+
+        @Override
+        public void giveEffect(String type, float seconds, int amplifier) {
+            effectGiven = type + ":" + seconds + ":" + amplifier;
+        }
+
+        @Override
+        public void strikeLightning(float x, float y, float z) {
+            lightningAt = new float[]{x, y, z};
+        }
+
         @Override
         public void setHunger(float foodLevel, float saturation, float exhaustion) {
             if (throwOnHunger) throw new IllegalStateException("no active world");
@@ -736,6 +749,16 @@ class CommandsTest {
         assertEquals(400, commands.execute("loadTestWorld", params()).status());
         fake.throwOnLoad = true;
         assertEquals(400, commands.execute("loadTestWorld", params("folder", "Nope")).status());
+    }
+
+    @Test
+    void giveEffectAndLightningDispatchAndValidate() {
+        assertEquals(200, commands.execute("giveEffect", params("type", "poison", "seconds", "5", "amp", "1")).status());
+        assertEquals("poison:5.0:1", fake.effectGiven);
+        assertEquals(400, commands.execute("giveEffect", params("type", "poison")).status());
+        assertEquals(200, commands.execute("lightning", params("x", "1", "y", "2", "z", "3")).status());
+        assertEquals(2f, fake.lightningAt[1]);
+        assertEquals(400, commands.execute("lightning", params("x", "1")).status());
     }
 
     @Test

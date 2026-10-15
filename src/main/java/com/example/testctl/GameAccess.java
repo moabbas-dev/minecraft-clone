@@ -125,6 +125,12 @@ public interface GameAccess {
      *  in-game. */
     void setHunger(float foodLevel, float saturation, float exhaustion);
 
+    /** Gives the player a status effect (hunger, poison, regeneration, absorption) for {@code seconds}, level {@code amplifier} + 1. */
+    void giveEffect(String type, float seconds, int amplifier);
+
+    /** Strikes a lightning bolt at a position. */
+    void strikeLightning(float x, float y, float z);
+
     /** One player attack click (swing at the mob in the crosshair, or the air) through the real attack path. */
     void attack();
 

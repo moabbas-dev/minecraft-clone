@@ -41,7 +41,7 @@ JAR_PREFIX = "assets/minecraft/"
 BULK_TEXTURE_DIRS = ("textures/block/", "textures/item/", "textures/gui/", "textures/colormap/", "textures/particle/",
                      "textures/environment/", "textures/entity/chest/", "textures/entity/player/wide/",
                      "textures/entity/equipment/humanoid/", "textures/entity/equipment/humanoid_leggings/", "textures/entity/experience/",
-                     "textures/font/")
+                     "textures/font/", "textures/mob_effect/")
 UA = {"User-Agent": "minecraft-clone-asset-restore/1.0"}
 EXTRA_FILES = ("texts/splashes.txt",)  # plain data files outside textures/ that the game reads
 DEST = ROOT  # where textures/ and sounds/ are written (--dest overrides, used by the offline test)

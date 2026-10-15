@@ -31,11 +31,17 @@ public enum DamageSource {
     /** Creeper and TNT blasts: reduced by armor like vanilla. */
     EXPLOSION,
     /** A skeleton arrow in flight. */
-    ARROW;
+    ARROW,
+    /** Poison and other magic: ignores armor. */
+    MAGIC,
+    /** A lightning bolt: 5 damage, reduced by armor. */
+    LIGHTNING,
+    /** Burning (1 damage a second while alight): ignores armor. */
+    ON_FIRE;
 
     /** Sources ordinary armor does not reduce (research: docs/research/armor.md). GENERIC is the test
      *  controller's exact-amount damage. */
     public boolean bypassesArmor() {
-        return this == FALL || this == STARVATION || this == DROWNING || this == VOID || this == GENERIC;
+        return this == FALL || this == STARVATION || this == DROWNING || this == VOID || this == GENERIC || this == MAGIC || this == ON_FIRE;
     }
 }

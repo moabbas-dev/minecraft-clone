@@ -225,7 +225,9 @@ public class Game implements GameAccess {
     private float underwaterBlend = 0f;
     /** Seconds the eye has been under water without a break (LocalPlayer.waterVisionTime), and the rain fog's eased strength. */
     private float waterVisionSeconds, rainFogMultiplier;
-    private Mesh skyDiscMesh, sunriseMesh;
+    private Mesh skyDiscMesh, sunriseMesh, lightningMesh;
+    private final com.example.entity.LightningBolts lightning = new com.example.entity.LightningBolts();
+    private final float[] lightningScratch = new float[LightningGeometry.capacityFloats()];
     private Mesh sunMoonMesh;
     private Mesh heldItemMesh;
 
@@ -341,6 +343,7 @@ public class Game implements GameAccess {
         sunMoonMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
         skyDiscMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
         sunriseMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
+        lightningMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
         rainMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
         starMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
         cloudMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
@@ -1136,6 +1139,75 @@ public class Game implements GameAccess {
         if (use && !useHand(false, hit, forcedUse)) useHand(true, hit, forcedUse);
     }
 
+    /** One tick of thunderstorm strikes and of the bolts alight. */
+    private void tickLightning() {
+        int pcx = World.worldToChunk((int) Math.floor(player.position.x)), pcz = World.worldToChunk((int) Math.floor(player.position.z));
+        if (weather.isRaining() && weather.isThundering()) {
+            java.util.List<float[]> living = new java.util.ArrayList<>();
+            living.add(new float[]{player.position.x, player.position.y, player.position.z});
+            for (Mob m : mobs.mobs()) if (m.isAlive()) living.add(new float[]{m.position.x, m.position.y, m.position.z});
+            for (float[] at : com.example.entity.LightningBolts.randomStrikes(world, gameplayRandom, pcx, pcz, RANDOM_TICK_RADIUS_CHUNKS, living)) {
+                lightning.spawn(at[0], at[1], at[2], gameplayRandom);
+            }
+        }
+        lightning.tick(gameplayRandom, new com.example.entity.LightningBolts.Listener() {
+            @Override
+            public void struck(com.example.entity.LightningBolts.Bolt bolt) {
+                weather.strike(); // the thunder (GameAudio watches for it)
+            }
+
+            @Override
+            public void lit(com.example.entity.LightningBolts.Bolt bolt) {
+                weather.flashSky();
+                strikeAround(bolt);
+            }
+        });
+    }
+
+    /** Entity.thunderHit for everything within 3 blocks of a lit bolt (and from 3 below to 6 above it): alight for 8 s and 5 damage. */
+    private void strikeAround(com.example.entity.LightningBolts.Bolt b) {
+        for (Mob m : mobs.mobs()) {
+            if (!m.isAlive()) continue;
+            float dx = m.position.x - b.x, dz = m.position.z - b.z, dy = m.position.y - b.y;
+            if (Math.abs(dx) > 3f + m.getWidth() * 0.5f || Math.abs(dz) > 3f + m.getWidth() * 0.5f || dy < -3f - m.getHeight() || dy > 6f) continue;
+            if (!m.isOnFire()) m.setOnFire(8f);
+            m.hurtBy(5f, com.example.survival.DamageSource.LIGHTNING, new Vector3f(b.x, m.position.y, b.z), 0f);
+        }
+        float dx = player.position.x - b.x, dz = player.position.z - b.z, dy = player.position.y - b.y;
+        if (Math.abs(dx) <= 3.3f && Math.abs(dz) <= 3.3f && dy >= -4.8f && dy <= 6f && survival.getHealth().isAlive()) {
+            if (!survival.isBurning()) survival.ignite(8f);
+            survival.damage(5f, com.example.survival.DamageSource.LIGHTNING);
+        }
+    }
+
+    /** The lit bolts, jagged from the cloud to the strike, added onto the sky (LightningBoltRenderer). */
+    private void renderLightning(Vector3f eye) {
+        boolean any = false;
+        for (com.example.entity.LightningBolts.Bolt b : lightning.bolts()) any |= b.lit();
+        if (!any) return;
+        if (whiteTexture == null) whiteTexture = com.example.engine.EntityTexture.solid(0xFFFFFF);
+        whiteTexture.bind(0);
+        chunkShader.setUniform("uLitMode", LIT_UNLIT);
+        chunkShader.setUniform("uAlpha", 0.3f);
+        chunkShader.setUniform("uFogStart", 1_000_000f);
+        chunkShader.setUniform("uFogEnd", 2_000_000f);
+        boolean culled = glIsEnabled(GL_CULL_FACE);
+        glDisable(GL_CULL_FACE);
+        glDepthMask(false);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+        for (com.example.entity.LightningBolts.Bolt b : lightning.bolts()) {
+            if (!b.lit()) continue;
+            int floats = LightningGeometry.build(b.seed, lightningScratch);
+            lightningMesh.upload(lightningScratch, floats);
+            chunkShader.setUniform("uModel", new Matrix4f().translation(b.x, b.y, b.z));
+            lightningMesh.draw();
+        }
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glDepthMask(true);
+        if (culled) glEnable(GL_CULL_FACE);
+        atlas.bind(0);
+    }
+
     /** What the world reports back to the game: torches that lost their support drop as items. */
     private void installWorldHooks() {
         world.setDetachListener((x, y, z, type) -> {
@@ -1303,6 +1375,7 @@ public class Game implements GameAccess {
      *  {@link PlayerSurvival#eat} actually applied it (blocked at max food for non-overeat food). */
     private void tryEat(boolean offhand, BlockType foodType) {
         if (survival.eat(foodType)) {
+            survival.applyFoodEffects(foodType, gameplayRandom);
             if (offhand) inventory.offhandSlot().removeOne(0);
             else inventory.removeFromSlot(inventory.getSelectedSlot(), 1);
         }
@@ -1596,6 +1669,12 @@ public class Game implements GameAccess {
             tickAccumulator -= TICK_SECONDS;
             lightFlicker = LightmapColors.nextFlicker(lightFlicker, lightFlickerRandom);
             cookingStations.tickAll(world);
+            tickLightning();
+            if (survival.isBurning()) {
+                int fx = (int) Math.floor(player.position.x), fz = (int) Math.floor(player.position.z);
+                int fy = (int) Math.floor(player.position.y + 0.3f), hy = (int) Math.floor(player.eyePosition().y);
+                if (world.getBlock(fx, fy, fz) == BlockType.WATER || (weather.isRaining() && world.getSkyLight(fx, hy, fz) >= 15)) survival.extinguish();
+            }
             com.example.world.RandomTicks.tick(world, gameplayRandom, World.worldToChunk((int) Math.floor(player.position.x)),
                     World.worldToChunk((int) Math.floor(player.position.z)), RANDOM_TICK_RADIUS_CHUNKS,
                     (x, y, z) -> weather.isRaining() && world.getSkyLight(x, y, z) >= 15);
@@ -1763,6 +1842,7 @@ public class Game implements GameAccess {
         playerTarget.bind(player, survival);
         float stormLevel = weather.getStormIntensity();
         world.setSkyDarken(SkyDetails.skyDarken(SkyDetails.dayTick(dayTime), stormLevel, weather.isThundering() ? stormLevel : 0f));
+        world.setMonstersBurn(SkyDetails.monstersBurn(SkyDetails.dayTick(dayTime)));
         mobs.setRaining(weather.isRaining());
         if (survival.getDifficulty() == Difficulty.PEACEFUL) mobs.removeHostile();
         fallingBlocks.update(world, dt, itemEntities, gameplayRandom);
@@ -1994,6 +2074,7 @@ public class Game implements GameAccess {
         renderStars(eye, sunDir, rain);
         renderSunAndMoon(eye, sunDir, rain);
         setEnvFog(false);
+        renderLightning(eye);
         renderClouds(tick, rain, thunder);
         chunkShader.setUniform("uLitMode", LIT_TERRAIN);
         renderRain();
@@ -3084,6 +3165,7 @@ public class Game implements GameAccess {
 
         if (hudTextures != null && inventory.getHotbarSize() == 9) {
             renderRealHud();
+            drawFireOverlay(window.getWidth(), window.getHeight());
             renderDebugOverlay();
             return;
         }
@@ -3138,12 +3220,13 @@ public class Game implements GameAccess {
         HudTextures.draw(uiRenderer, t.hotbar, hx, hy, s);
 
         float heartsY = hy - 17 * s;
-        drawHealthAndFood(t, hx, heartsY, s);
+        int extraHeartRows = drawHealthAndFood(t, hx, heartsY, s);
+        float rowsUp = extraHeartRows * 10 * s;
 
         int defense = survival.getArmor().totalDefense();
         if (defense > 0 && t.armorEmpty != null) {
             for (int i = 0; i < 10; i++) {
-                float x = hx + i * 8 * s, ay = heartsY - 10 * s;
+                float x = hx + i * 8 * s, ay = heartsY - 10 * s - rowsUp;
                 HudTextures.draw(uiRenderer, t.armorEmpty, x, ay, s);
                 int v = defense - i * 2;
                 if (v >= 2) HudTextures.draw(uiRenderer, t.armorFull, x, ay, s);
@@ -3151,7 +3234,8 @@ public class Game implements GameAccess {
             }
         }
 
-        drawAirBubbles(t, hx, heartsY - 10 * s, s);
+        drawAirBubbles(t, hx, heartsY - 10 * s - rowsUp, s);
+        drawEffectIcons(w, s);
         drawExperienceBar(t, hx, h, s);
         drawAttackIndicator(t, w, h, hx, hy, s);
 
@@ -3187,7 +3271,7 @@ public class Game implements GameAccess {
      * less each heart jitters 0-1 px downwards; hunger icons jitter by -1..+1 px while saturation is 0. The jitter is
      * seeded per game tick, so it is steady within a tick like vanilla's.
      */
-    private void drawHealthAndFood(HudTextures t, float hx, float rowY, float s) {
+    private int drawHealthAndFood(HudTextures t, float hx, float rowY, float s) {
         long tick = System.nanoTime() / 50_000_000L;
         float healthNow = survival.getHealth().getCurrentHealth();
         if (hudLastHealth < 0f) hudLastHealth = healthNow;
@@ -3206,10 +3290,17 @@ public class Game implements GameAccess {
         int food = (int) Math.ceil(survival.getHunger().getFoodLevel());
         boolean hungerShake = com.example.ui.HudAnimation.hungerShake(tick, food, survival.getHunger().getSaturation());
         java.util.Random jitter = new java.util.Random(tick * 312871L);
+        // Gui.renderHearts: poison turns the hearts green, regeneration makes one heart at a time hop 2 px (tickCount % ceil(max + 5)).
+        boolean poisoned = survival.getEffects().has(com.example.survival.StatusEffect.POISON);
+        int regenHeart = survival.getEffects().has(com.example.survival.StatusEffect.REGENERATION)
+                ? (int) (tick % (long) Math.ceil(survival.getHealth().getMaxHealth() + 5f)) : -1;
+        HudTextures.Sprite poisonFull = poisoned ? guiSprite("textures/gui/sprites/hud/heart/poisoned_full.png") : null;
+        HudTextures.Sprite poisonHalf = poisoned ? guiSprite("textures/gui/sprites/hud/heart/poisoned_half.png") : null;
 
         for (int i = 0; i < 10; i++) {
             float x = hx + i * 8 * s;
             float y = com.example.ui.HudAnimation.lowHealthShake(hp) ? rowY + jitter.nextInt(2) * s : rowY;
+            if (i == regenHeart) y -= 2 * s;
             HudTextures.Sprite container = blink && t.heartContainerBlink != null ? t.heartContainerBlink : t.heartContainer;
             HudTextures.draw(uiRenderer, container, x, y, s);
             if (blink && t.heartFullBlink != null && t.heartHalfBlink != null) {
@@ -3218,8 +3309,18 @@ public class Game implements GameAccess {
                 else if (lost == 1) HudTextures.draw(uiRenderer, t.heartHalfBlink, x, y, s);
             }
             int v = hp - i * 2;
-            if (v >= 2) HudTextures.draw(uiRenderer, t.heartFull, x, y, s);
-            else if (v == 1) HudTextures.draw(uiRenderer, t.heartHalf, x, y, s);
+            if (v >= 2) HudTextures.draw(uiRenderer, poisonFull != null ? poisonFull : t.heartFull, x, y, s);
+            else if (v == 1) HudTextures.draw(uiRenderer, poisonHalf != null ? poisonHalf : t.heartHalf, x, y, s);
+        }
+        // Absorption hearts continue after the health hearts, in the rows above (absorbing_full / absorbing_half).
+        int absorbed = (int) Math.ceil(survival.getAbsorption());
+        int absorptionHearts = (absorbed + 1) / 2;
+        HudTextures.Sprite absFull = absorptionHearts > 0 ? guiSprite("textures/gui/sprites/hud/heart/absorbing_full.png") : null;
+        HudTextures.Sprite absHalf = absorptionHearts > 0 ? guiSprite("textures/gui/sprites/hud/heart/absorbing_half.png") : null;
+        for (int j = 0; j < absorptionHearts && absFull != null; j++) {
+            float x = hx + (j % 10) * 8 * s, y = rowY - (1 + j / 10) * 10 * s;
+            int v = absorbed - j * 2;
+            HudTextures.draw(uiRenderer, v >= 2 ? absFull : absHalf != null ? absHalf : absFull, x, y, s);
         }
         for (int i = 0; i < 10; i++) {
             float fx = hx + (182 - 9) * s - i * 8 * s;
@@ -3228,6 +3329,49 @@ public class Game implements GameAccess {
             int v = food - i * 2;
             if (v >= 2) HudTextures.draw(uiRenderer, t.foodFull, fx, fy, s);
             else if (v == 1) HudTextures.draw(uiRenderer, t.foodHalf, fx, fy, s);
+        }
+        return (absorptionHearts + 9) / 10;
+    }
+
+    /**
+     * The active effects at the top right as in Gui.renderEffects: a 24 x 24 background with the 18 x 18 icon in it, beneficial
+     * ones in the first row and harmful ones in the second, each 25 px left of the last; an icon blinks during its last 10 seconds.
+     */
+    private void drawEffectIcons(int screenW, float s) {
+        int good = 0, bad = 0;
+        HudTextures.Sprite bg = guiSprite("textures/gui/sprites/hud/effect_background.png");
+        for (com.example.survival.PlayerEffects.Instance e : survival.getEffects().all()) {
+            float x, y = 1;
+            if (e.type().beneficial) {
+                x = screenW / s - 25 * ++good;
+            } else {
+                x = screenW / s - 25 * ++bad;
+                y += 26;
+            }
+            HudTextures.Sprite icon = guiSprite("textures/mob_effect/" + e.type().icon + ".png");
+            float alpha = 1f;
+            if (e.duration() <= 200) { // the icon blinks during the last 10 seconds (Gui.renderEffects)
+                int d = 10 - e.duration() / 20;
+                alpha = Math.max(0f, Math.min(0.5f, e.duration() / 10f / 5f * 0.5f))
+                        + (float) Math.cos(e.duration() * Math.PI / 5.0) * Math.max(0f, Math.min(0.25f, d / 10f * 0.25f));
+            }
+            if (bg != null) HudTextures.draw(uiRenderer, bg, x * s, y * s, s);
+            if (icon != null) uiRenderer.drawTexturedQuad((x + 3) * s, (y + 3) * s, 18 * s, 18 * s, new float[]{0f, 0f, 1f, 1f}, icon.id(), 1f, 1f, 1f, alpha);
+        }
+    }
+
+    /** ScreenEffectRenderer.renderFire, flattened: two sheets of the real fire texture over the lower screen while the player burns. */
+    private void drawFireOverlay(int w, int h) {
+        if (!survival.isBurning()) return;
+        HudTextures.Sprite fire = guiSprite("textures/block/fire_1.png");
+        if (fire == null) return;
+        int frames = Math.max(1, fire.h() / Math.max(1, fire.w()));
+        int frame = (int) ((System.nanoTime() / 100_000_000L) % frames);
+        float size = h * 0.55f;
+        float v0 = frame / (float) frames, v1 = (frame + 1) / (float) frames;
+        for (int i = 0; i < 2; i++) {
+            float x = i == 0 ? w / 2f - size * 1.05f : w / 2f + size * 0.05f;
+            uiRenderer.drawTexturedQuad(x, h - size, size, size, new float[]{0f, v0, 1f, v1}, fire.id(), 1f, 1f, 1f, 0.9f);
         }
     }
 
@@ -3797,6 +3941,19 @@ public class Game implements GameAccess {
         survival.getHunger().forceState(foodLevel, saturation, exhaustion);
     }
 
+    @Override
+    public void giveEffect(String type, float seconds, int amplifier) {
+        if (world == null) throw new IllegalStateException("no active world");
+        com.example.survival.StatusEffect effect = com.example.survival.StatusEffect.valueOf(type.toUpperCase(java.util.Locale.ROOT));
+        survival.addEffect(effect, Math.round(seconds * 20f), amplifier);
+    }
+
+    @Override
+    public void strikeLightning(float x, float y, float z) {
+        if (world == null) throw new IllegalStateException("no active world");
+        lightning.spawn(x, y, z, gameplayRandom);
+    }
+
     private static String stackSummary(ItemStack stack) {
         return stack.isEmpty() ? "" : stack.type().name() + "x" + stack.count();
     }
@@ -3867,6 +4024,14 @@ public class Game implements GameAccess {
             if (slots.length() > 0) slots.append(',');
             slots.append(i).append(':').append(st.type().name()).append('x').append(st.count());
         }
+        sb.append("effects=");
+        for (com.example.survival.PlayerEffects.Instance e : survival.getEffects().all()) {
+            sb.append(e.type()).append(':').append(e.amplifier()).append(':').append(e.duration()).append(' ');
+        }
+        sb.append('\n');
+        sb.append("survival.absorption=").append(String.format("%.1f", survival.getAbsorption())).append('\n');
+        sb.append("survival.burnTicks=").append(survival.getBurnTicks()).append('\n');
+        sb.append("lightning.bolts=").append(lightning.bolts().size()).append('\n');
         sb.append("inventory.selectedSlot=").append(inventory.getSelectedSlot()).append('\n');
         sb.append("inventory.slots=").append(slots).append('\n');
         ItemStack offhandNow = inventory.getOffhand();
@@ -3951,6 +4116,7 @@ public class Game implements GameAccess {
         sunMoonMesh.destroy();
         skyDiscMesh.destroy();
         sunriseMesh.destroy();
+        lightningMesh.destroy();
         rainMesh.destroy();
         heldItemMesh.destroy();
         itemMesh.destroy();

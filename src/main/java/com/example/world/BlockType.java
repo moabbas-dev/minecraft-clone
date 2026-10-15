@@ -224,7 +224,8 @@ public enum BlockType {
     WALL_TORCH_NORTH(217, "Torch", false, true, 0f, 14f),
     WALL_TORCH_SOUTH(218, "Torch", false, true, 0f, 14f),
     FARMLAND(219, "Farmland", true, true, 0.6f, 0f),
-    FARMLAND_MOIST(220, "Farmland", true, true, 0.6f, 0f);
+    FARMLAND_MOIST(220, "Farmland", true, true, 0.6f, 0f),
+    GOLDEN_APPLE(221, "Golden Apple", false, true, -1f, 0f);
 
     public final int id;
     public final String displayName;

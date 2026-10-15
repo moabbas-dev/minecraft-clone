@@ -64,6 +64,8 @@ public final class Commands {
             case "respawn" -> respawn();
             case "setDifficulty" -> setDifficulty(params);
             case "setHunger" -> setHunger(params);
+            case "giveEffect" -> giveEffect(params);
+            case "lightning" -> lightning(params);
             case "state" -> state();
             case "shutdown" -> shutdown();
             default -> Result.badRequest("Unknown command: " + command);
@@ -242,6 +244,37 @@ public final class Commands {
             return Result.badRequest(e.getMessage());
         }
         return Result.ok("hunger set to food=" + food + " saturation=" + saturation + " exhaustion=" + exhaustion);
+    }
+
+    private Result giveEffect(Map<String, String> p) {
+        String type = p.get("type");
+        Float seconds = parseFloat(p, "seconds");
+        if (type == null || seconds == null) return Result.badRequest("giveEffect requires 'type' and numeric 'seconds' (and optional 'amp')");
+        int amp = 0;
+        if (p.get("amp") != null) {
+            try {
+                amp = Integer.parseInt(p.get("amp"));
+            } catch (NumberFormatException e) {
+                return Result.badRequest("amp must be an integer");
+            }
+        }
+        try {
+            game.giveEffect(type, seconds, amp);
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return Result.badRequest(e.getMessage());
+        }
+        return Result.ok("gave " + type + " for " + seconds + "s, amplifier " + amp);
+    }
+
+    private Result lightning(Map<String, String> p) {
+        Float x = parseFloat(p, "x"), y = parseFloat(p, "y"), z = parseFloat(p, "z");
+        if (x == null || y == null || z == null) return Result.badRequest("lightning requires numeric 'x', 'y' and 'z'");
+        try {
+            game.strikeLightning(x, y, z);
+        } catch (IllegalStateException e) {
+            return Result.badRequest(e.getMessage());
+        }
+        return Result.ok("lightning at " + x + "," + y + "," + z);
     }
 
     private Result holdUse(Map<String, String> p) {

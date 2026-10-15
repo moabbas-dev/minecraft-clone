@@ -10,6 +10,10 @@ public final class SkyDetailsAccess {
         return (((tick + 6000f) % 24000f) + 24000f) % 24000f / 24000f;
     }
 
+    public static boolean monstersBurn(float tick) {
+        return SkyDetails.monstersBurn(tick);
+    }
+
     public static int skyDarken(float tick, float rain, float thunder) {
         return SkyDetails.skyDarken(tick, rain, thunder);
     }

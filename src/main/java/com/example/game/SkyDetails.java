@@ -134,6 +134,12 @@ final class SkyDetails {
         return (int) (15f - skyLightLevel(tick, rainLevel, thunderLevel));
     }
 
+    /** gameplay/monsters_burn: false from tick 12542, true from tick 23460 (a boolean track that switches at its keyframes). */
+    static boolean monstersBurn(float tick) {
+        float t = ((tick % 24000f) + 24000f) % 24000f;
+        return t >= 23460f || t < 12542f;
+    }
+
     static float cyclic(float[][] keys, float tick) {
         float t = ((tick % 24000f) + 24000f) % 24000f;
         int n = keys.length;

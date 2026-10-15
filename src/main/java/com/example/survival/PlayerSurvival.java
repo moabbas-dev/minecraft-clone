@@ -66,6 +66,16 @@ public class PlayerSurvival {
     @Getter
     private float airTicks = MAX_AIR_TICKS;
 
+    /** The active status effects (hunger, poison, regeneration, absorption), run at 20 ticks a second. */
+    @Getter
+    private final PlayerEffects effects = new PlayerEffects();
+    /** Extra health from absorption, lost before the real health (AbsorptionMobEffect: 4 x (level + 1)). */
+    @Getter
+    private float absorption = 0f;
+    /** Ticks the player stays alight (0 = not burning): 1 damage every 20 ticks, put out by water. */
+    @Getter
+    private int burnTicks = 0;
+    private float effectClock = 0f;
     private final Vector3f lastPosition = new Vector3f();
     private boolean positionInitialized = false;
     /** NaN = not currently tracking an in-progress fall. */
@@ -93,6 +103,10 @@ public class PlayerSurvival {
         fallStartY = Float.NaN;
         regenTimer = 0f;
         starvationTimer = 0f;
+        effects.clear();
+        absorption = 0f;
+        burnTicks = 0;
+        effectClock = 0f;
     }
 
     /** Restores exact saved health/hunger/saturation/exhaustion (see {@link HungerComponent#forceState}) -
@@ -121,6 +135,13 @@ public class PlayerSurvival {
         if (health.isDead()) {
             lastPosition.set(player.position);
             return;
+        }
+
+        effectClock += dt;
+        while (effectClock >= 0.05f) {
+            effectClock -= 0.05f;
+            effects.tick(this);
+            tickBurning();
         }
 
         float dx = player.position.x - lastPosition.x;
@@ -247,6 +268,16 @@ public class PlayerSurvival {
         float taken = reducible
                 ? com.example.combat.ArmorRules.reduce(amount, armor.totalDefense(), armor.totalToughness())
                 : amount;
+        if (absorption > 0f && taken > 0f && health.isAlive()) { // absorption soaks the damage first
+            float soaked = Math.min(absorption, taken);
+            absorption -= soaked;
+            taken -= soaked;
+            if (taken <= 0f) {
+                hunger.addExhaustion(DAMAGE_EXHAUSTION_PER_HIT);
+                if (reducible && armor.totalDefense() > 0) armor.wear(amount);
+                return true;
+            }
+        }
         boolean applied = health.damage(taken, source);
         if (applied) {
             hunger.addExhaustion(DAMAGE_EXHAUSTION_PER_HIT);
@@ -266,6 +297,74 @@ public class PlayerSurvival {
     public boolean eat(BlockType foodType) {
         FoodProperties food = FoodRegistry.propertiesFor(foodType);
         return food != null && hunger.eat(food);
+    }
+
+    /** One tick of an effect's work (PoisonMobEffect, HungerMobEffect, RegenerationMobEffect). */
+    void applyEffectTick(StatusEffect type, int amplifier) {
+        switch (type) {
+            case POISON -> {
+                if (health.getCurrentHealth() > 1f) damage(1f, DamageSource.MAGIC); // poison never kills
+            }
+            case HUNGER -> hunger.addExhaustion(0.005f * (amplifier + 1));
+            case REGENERATION -> {
+                if (health.getCurrentHealth() < health.getMaxHealth()) health.heal(1f);
+            }
+            case ABSORPTION -> {
+            }
+        }
+    }
+
+    void onEffectEnded(StatusEffect type, int amplifier) {
+        if (type == StatusEffect.ABSORPTION) absorption = Math.max(0f, absorption - 4f * (amplifier + 1));
+    }
+
+    /** Gives an effect (ticks, level 0 = I); absorption also raises the extra health to 4 x (level + 1) when that is more. */
+    public void addEffect(StatusEffect type, int durationTicks, int amplifier) {
+        if (!health.isAlive()) return;
+        if (effects.add(type, durationTicks, amplifier) && type == StatusEffect.ABSORPTION) {
+            absorption = Math.max(absorption, 4f * (amplifier + 1));
+        }
+    }
+
+    /**
+     * What eating this food does besides filling the bars (Consumables of the 26.3 client): rotten flesh hunger 30 s (80%), raw
+     * chicken hunger 30 s (30%), a spider eye poison 5 s, a golden apple regeneration II for 5 s and absorption for 2 minutes.
+     */
+    public void applyFoodEffects(BlockType food, java.util.Random random) {
+        switch (food) {
+            case ROTTEN_FLESH -> {
+                if (random.nextFloat() < 0.8f) addEffect(StatusEffect.HUNGER, 600, 0);
+            }
+            case RAW_CHICKEN -> {
+                if (random.nextFloat() < 0.3f) addEffect(StatusEffect.HUNGER, 600, 0);
+            }
+            case SPIDER_EYE -> addEffect(StatusEffect.POISON, 100, 0);
+            case GOLDEN_APPLE -> {
+                addEffect(StatusEffect.REGENERATION, 100, 1);
+                addEffect(StatusEffect.ABSORPTION, 2400, 0);
+            }
+            default -> {
+            }
+        }
+    }
+
+    /** Sets the player alight for this many seconds (Entity.igniteForSeconds); never shortens a longer burn. */
+    public void ignite(float seconds) {
+        burnTicks = Math.max(burnTicks, (int) Math.floor(seconds * 20f));
+    }
+
+    public void extinguish() {
+        burnTicks = 0;
+    }
+
+    public boolean isBurning() {
+        return burnTicks > 0;
+    }
+
+    private void tickBurning() {
+        if (burnTicks <= 0) return;
+        burnTicks--;
+        if (burnTicks % 20 == 0) damage(1f, DamageSource.ON_FIRE);
     }
 
     /** Adds XP (e.g. from taking cooked/smelted output - see {@code CookingMenu}) - a plain

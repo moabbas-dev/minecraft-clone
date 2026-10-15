@@ -117,6 +117,10 @@ public final class Recipes {
             tool(new String[]{"HH", "S.", "S."}, BlockType.GOLD_INGOT, new ItemStack(BlockType.GOLD_HOE, 1)),
             tool(new String[]{"HH", ".S", ".S"}, BlockType.DIAMOND, new ItemStack(BlockType.DIAMOND_HOE, 1)),
             tool(new String[]{"HH", "S.", "S."}, BlockType.DIAMOND, new ItemStack(BlockType.DIAMOND_HOE, 1)),
+            // Golden apple: an apple in a ring of eight gold ingots.
+            new Recipe(new String[]{"GGG", "GAG", "GGG"}, Map.of('G', only(BlockType.GOLD_INGOT), 'A', only(BlockType.APPLE)),
+                    new ItemStack(BlockType.GOLDEN_APPLE, 1)),
+
             // Torches: coal or charcoal over a stick, four at a time (recipe/torch.json).
             new Recipe(new String[]{"X", "S"}, Map.of('X', c -> c == BlockType.COAL || c == BlockType.CHARCOAL, 'S', only(BlockType.STICK)),
                     new ItemStack(BlockType.TORCH, 4)),

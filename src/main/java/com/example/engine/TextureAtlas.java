@@ -67,7 +67,7 @@ public class TextureAtlas {
             Tile.FLINT, Tile.CLAY_BALL, Tile.SNOWBALL, Tile.GLOWSTONE_DUST, Tile.BOOK,
             Tile.GUNPOWDER, Tile.BONE, Tile.ARROW, Tile.STRING, Tile.SPIDER_EYE,
             Tile.GOLD_SWORD, Tile.GOLD_AXE, Tile.GOLD_PICKAXE, Tile.GOLD_SHOVEL, Tile.WOODEN_HOE, Tile.STONE_HOE, Tile.IRON_HOE, Tile.GOLD_HOE, Tile.DIAMOND_HOE,
-            Tile.TORCH, Tile.COPPER_SWORD, Tile.COPPER_AXE, Tile.COPPER_PICKAXE, Tile.COPPER_SHOVEL, Tile.COPPER_HOE, Tile.WOODEN_SPEAR, Tile.STONE_SPEAR, Tile.COPPER_SPEAR, Tile.IRON_SPEAR, Tile.GOLD_SPEAR, Tile.DIAMOND_SPEAR);
+            Tile.TORCH, Tile.GOLDEN_APPLE, Tile.COPPER_SWORD, Tile.COPPER_AXE, Tile.COPPER_PICKAXE, Tile.COPPER_SHOVEL, Tile.COPPER_HOE, Tile.WOODEN_SPEAR, Tile.STONE_SPEAR, Tile.COPPER_SPEAR, Tile.IRON_SPEAR, Tile.GOLD_SPEAR, Tile.DIAMOND_SPEAR);
 
     static {
         REAL_TEXTURE_PATHS.put(Tile.STONE, "textures/block/stone.png");
@@ -204,6 +204,7 @@ public class TextureAtlas {
         REAL_TEXTURE_PATHS.put(Tile.GOLD_SPEAR, "textures/item/golden_spear.png");
         REAL_TEXTURE_PATHS.put(Tile.DIAMOND_SPEAR, "textures/item/diamond_spear.png");
         REAL_TEXTURE_PATHS.put(Tile.TORCH, "textures/block/torch.png");
+        REAL_TEXTURE_PATHS.put(Tile.GOLDEN_APPLE, "textures/item/golden_apple.png");
         REAL_TEXTURE_PATHS.put(Tile.FARMLAND, "textures/block/farmland.png");
         REAL_TEXTURE_PATHS.put(Tile.FARMLAND_MOIST, "textures/block/farmland_moist.png");
         // Item icons: textures/item/<name>.png.
