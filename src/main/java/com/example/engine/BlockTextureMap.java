@@ -158,6 +158,17 @@ public class BlockTextureMap {
         uniform(BlockType.STONE_HOE, Tile.STONE_HOE);
         uniform(BlockType.IRON_HOE, Tile.IRON_HOE);
         uniform(BlockType.GOLD_HOE, Tile.GOLD_HOE);
+        uniform(BlockType.COPPER_SWORD, Tile.COPPER_SWORD);
+        uniform(BlockType.COPPER_AXE, Tile.COPPER_AXE);
+        uniform(BlockType.COPPER_PICKAXE, Tile.COPPER_PICKAXE);
+        uniform(BlockType.COPPER_SHOVEL, Tile.COPPER_SHOVEL);
+        uniform(BlockType.COPPER_HOE, Tile.COPPER_HOE);
+        uniform(BlockType.WOODEN_SPEAR, Tile.WOODEN_SPEAR);
+        uniform(BlockType.STONE_SPEAR, Tile.STONE_SPEAR);
+        uniform(BlockType.COPPER_SPEAR, Tile.COPPER_SPEAR);
+        uniform(BlockType.IRON_SPEAR, Tile.IRON_SPEAR);
+        uniform(BlockType.GOLD_SPEAR, Tile.GOLD_SPEAR);
+        uniform(BlockType.DIAMOND_SPEAR, Tile.DIAMOND_SPEAR);
         uniform(BlockType.DIAMOND_HOE, Tile.DIAMOND_HOE);
         uniform(BlockType.FLINT, Tile.FLINT);
         uniform(BlockType.CLAY_BALL, Tile.CLAY_BALL);

@@ -203,7 +203,19 @@ public enum BlockType {
     STONE_HOE(199, "Stone Hoe", false, true, -1f, 0f),
     IRON_HOE(200, "Iron Hoe", false, true, -1f, 0f),
     GOLD_HOE(201, "Golden Hoe", false, true, -1f, 0f),
-    DIAMOND_HOE(202, "Diamond Hoe", false, true, -1f, 0f);
+    DIAMOND_HOE(202, "Diamond Hoe", false, true, -1f, 0f),
+    // Copper tools (same stats as stone, tier #minecraft:copper_tool_materials = copper ingot) and the six spears (jab attack only).
+    COPPER_SWORD(203, "Copper Sword", false, true, -1f, 0f),
+    COPPER_AXE(204, "Copper Axe", false, true, -1f, 0f),
+    COPPER_PICKAXE(205, "Copper Pickaxe", false, true, -1f, 0f),
+    COPPER_SHOVEL(206, "Copper Shovel", false, true, -1f, 0f),
+    COPPER_HOE(207, "Copper Hoe", false, true, -1f, 0f),
+    WOODEN_SPEAR(208, "Wooden Spear", false, true, -1f, 0f),
+    STONE_SPEAR(209, "Stone Spear", false, true, -1f, 0f),
+    COPPER_SPEAR(210, "Copper Spear", false, true, -1f, 0f),
+    IRON_SPEAR(211, "Iron Spear", false, true, -1f, 0f),
+    GOLD_SPEAR(212, "Golden Spear", false, true, -1f, 0f),
+    DIAMOND_SPEAR(213, "Diamond Spear", false, true, -1f, 0f);
 
     public final int id;
     public final String displayName;

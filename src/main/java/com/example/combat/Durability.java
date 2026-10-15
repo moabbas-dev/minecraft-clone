@@ -21,6 +21,13 @@ public final class Durability {
         for (BlockType t : new BlockType[]{BlockType.IRON_PICKAXE, BlockType.IRON_AXE, BlockType.IRON_SHOVEL, BlockType.IRON_SWORD}) MAX.put(t, 250);
         for (BlockType t : new BlockType[]{BlockType.DIAMOND_PICKAXE, BlockType.DIAMOND_AXE, BlockType.DIAMOND_SHOVEL, BlockType.DIAMOND_SWORD}) MAX.put(t, 1561);
         for (BlockType t : new BlockType[]{BlockType.GOLD_PICKAXE, BlockType.GOLD_AXE, BlockType.GOLD_SHOVEL, BlockType.GOLD_SWORD, BlockType.GOLD_HOE}) MAX.put(t, 32);
+        for (BlockType t : new BlockType[]{BlockType.COPPER_PICKAXE, BlockType.COPPER_AXE, BlockType.COPPER_SHOVEL, BlockType.COPPER_SWORD, BlockType.COPPER_HOE}) MAX.put(t, 190);
+        MAX.put(BlockType.WOODEN_SPEAR, 59);
+        MAX.put(BlockType.STONE_SPEAR, 131);
+        MAX.put(BlockType.COPPER_SPEAR, 190);
+        MAX.put(BlockType.IRON_SPEAR, 250);
+        MAX.put(BlockType.GOLD_SPEAR, 32);
+        MAX.put(BlockType.DIAMOND_SPEAR, 1561);
         MAX.put(BlockType.WOODEN_HOE, 59);
         MAX.put(BlockType.STONE_HOE, 131);
         MAX.put(BlockType.IRON_HOE, 250);
@@ -49,12 +56,12 @@ public final class Durability {
     }
 
     private static boolean isMiningTool(BlockType t) {
-        return isDamageable(t) && WeaponStats.isTool(t) && !WeaponStats.isSword(t);
+        return isDamageable(t) && WeaponStats.isTool(t) && !WeaponStats.isSword(t) && !WeaponStats.isSpear(t);
     }
 
     /** Durability spent by a successful attack on a mob with this item in hand. */
     public static int attackCost(BlockType held) {
-        if (WeaponStats.isSword(held)) return 1;
+        if (WeaponStats.isSword(held) || WeaponStats.isSpear(held)) return 1; // Weapon(itemDamagePerAttack = 1)
         if (isMiningTool(held)) return 2;
         return 0;
     }

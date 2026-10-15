@@ -29,12 +29,14 @@ public final class ToolEffectiveness {
     private ToolEffectiveness() {
     }
 
-    public enum Kind {PICKAXE, AXE, SHOVEL, SWORD, HOE}
+    public enum Kind {PICKAXE, AXE, SHOVEL, SWORD, HOE, SPEAR}
 
     /** speedMultiplier applies only when a tool's Kind matches {@link #correctKindFor}; harvestLevel
      *  is compared against {@link #requiredHarvestLevel} for the 4 gated ores. */
     public enum Tier {
         WOOD(2f, 1), STONE(4f, 2), IRON(6f, 3), DIAMOND(8f, 4),
+        /** Copper mines at 5 and harvests as well as stone (ToolMaterial.COPPER; incorrect_for_copper_tool = needs iron or diamond). */
+        COPPER(5f, 2),
         /** Gold mines fastest (x12) but harvests no better than wood (vanilla mining level 0). */
         GOLD(12f, 1);
 
@@ -81,6 +83,18 @@ public final class ToolEffectiveness {
         TOOLS.put(BlockType.IRON_HOE, new ToolInfo(Kind.HOE, Tier.IRON));
         TOOLS.put(BlockType.GOLD_HOE, new ToolInfo(Kind.HOE, Tier.GOLD));
         TOOLS.put(BlockType.DIAMOND_HOE, new ToolInfo(Kind.HOE, Tier.DIAMOND));
+        TOOLS.put(BlockType.COPPER_SWORD, new ToolInfo(Kind.SWORD, Tier.COPPER));
+        TOOLS.put(BlockType.COPPER_AXE, new ToolInfo(Kind.AXE, Tier.COPPER));
+        TOOLS.put(BlockType.COPPER_PICKAXE, new ToolInfo(Kind.PICKAXE, Tier.COPPER));
+        TOOLS.put(BlockType.COPPER_SHOVEL, new ToolInfo(Kind.SHOVEL, Tier.COPPER));
+        TOOLS.put(BlockType.COPPER_HOE, new ToolInfo(Kind.HOE, Tier.COPPER));
+        // Spears: weapons with no mining speed (like swords here), one per material.
+        TOOLS.put(BlockType.WOODEN_SPEAR, new ToolInfo(Kind.SPEAR, Tier.WOOD));
+        TOOLS.put(BlockType.STONE_SPEAR, new ToolInfo(Kind.SPEAR, Tier.STONE));
+        TOOLS.put(BlockType.COPPER_SPEAR, new ToolInfo(Kind.SPEAR, Tier.COPPER));
+        TOOLS.put(BlockType.IRON_SPEAR, new ToolInfo(Kind.SPEAR, Tier.IRON));
+        TOOLS.put(BlockType.GOLD_SPEAR, new ToolInfo(Kind.SPEAR, Tier.GOLD));
+        TOOLS.put(BlockType.DIAMOND_SPEAR, new ToolInfo(Kind.SPEAR, Tier.DIAMOND));
     }
 
     /** Blocks a pickaxe speeds up. Ore/stone/stone-derived blocks - real vanilla's own pickaxe list,
