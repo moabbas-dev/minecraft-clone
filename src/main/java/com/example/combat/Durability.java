@@ -20,6 +20,11 @@ public final class Durability {
         for (BlockType t : new BlockType[]{BlockType.STONE_PICKAXE, BlockType.STONE_AXE, BlockType.STONE_SHOVEL, BlockType.STONE_SWORD}) MAX.put(t, 131);
         for (BlockType t : new BlockType[]{BlockType.IRON_PICKAXE, BlockType.IRON_AXE, BlockType.IRON_SHOVEL, BlockType.IRON_SWORD}) MAX.put(t, 250);
         for (BlockType t : new BlockType[]{BlockType.DIAMOND_PICKAXE, BlockType.DIAMOND_AXE, BlockType.DIAMOND_SHOVEL, BlockType.DIAMOND_SWORD}) MAX.put(t, 1561);
+        for (BlockType t : new BlockType[]{BlockType.GOLD_PICKAXE, BlockType.GOLD_AXE, BlockType.GOLD_SHOVEL, BlockType.GOLD_SWORD, BlockType.GOLD_HOE}) MAX.put(t, 32);
+        MAX.put(BlockType.WOODEN_HOE, 59);
+        MAX.put(BlockType.STONE_HOE, 131);
+        MAX.put(BlockType.IRON_HOE, 250);
+        MAX.put(BlockType.DIAMOND_HOE, 1561);
         // Armor: piece constant (helmet 11, chest 16, legs 15, boots 13) times the material multiplier.
         armor(5, BlockType.LEATHER_HELMET, BlockType.LEATHER_CHESTPLATE, BlockType.LEATHER_LEGGINGS, BlockType.LEATHER_BOOTS);
         armor(15, BlockType.IRON_HELMET, BlockType.IRON_CHESTPLATE, BlockType.IRON_LEGGINGS, BlockType.IRON_BOOTS);

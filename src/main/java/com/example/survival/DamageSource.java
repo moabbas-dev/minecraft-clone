@@ -26,7 +26,7 @@ public enum DamageSource {
     CACTUS,
     /** Wired up this round - see {@code PlayerSurvival}'s starvation tick. */
     STARVATION,
-    /** Not wired up yet - no void/kill-plane check exists below the world. */
+    /** Falling out of the world: 4 damage whenever the hurt cooldown allows, below y = -64 (see {@code PlayerSurvival}). */
     VOID,
     /** Creeper and TNT blasts: reduced by armor like vanilla. */
     EXPLOSION,

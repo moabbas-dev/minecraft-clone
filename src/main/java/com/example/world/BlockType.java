@@ -193,7 +193,17 @@ public enum BlockType {
     BONE(190, "Bone", false, true, -1f, 0f),
     ARROW(191, "Arrow", false, true, -1f, 0f),
     STRING(192, "String", false, true, -1f, 0f),
-    SPIDER_EYE(193, "Spider Eye", false, true, -1f, 0f);
+    SPIDER_EYE(193, "Spider Eye", false, true, -1f, 0f),
+    // Gold tools and the hoes (the tools themselves; hoes have no tilling because there is no farmland yet).
+    GOLD_SWORD(194, "Golden Sword", false, true, -1f, 0f),
+    GOLD_AXE(195, "Golden Axe", false, true, -1f, 0f),
+    GOLD_PICKAXE(196, "Golden Pickaxe", false, true, -1f, 0f),
+    GOLD_SHOVEL(197, "Golden Shovel", false, true, -1f, 0f),
+    WOODEN_HOE(198, "Wooden Hoe", false, true, -1f, 0f),
+    STONE_HOE(199, "Stone Hoe", false, true, -1f, 0f),
+    IRON_HOE(200, "Iron Hoe", false, true, -1f, 0f),
+    GOLD_HOE(201, "Golden Hoe", false, true, -1f, 0f),
+    DIAMOND_HOE(202, "Diamond Hoe", false, true, -1f, 0f);
 
     public final int id;
     public final String displayName;

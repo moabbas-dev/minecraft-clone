@@ -41,6 +41,9 @@ public class PlayerSurvival {
     private static final float STARVATION_DAMAGE = 1f;
     /** Real vanilla's own fall-damage rule: 1 HP per block fallen beyond this. */
     private static final float FALL_DAMAGE_SAFE_DISTANCE = 3f;
+    /** Vanilla Entity.checkBelowWorld: below (world minimum height - 64) every hurt cooldown deals 4 damage (LivingEntity.onBelowWorld). */
+    public static final float VOID_Y = -64f;
+    private static final float VOID_DAMAGE = 4f;
 
     @Getter
     private final HealthComponent health = new HealthComponent();
@@ -138,6 +141,7 @@ public class PlayerSurvival {
 
         updateFallTracking(player);
         tickAir(dt, player);
+        if (player.position.y < VOID_Y) damage(VOID_DAMAGE, DamageSource.VOID);
         if (difficulty == Difficulty.PEACEFUL) {
             tickPeaceful(dt);
         } else {

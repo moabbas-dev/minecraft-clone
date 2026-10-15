@@ -65,7 +65,8 @@ public class TextureAtlas {
             Tile.WOODEN_SWORD, Tile.STONE_SWORD, Tile.IRON_SWORD, Tile.LEATHER, Tile.FEATHER, Tile.EGG, Tile.LEATHER_HELMET, Tile.LEATHER_CHESTPLATE, Tile.LEATHER_LEGGINGS, Tile.LEATHER_BOOTS, Tile.IRON_HELMET, Tile.IRON_CHESTPLATE, Tile.IRON_LEGGINGS, Tile.IRON_BOOTS, Tile.GOLD_HELMET, Tile.GOLD_CHESTPLATE, Tile.GOLD_LEGGINGS, Tile.GOLD_BOOTS,
             Tile.DIAMOND, Tile.DIAMOND_SWORD, Tile.DIAMOND_AXE, Tile.DIAMOND_PICKAXE, Tile.DIAMOND_SHOVEL, Tile.DIAMOND_HELMET, Tile.DIAMOND_CHESTPLATE, Tile.DIAMOND_LEGGINGS, Tile.DIAMOND_BOOTS,
             Tile.FLINT, Tile.CLAY_BALL, Tile.SNOWBALL, Tile.GLOWSTONE_DUST, Tile.BOOK,
-            Tile.GUNPOWDER, Tile.BONE, Tile.ARROW, Tile.STRING, Tile.SPIDER_EYE);
+            Tile.GUNPOWDER, Tile.BONE, Tile.ARROW, Tile.STRING, Tile.SPIDER_EYE,
+            Tile.GOLD_SWORD, Tile.GOLD_AXE, Tile.GOLD_PICKAXE, Tile.GOLD_SHOVEL, Tile.WOODEN_HOE, Tile.STONE_HOE, Tile.IRON_HOE, Tile.GOLD_HOE, Tile.DIAMOND_HOE);
 
     static {
         REAL_TEXTURE_PATHS.put(Tile.STONE, "textures/block/stone.png");
@@ -181,6 +182,15 @@ public class TextureAtlas {
         REAL_TEXTURE_PATHS.put(Tile.DIAMOND_CHESTPLATE, "textures/item/diamond_chestplate.png");
         REAL_TEXTURE_PATHS.put(Tile.DIAMOND_LEGGINGS, "textures/item/diamond_leggings.png");
         REAL_TEXTURE_PATHS.put(Tile.DIAMOND_BOOTS, "textures/item/diamond_boots.png");
+        REAL_TEXTURE_PATHS.put(Tile.GOLD_SWORD, "textures/item/golden_sword.png");
+        REAL_TEXTURE_PATHS.put(Tile.GOLD_AXE, "textures/item/golden_axe.png");
+        REAL_TEXTURE_PATHS.put(Tile.GOLD_PICKAXE, "textures/item/golden_pickaxe.png");
+        REAL_TEXTURE_PATHS.put(Tile.GOLD_SHOVEL, "textures/item/golden_shovel.png");
+        REAL_TEXTURE_PATHS.put(Tile.WOODEN_HOE, "textures/item/wooden_hoe.png");
+        REAL_TEXTURE_PATHS.put(Tile.STONE_HOE, "textures/item/stone_hoe.png");
+        REAL_TEXTURE_PATHS.put(Tile.IRON_HOE, "textures/item/iron_hoe.png");
+        REAL_TEXTURE_PATHS.put(Tile.GOLD_HOE, "textures/item/golden_hoe.png");
+        REAL_TEXTURE_PATHS.put(Tile.DIAMOND_HOE, "textures/item/diamond_hoe.png");
         // Item icons: textures/item/<name>.png.
         REAL_TEXTURE_PATHS.put(Tile.STICK, "textures/item/stick.png");
         REAL_TEXTURE_PATHS.put(Tile.WOODEN_PICKAXE, "textures/item/wooden_pickaxe.png");

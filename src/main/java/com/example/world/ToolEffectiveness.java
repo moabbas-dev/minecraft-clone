@@ -29,12 +29,14 @@ public final class ToolEffectiveness {
     private ToolEffectiveness() {
     }
 
-    public enum Kind {PICKAXE, AXE, SHOVEL, SWORD}
+    public enum Kind {PICKAXE, AXE, SHOVEL, SWORD, HOE}
 
     /** speedMultiplier applies only when a tool's Kind matches {@link #correctKindFor}; harvestLevel
      *  is compared against {@link #requiredHarvestLevel} for the 4 gated ores. */
     public enum Tier {
-        WOOD(2f, 1), STONE(4f, 2), IRON(6f, 3), DIAMOND(8f, 4);
+        WOOD(2f, 1), STONE(4f, 2), IRON(6f, 3), DIAMOND(8f, 4),
+        /** Gold mines fastest (x12) but harvests no better than wood (vanilla mining level 0). */
+        GOLD(12f, 1);
 
         public final float speedMultiplier;
         public final int harvestLevel;
@@ -69,6 +71,16 @@ public final class ToolEffectiveness {
         TOOLS.put(BlockType.DIAMOND_AXE, new ToolInfo(Kind.AXE, Tier.DIAMOND));
         TOOLS.put(BlockType.DIAMOND_SHOVEL, new ToolInfo(Kind.SHOVEL, Tier.DIAMOND));
         TOOLS.put(BlockType.DIAMOND_SWORD, new ToolInfo(Kind.SWORD, Tier.DIAMOND));
+        TOOLS.put(BlockType.GOLD_PICKAXE, new ToolInfo(Kind.PICKAXE, Tier.GOLD));
+        TOOLS.put(BlockType.GOLD_AXE, new ToolInfo(Kind.AXE, Tier.GOLD));
+        TOOLS.put(BlockType.GOLD_SHOVEL, new ToolInfo(Kind.SHOVEL, Tier.GOLD));
+        TOOLS.put(BlockType.GOLD_SWORD, new ToolInfo(Kind.SWORD, Tier.GOLD));
+        // Hoes: items with durability and attack stats; they speed up no block that exists here (hay, leaves and sculk are not in this game).
+        TOOLS.put(BlockType.WOODEN_HOE, new ToolInfo(Kind.HOE, Tier.WOOD));
+        TOOLS.put(BlockType.STONE_HOE, new ToolInfo(Kind.HOE, Tier.STONE));
+        TOOLS.put(BlockType.IRON_HOE, new ToolInfo(Kind.HOE, Tier.IRON));
+        TOOLS.put(BlockType.GOLD_HOE, new ToolInfo(Kind.HOE, Tier.GOLD));
+        TOOLS.put(BlockType.DIAMOND_HOE, new ToolInfo(Kind.HOE, Tier.DIAMOND));
     }
 
     /** Blocks a pickaxe speeds up. Ore/stone/stone-derived blocks - real vanilla's own pickaxe list,

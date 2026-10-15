@@ -35,6 +35,16 @@ public final class WeaponStats {
         put(BlockType.DIAMOND_AXE, 9, 1.0f);
         put(BlockType.DIAMOND_PICKAXE, 5, 1.2f);
         put(BlockType.DIAMOND_SHOVEL, 5.5f, 1.0f);
+        put(BlockType.GOLD_SWORD, 4, 1.6f);
+        put(BlockType.GOLD_AXE, 7, 1.0f);
+        put(BlockType.GOLD_PICKAXE, 2, 1.2f);
+        put(BlockType.GOLD_SHOVEL, 2.5f, 1.0f);
+        // hoes: 1 damage for every tier, speed 1 / 2 / 3 / 4 (wood, stone, iron, diamond), gold 1
+        put(BlockType.WOODEN_HOE, 1, 1.0f);
+        put(BlockType.STONE_HOE, 1, 2.0f);
+        put(BlockType.IRON_HOE, 1, 3.0f);
+        put(BlockType.GOLD_HOE, 1, 1.0f);
+        put(BlockType.DIAMOND_HOE, 1, 4.0f);
     }
 
     private static void put(BlockType t, float damage, float speed) {
@@ -48,7 +58,7 @@ public final class WeaponStats {
 
     public static boolean isSword(BlockType t) {
         return t == BlockType.WOODEN_SWORD || t == BlockType.STONE_SWORD || t == BlockType.IRON_SWORD
-                || t == BlockType.DIAMOND_SWORD;
+                || t == BlockType.DIAMOND_SWORD || t == BlockType.GOLD_SWORD;
     }
 
     public static float damage(BlockType held) {

@@ -50,6 +50,23 @@ class PlayerSurvivalTest {
     }
 
     @Test
+    void fallingBelowSixtyFourBlocksUnderTheWorldHurtsFourAtATimeWhileAboveItDoesNot() {
+        Player player = new Player(new Vector3f(0.5f, 1f, 0.5f));
+        PlayerSurvival s = survival(Difficulty.NORMAL);
+        s.update(0f, player);
+        player.position.y = -60f; // below the world but not yet 64 blocks under it
+        s.update(DT, player);
+        assertEquals(20f, s.getHealth().getCurrentHealth(), "no void damage above y = -64");
+        player.position.y = -70f;
+        s.update(DT, player);
+        assertEquals(16f, s.getHealth().getCurrentHealth(), 1e-4f, "4 damage");
+        s.update(DT, player);
+        assertEquals(16f, s.getHealth().getCurrentHealth(), 1e-4f, "then the hurt cooldown holds the next hit back");
+        for (int i = 0; i < 40; i++) s.update(DT, player);
+        assertTrue(s.getHealth().getCurrentHealth() < 16f, "and it keeps coming while the player stays down there");
+    }
+
+    @Test
     void sprintingOnGroundAddsExhaustionProportionalToDistanceTravelled() {
         Player player = new Player(new Vector3f(0.5f, SPAWN_Y, 0.5f));
         PlayerSurvival s = survival(Difficulty.NORMAL);

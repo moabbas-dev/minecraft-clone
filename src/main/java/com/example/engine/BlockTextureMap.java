@@ -150,6 +150,15 @@ public class BlockTextureMap {
         uniform(BlockType.DIAMOND_CHESTPLATE, Tile.DIAMOND_CHESTPLATE);
         uniform(BlockType.DIAMOND_LEGGINGS, Tile.DIAMOND_LEGGINGS);
         uniform(BlockType.DIAMOND_BOOTS, Tile.DIAMOND_BOOTS);
+        uniform(BlockType.GOLD_SWORD, Tile.GOLD_SWORD);
+        uniform(BlockType.GOLD_AXE, Tile.GOLD_AXE);
+        uniform(BlockType.GOLD_PICKAXE, Tile.GOLD_PICKAXE);
+        uniform(BlockType.GOLD_SHOVEL, Tile.GOLD_SHOVEL);
+        uniform(BlockType.WOODEN_HOE, Tile.WOODEN_HOE);
+        uniform(BlockType.STONE_HOE, Tile.STONE_HOE);
+        uniform(BlockType.IRON_HOE, Tile.IRON_HOE);
+        uniform(BlockType.GOLD_HOE, Tile.GOLD_HOE);
+        uniform(BlockType.DIAMOND_HOE, Tile.DIAMOND_HOE);
         uniform(BlockType.FLINT, Tile.FLINT);
         uniform(BlockType.CLAY_BALL, Tile.CLAY_BALL);
         uniform(BlockType.SNOWBALL, Tile.SNOWBALL);
