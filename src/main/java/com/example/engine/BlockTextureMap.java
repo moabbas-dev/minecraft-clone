@@ -161,6 +161,10 @@ public class BlockTextureMap {
         for (BlockType torch : new BlockType[]{BlockType.TORCH, BlockType.WALL_TORCH_EAST, BlockType.WALL_TORCH_WEST,
                 BlockType.WALL_TORCH_NORTH, BlockType.WALL_TORCH_SOUTH}) uniform(torch, Tile.TORCH);
         uniform(BlockType.GOLDEN_APPLE, Tile.GOLDEN_APPLE);
+        uniform(BlockType.BOW, Tile.BOW);
+        uniform(BlockType.BOW_PULLING_0, Tile.BOW_PULLING_0);
+        uniform(BlockType.BOW_PULLING_1, Tile.BOW_PULLING_1);
+        uniform(BlockType.BOW_PULLING_2, Tile.BOW_PULLING_2);
         put(BlockType.FARMLAND, Tile.FARMLAND, Tile.DIRT, Tile.DIRT);
         put(BlockType.FARMLAND_MOIST, Tile.FARMLAND_MOIST, Tile.DIRT, Tile.DIRT);
         uniform(BlockType.COPPER_SWORD, Tile.COPPER_SWORD);

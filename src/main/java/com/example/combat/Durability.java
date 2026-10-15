@@ -28,6 +28,7 @@ public final class Durability {
         MAX.put(BlockType.IRON_SPEAR, 250);
         MAX.put(BlockType.GOLD_SPEAR, 32);
         MAX.put(BlockType.DIAMOND_SPEAR, 1561);
+        MAX.put(BlockType.BOW, BowMath.BOW_DURABILITY);
         MAX.put(BlockType.WOODEN_HOE, 59);
         MAX.put(BlockType.STONE_HOE, 131);
         MAX.put(BlockType.IRON_HOE, 250);

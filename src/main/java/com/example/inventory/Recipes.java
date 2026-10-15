@@ -117,6 +117,12 @@ public final class Recipes {
             tool(new String[]{"HH", "S.", "S."}, BlockType.GOLD_INGOT, new ItemStack(BlockType.GOLD_HOE, 1)),
             tool(new String[]{"HH", ".S", ".S"}, BlockType.DIAMOND, new ItemStack(BlockType.DIAMOND_HOE, 1)),
             tool(new String[]{"HH", "S.", "S."}, BlockType.DIAMOND, new ItemStack(BlockType.DIAMOND_HOE, 1)),
+            // Arrows: flint over a stick over a feather, four at a time; the bow: three sticks and three strings (either way round).
+            new Recipe(new String[]{"F", "S", "W"}, Map.of('F', only(BlockType.FLINT), 'S', only(BlockType.STICK), 'W', only(BlockType.FEATHER)),
+                    new ItemStack(BlockType.ARROW, 4)),
+            new Recipe(new String[]{".SX", "S.X", ".SX"}, Map.of('S', only(BlockType.STICK), 'X', only(BlockType.STRING)), new ItemStack(BlockType.BOW, 1)),
+            new Recipe(new String[]{"XS.", "X.S", "XS."}, Map.of('S', only(BlockType.STICK), 'X', only(BlockType.STRING)), new ItemStack(BlockType.BOW, 1)),
+
             // Golden apple: an apple in a ring of eight gold ingots.
             new Recipe(new String[]{"GGG", "GAG", "GGG"}, Map.of('G', only(BlockType.GOLD_INGOT), 'A', only(BlockType.APPLE)),
                     new ItemStack(BlockType.GOLDEN_APPLE, 1)),

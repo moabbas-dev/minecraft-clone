@@ -225,7 +225,12 @@ public enum BlockType {
     WALL_TORCH_SOUTH(218, "Torch", false, true, 0f, 14f),
     FARMLAND(219, "Farmland", true, true, 0.6f, 0f),
     FARMLAND_MOIST(220, "Farmland", true, true, 0.6f, 0f),
-    GOLDEN_APPLE(221, "Golden Apple", false, true, -1f, 0f);
+    GOLDEN_APPLE(221, "Golden Apple", false, true, -1f, 0f),
+    BOW(222, "Bow", false, true, -1f, 0f),
+    // The bow while it is drawn: only ever shown in the hand, never an item in a slot.
+    BOW_PULLING_0(223, "Bow", false, true, -1f, 0f),
+    BOW_PULLING_1(224, "Bow", false, true, -1f, 0f),
+    BOW_PULLING_2(225, "Bow", false, true, -1f, 0f);
 
     public final int id;
     public final String displayName;

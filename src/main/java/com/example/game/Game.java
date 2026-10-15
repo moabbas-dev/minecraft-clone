@@ -225,6 +225,8 @@ public class Game implements GameAccess {
     private float underwaterBlend = 0f;
     /** Seconds the eye has been under water without a break (LocalPlayer.waterVisionTime), and the rain fog's eased strength. */
     private float waterVisionSeconds, rainFogMultiplier;
+    /** Ticks the bow has been drawn (0 = not drawing). */
+    private float bowDrawTicks;
     private Mesh skyDiscMesh, sunriseMesh, lightningMesh;
     private final com.example.entity.LightningBolts lightning = new com.example.entity.LightningBolts();
     private final float[] lightningScratch = new float[LightningGeometry.capacityFloats()];
@@ -881,7 +883,7 @@ public class Game implements GameAccess {
             return;
         }
 
-        float targetFov = options.fov * options.sprintFovFactor(player.isSprinting());
+        float targetFov = options.fov * options.sprintFovFactor(player.isSprinting()) * com.example.combat.BowMath.fovFactor(bowDrawTicks);
         currentFov += (targetFov - currentFov) * Math.min(1f, FOV_LERP_RATE * dt);
         if (swingTimer > 0f) swingTimer = Math.max(0f, swingTimer - dt);
         attackTimer += dt;
@@ -1129,6 +1131,17 @@ public class Game implements GameAccess {
             eatUseTicks = 0f;
         }
 
+        // Drawing the bow: hold use with a bow in the main hand and an arrow somewhere in the inventory; release shoots (BowItem).
+        boolean drawing = (held(com.example.ui.KeyBindings.Bind.USE) || forcedUseHeld) && mainHeld.type() == BlockType.BOW
+                && !mainHeld.isEmpty() && inventory.count(BlockType.ARROW) > 0;
+        if (drawing) {
+            if (bowDrawTicks == 0f) startSwing();
+            bowDrawTicks += dt * 20f;
+        } else if (bowDrawTicks > 0f) {
+            releaseBow(bowDrawTicks);
+            bowDrawTicks = 0f;
+        }
+
         boolean use = pressed(com.example.ui.KeyBindings.Bind.USE);
         boolean forcedUse = false;
         if (forcedUseRequests > 0) {
@@ -1245,6 +1258,7 @@ public class Game implements GameAccess {
             if (forcedUse) tryEat(offhand, held.type()); // the test controller eats instantly; real input holds use
             return true;
         }
+        if (held.type() == BlockType.BOW && !offhand) return true; // drawing the bow is handled while the button is held
         if (hit == null) return false;
         // Using a crafting table opens the 3x3 crafting screen instead of placing a block (sneaking still places, like vanilla).
         if (hit.type() == BlockType.CRAFTING_TABLE && !player.isSneaking()) {
@@ -1290,6 +1304,24 @@ public class Game implements GameAccess {
             damageSelectedItem(1);
         }
         return true;
+    }
+
+    /** BowItem.releaseUsing: a draw of enough power loses an arrow and a use of the bow and looses an arrow with the look direction. */
+    private void releaseBow(float drawTicks) {
+        float power = com.example.combat.BowMath.power(drawTicks);
+        if (power < com.example.combat.BowMath.MIN_POWER || inventory.selected().isEmpty() || inventory.selected().type() != BlockType.BOW) return;
+        if (inventory.remove(BlockType.ARROW, 1) < 1) return;
+        Vector3f eye = player.eyePosition();
+        Vector3f dir = new Vector3f(player.frontVector());
+        // shoot(): the direction gets a Gaussian wobble of 0.0075 x inaccuracy (1.0 for a player) on each axis
+        dir.add((float) gameplayRandom.nextGaussian() * 0.0075f, (float) gameplayRandom.nextGaussian() * 0.0075f,
+                (float) gameplayRandom.nextGaussian() * 0.0075f).normalize();
+        float speed = power * com.example.combat.BowMath.ARROW_SPEED_PER_POWER * 20f; // blocks per second
+        Vector3f origin = new Vector3f(eye).fma(0.3f, dir);
+        arrows.firePlayer(origin, dir.mul(speed), com.example.combat.BowMath.critical(power));
+        gameAudio.play("arrow.shoot", new Vector3f(eye));
+        damageSelectedItem(1);
+        startSwing();
     }
 
     /** F: the selected hotbar stack and the offhand stack trade places. */
@@ -1846,7 +1878,12 @@ public class Game implements GameAccess {
         mobs.setRaining(weather.isRaining());
         if (survival.getDifficulty() == Difficulty.PEACEFUL) mobs.removeHostile();
         fallingBlocks.update(world, dt, itemEntities, gameplayRandom);
-        arrows.update(world, mobTargets, dt, p -> gameAudio.play("arrow.hit", new Vector3f(p)));
+        arrows.update(world, mobTargets, mobs.mobs(), dt, p -> gameAudio.play("arrow.hit", new Vector3f(p)), gameplayRandom);
+        int pickedUp = arrows.pickUp(player.position.add(0f, 0.9f, 0f, new Vector3f()));
+        if (pickedUp > 0) {
+            inventory.add(BlockType.ARROW, pickedUp);
+            gameAudio.playPickup();
+        }
         xpOrbs.update(world, player.position, dt, v -> {
             survival.addExperience((float) v);
             gameAudio.play("xp.pickup", null);
@@ -2695,6 +2732,9 @@ public class Game implements GameAccess {
         boolean eatingMain = eatUseTicks > 0f && !eatingOffhand;
         if (eatingMain) swing = 0f; // vanilla applies no attack motion to the hand that is using an item
 
+        if (shown == BlockType.BOW && bowDrawTicks > 0f) {
+            shown = BlockType.values()[BlockType.BOW_PULLING_0.ordinal() + com.example.combat.BowMath.pullingStage(bowDrawTicks)];
+        }
         float drop = HeldItemModel.equipDrop(equipRaised);
         float[] verts;
         Matrix4f model;
