@@ -122,6 +122,28 @@ public class World {
         return c.getBlockLight(worldToLocal(x), y, worldToLocal(z));
     }
 
+    /** Extra block light a position gives off on top of its block's own (a burning furnace), keyed by packed position. */
+    private final Map<Long, Integer> emissionOverrides = new HashMap<>();
+
+    private static long posKey(int x, int y, int z) {
+        return ((long) x & 0x3FFFFFFL) | (((long) z & 0x3FFFFFFL) << 26) | (((long) y & 0xFFL) << 52);
+    }
+
+    public int lightEmissionOverride(int x, int y, int z) {
+        if (emissionOverrides.isEmpty()) return 0;
+        Integer v = emissionOverrides.get(posKey(x, y, z));
+        return v == null ? 0 : v;
+    }
+
+    /** Sets (0 clears) the extra light a position emits and relights around it - a furnace lighting or going out. */
+    public void setLightEmissionOverride(int x, int y, int z, int level) {
+        int old = lightEmissionOverride(x, y, z);
+        if (old == level) return;
+        if (level <= 0) emissionOverrides.remove(posKey(x, y, z));
+        else emissionOverrides.put(posKey(x, y, z), level);
+        LightEngine.onEmissionChanged(this, x, y, z);
+    }
+
     public void setBlock(int x, int y, int z, BlockType type) {
         if (y < 0 || y >= Chunk.SIZE_Y) return;
         int cx = worldToChunk(x);
@@ -129,8 +151,14 @@ public class World {
         Chunk c = getOrCreateChunk(cx, cz);
         int lx = worldToLocal(x);
         int lz = worldToLocal(z);
+        BlockType previous = c.getLocal(lx, y, lz);
         c.setLocal(lx, y, lz, type);
         c.markMeshDirty();
+        if (previous != type) {
+            int oldOverride = lightEmissionOverride(x, y, z);
+            if (oldOverride > 0) emissionOverrides.remove(posKey(x, y, z)); // the burning furnace is gone
+            if (c.isGenerated() && c.isLightComputed()) LightEngine.onBlockChanged(this, x, y, z, previous, type, oldOverride);
+        }
         // If the edit is on a chunk border, the neighboring chunk's mesh must be rebuilt too.
         if (lx == 0) markNeighborDirty(cx - 1, cz);
         if (lx == Chunk.SIZE_X - 1) markNeighborDirty(cx + 1, cz);

@@ -296,6 +296,13 @@ public class Game implements GameAccess {
     // sapling cross-plants ever write a nonzero value; everything else writes a constant 0f.
     private static final int[] CHUNK_VERTEX_LAYOUT = {3, 2, 1, 1, 3, 1};
 
+    // How the chunk shader lights a draw (uLitMode, see Shaders.CHUNK_FRAGMENT).
+    private static final int LIT_TERRAIN = 0, LIT_UNLIT = 1, LIT_ENTITY = 2, LIT_HELD = 3, LIT_PREVIEW = 4;
+    private LightmapTexture lightmap;
+    /** The block light flicker of vanilla's lightmap, a random walk stepped 20 times a second. */
+    private float lightFlicker;
+    private final java.util.Random lightFlickerRandom = new java.util.Random();
+
     @RequiredArgsConstructor
     private static final class ChunkRenderData {
         final int chunkX, chunkZ;
@@ -328,6 +335,7 @@ public class Game implements GameAccess {
         textureMap = new BlockTextureMap();
         meshBuilder = new ChunkMeshBuilder(atlas, textureMap);
         chunkShader = new Shader(Shaders.CHUNK_VERTEX, Shaders.CHUNK_FRAGMENT);
+        lightmap = new LightmapTexture();
         uiRenderer = new UiRenderer();
         font = new Font();
         hudTextures = HudTextures.loadOrNull();
@@ -1019,10 +1027,9 @@ public class Game implements GameAccess {
 
     private void rebuildMesh(Chunk chunk) {
         long key = Chunk.key(chunk.chunkX, chunk.chunkZ);
-        // LightEngine now imports light across borders from loaded neighbors itself, and marks
-        // those neighbors dirty again if this chunk's own edge values changed as a result - see
-        // LightEngine.compute for why that subsumes the old "first light computed" special case.
-        LightEngine.compute(chunk, world);
+        // A chunk is lit once, when it first gets a mesh (its light then flows across the borders into the loaded
+        // neighbours and theirs into it); after that block edits update the light incrementally (World.setBlock).
+        if (!chunk.isLightComputed()) LightEngine.initChunk(chunk, world);
         ChunkMeshBuilder.MeshData data = meshBuilder.build(chunk, world);
         ChunkRenderData rd = renderData.computeIfAbsent(key, k -> new ChunkRenderData(chunk.chunkX, chunk.chunkZ));
         rd.opaqueMesh.upload(data.opaque());
@@ -1432,8 +1439,9 @@ public class Game implements GameAccess {
         chunkShader.setUniform("uModel", model);
         chunkShader.setUniform("uCameraPos", 0f, 0f, 0f);
         chunkShader.setUniform("uTexture", 0);
-        chunkShader.setUniform("uDaylightFactor", 1f);
-        chunkShader.setUniform("uGamma", options.gamma);
+        updateLightmap();
+        chunkShader.setUniform("uLightmap", LightmapTexture.UNIT);
+        chunkShader.setUniform("uLitMode", LIT_PREVIEW);
         chunkShader.setUniform("uWindStrength", 0f);
         chunkShader.setUniform("uAlpha", 1f);
         chunkShader.setUniform("uFogStart", 1_000_000f);
@@ -1550,6 +1558,7 @@ public class Game implements GameAccess {
         tickAccumulator += dt;
         while (tickAccumulator >= TICK_SECONDS) {
             tickAccumulator -= TICK_SECONDS;
+            lightFlicker = LightmapColors.nextFlicker(lightFlicker, lightFlickerRandom);
             cookingStations.tickAll(world);
         }
     }
@@ -1894,8 +1903,9 @@ public class Game implements GameAccess {
         chunkShader.setUniform("uFogColor", fogColor.x, fogColor.y, fogColor.z);
         chunkShader.setUniform("uFogStart", fogStart);
         chunkShader.setUniform("uFogEnd", fogEnd);
-        chunkShader.setUniform("uDaylightFactor", daylightFactor);
-        chunkShader.setUniform("uGamma", options.gamma);
+        updateLightmap();
+        chunkShader.setUniform("uLightmap", LightmapTexture.UNIT);
+        chunkShader.setUniform("uLitMode", LIT_TERRAIN);
         chunkShader.setUniform("uWindTime", windTime);
         chunkShader.setUniform("uWindStrength", WIND_STRENGTH);
         atlas.bind(0);
@@ -1914,19 +1924,25 @@ public class Game implements GameAccess {
         }
 
         chunkShader.setUniform("uAlpha", 1f);
+        chunkShader.setUniform("uLitMode", LIT_UNLIT);
         renderBlockCrack();
+        chunkShader.setUniform("uLitMode", LIT_ENTITY);
         renderDroppedItems();
         renderMobs();
         renderArrows();
-        renderXpOrbs();
         renderFallingBlocks();
+        chunkShader.setUniform("uLitMode", LIT_TERRAIN);
+        renderXpOrbs();
         renderParticles();
         renderSpriteParticles();
 
+        chunkShader.setUniform("uLitMode", LIT_UNLIT);
         renderStars(eye, sunDir, stormFactor);
         renderSunAndMoon(eye, sunDir, stormFactor, weather.isThundering());
         renderClouds();
+        chunkShader.setUniform("uLitMode", LIT_TERRAIN);
         renderRain();
+        chunkShader.setUniform("uLitMode", LIT_HELD);
         renderHeldItem();
 
         chunkShader.unbind();
@@ -2569,10 +2585,17 @@ public class Game implements GameAccess {
 
     private float[] heldLit = new float[0];
 
+    /** Recomputes the lightmap for the time of day, the weather, the flicker and the Brightness option, and binds it to its unit. */
+    private void updateLightmap() {
+        float rain = weather.getStormIntensity();
+        float thunder = weather.isThundering() ? rain : 0f;
+        lightmap.update(LightmapColors.build(LightmapColors.params(SkyDetails.dayTick(dayTime), rain, thunder, lightFlicker, options.gamma)));
+    }
+
     /**
-     * Uploads a held-item mesh lit by the world: the sky and block light at the player's eye, with the mesh's own baked
-     * per-face brightness on the sky part, so the hands are as bright as everything else - dark at night, dim in a cave,
-     * lit by a torch (vanilla lights the first-person hands with the light at the player).
+     * Uploads a held-item mesh lit by the world: the sky and block light at the player's eye go through the lightmap like
+     * everything else (dark at night, dim in a cave, lit by a glowstone; vanilla lights the first-person hands with the light
+     * at the player), and the shader adds the directional shading from the face normals.
      */
     private void uploadLitHeld(float[] src) {
         Vector3f eye = player.eyePosition();
@@ -2581,8 +2604,7 @@ public class Game implements GameAccess {
         if (heldLit.length < src.length) heldLit = new float[src.length];
         System.arraycopy(src, 0, heldLit, 0, src.length);
         for (int i = 0; i + 6 < src.length; i += 11) {
-            float shade = src[i + 6]; // the baked face brightness lives in the block-light slot of a held mesh
-            heldLit[i + 5] = shade * sky;
+            heldLit[i + 5] = sky;
             heldLit[i + 6] = blk;
         }
         heldItemMesh.upload(heldLit, src.length);
@@ -2658,9 +2680,8 @@ public class Game implements GameAccess {
         arr[idx++] = p[2];
         arr[idx++] = u;
         arr[idx++] = v;
-        arr[idx++] = 0f; // skyShade unused - the held item ignores day/night and world lighting
-        arr[idx++] = shade; // baked per-face brightness lives in the blockLight channel instead,
-        // since that one isn't multiplied by uDaylightFactor, so it stays constant day or night
+        arr[idx++] = 1f; // light levels: replaced by the light at the player when drawn (uploadLitHeld)
+        arr[idx++] = 1f;
         arr[idx++] = tint[0];
         arr[idx++] = tint[1];
         arr[idx++] = tint[2];

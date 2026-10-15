@@ -55,7 +55,6 @@ final class MobModelBuilder {
             {{-1, -1, -1}, {-1, -1, 1}, {-1, 1, 1}, {-1, 1, -1}},
     };
     private static final int[][] FACE_NORMAL = {{0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}, {1, 0, 0}, {-1, 0, 0}};
-    private static final float[] FACE_SHADE = {1.0f, 0.6f, 0.85f, 0.85f, 0.7f, 0.7f};
     private static final int[] ORDER = {0, 1, 2, 0, 2, 3};
 
     // Strip ids: 0 U, 1 D, 2 W, 3 N, 4 E, 5 S.
@@ -161,7 +160,7 @@ final class MobModelBuilder {
             out[n++] = pz + rx * sin + lz * cos;
             out[n++] = tu;
             out[n++] = tv;
-            out[n++] = sky * FACE_SHADE[face];
+            out[n++] = sky; // the face shading comes from the shader (entity lighting from the face normal)
             out[n++] = blockLight;
             out[n++] = tint[0];
             out[n++] = tint[1];

@@ -8,11 +8,12 @@ import com.example.engine.TextureAtlas;
  * visible faces. Only faces adjacent to a non-occluding neighbor are emitted (simple face
  * culling, not full greedy meshing) which is enough to keep vertex counts reasonable.
  *
- * Sky light and block light are baked in as two separate channels (rather than one combined
- * brightness) so the fragment shader can blend them live against a day-night uniform without
- * needing to re-mesh every chunk every frame: skyShade already has the old per-face directional
- * tint (top/side/bottom) folded in and fades with uDaylightFactor, while blockLight (torches,
- * glowstone, ...) stays constant regardless of time of day, matching vanilla's actual model.
+ * Each vertex carries its sky light and block light levels (0-15 divided by 15, fractional where
+ * smooth lighting averaged four cells) in two channels; the vertex shader looks them up in the
+ * lightmap (see game.LightmapColors), so the time of day, the weather, the flicker and the
+ * Brightness option change the colours without re-meshing anything. The cardinal shade (top 1.0,
+ * bottom 0.5, north/south 0.8, east/west 0.6) and the ambient occlusion are folded into the tint,
+ * as vanilla bakes them into the vertex colour; see {@link #faceLight}.
  *
  * Neighbor sampling checks the LOCAL chunk first and only falls through to {@link World}
  * (a HashMap&lt;Long,Chunk&gt; lookup, with Long autoboxing) when a face's neighbor actually
@@ -158,32 +159,28 @@ public class ChunkMeshBuilder {
                     float[] overlayUv = faces.sideOverlay() != null ? atlas.getUv(faces.sideOverlay()) : null;
 
                     if (shouldDrawFace(type, up))
-                        emitFace(target, Face.TOP, lx, ly, lz, atlas.getUv(faces.top()), SHADE_TOP, chunk, world, lx, ly + 1, lz, topY, topTint, windWeight);
+                        emitFace(target, Face.TOP, lx, ly, lz, atlas.getUv(faces.top()), faceLight(Face.TOP, type, chunk, world, lx, ly, lz), topY, topTint, windWeight, 0f);
                     if (shouldDrawFace(type, down))
-                        emitFace(target, Face.BOTTOM, lx, ly, lz, atlas.getUv(faces.bottom()), SHADE_BOTTOM, chunk, world, lx, ly - 1, lz, topY, sideTint, windWeight);
+                        emitFace(target, Face.BOTTOM, lx, ly, lz, atlas.getUv(faces.bottom()), faceLight(Face.BOTTOM, type, chunk, world, lx, ly, lz), topY, sideTint, windWeight, 0f);
                     if (shouldDrawFace(type, north)) {
-                        emitFace(target, Face.NORTH, lx, ly, lz, atlas.getUv(faces.side()), SHADE_NORTH_SOUTH, chunk, world, lx, ly, lz - 1, topY, sideTint, windWeight);
-                        if (overlayUv != null) {
-                            emitFace(target, Face.NORTH, lx, ly, lz, overlayUv, SHADE_NORTH_SOUTH, chunk, world, lx, ly, lz - 1, topY, topTint, windWeight, OVERLAY_OFFSET);
-                        }
+                        FaceLight light = faceLight(Face.NORTH, type, chunk, world, lx, ly, lz);
+                        emitFace(target, Face.NORTH, lx, ly, lz, atlas.getUv(faces.side()), light, topY, sideTint, windWeight, 0f);
+                        if (overlayUv != null) emitFace(target, Face.NORTH, lx, ly, lz, overlayUv, light, topY, topTint, windWeight, OVERLAY_OFFSET);
                     }
                     if (shouldDrawFace(type, south)) {
-                        emitFace(target, Face.SOUTH, lx, ly, lz, atlas.getUv(faces.side()), SHADE_NORTH_SOUTH, chunk, world, lx, ly, lz + 1, topY, sideTint, windWeight);
-                        if (overlayUv != null) {
-                            emitFace(target, Face.SOUTH, lx, ly, lz, overlayUv, SHADE_NORTH_SOUTH, chunk, world, lx, ly, lz + 1, topY, topTint, windWeight, OVERLAY_OFFSET);
-                        }
+                        FaceLight light = faceLight(Face.SOUTH, type, chunk, world, lx, ly, lz);
+                        emitFace(target, Face.SOUTH, lx, ly, lz, atlas.getUv(faces.side()), light, topY, sideTint, windWeight, 0f);
+                        if (overlayUv != null) emitFace(target, Face.SOUTH, lx, ly, lz, overlayUv, light, topY, topTint, windWeight, OVERLAY_OFFSET);
                     }
                     if (shouldDrawFace(type, east)) {
-                        emitFace(target, Face.EAST, lx, ly, lz, atlas.getUv(faces.side()), SHADE_EAST_WEST, chunk, world, lx + 1, ly, lz, topY, sideTint, windWeight);
-                        if (overlayUv != null) {
-                            emitFace(target, Face.EAST, lx, ly, lz, overlayUv, SHADE_EAST_WEST, chunk, world, lx + 1, ly, lz, topY, topTint, windWeight, OVERLAY_OFFSET);
-                        }
+                        FaceLight light = faceLight(Face.EAST, type, chunk, world, lx, ly, lz);
+                        emitFace(target, Face.EAST, lx, ly, lz, atlas.getUv(faces.side()), light, topY, sideTint, windWeight, 0f);
+                        if (overlayUv != null) emitFace(target, Face.EAST, lx, ly, lz, overlayUv, light, topY, topTint, windWeight, OVERLAY_OFFSET);
                     }
                     if (shouldDrawFace(type, west)) {
-                        emitFace(target, Face.WEST, lx, ly, lz, atlas.getUv(faces.side()), SHADE_EAST_WEST, chunk, world, lx - 1, ly, lz, topY, sideTint, windWeight);
-                        if (overlayUv != null) {
-                            emitFace(target, Face.WEST, lx, ly, lz, overlayUv, SHADE_EAST_WEST, chunk, world, lx - 1, ly, lz, topY, topTint, windWeight, OVERLAY_OFFSET);
-                        }
+                        FaceLight light = faceLight(Face.WEST, type, chunk, world, lx, ly, lz);
+                        emitFace(target, Face.WEST, lx, ly, lz, atlas.getUv(faces.side()), light, topY, sideTint, windWeight, 0f);
+                        if (overlayUv != null) emitFace(target, Face.WEST, lx, ly, lz, overlayUv, light, topY, topTint, windWeight, OVERLAY_OFFSET);
                     }
                 }
             }
@@ -306,23 +303,132 @@ public class ChunkMeshBuilder {
 
     private enum Face {TOP, BOTTOM, NORTH, SOUTH, EAST, WEST}
 
+    /** Smooth lighting with ambient occlusion on (vanilla's default Smooth Lighting option). */
+    static final boolean SMOOTH_LIGHTING = true;
+
+    private static final int[][] NORMAL = {{0, 1, 0}, {0, -1, 0}, {0, 0, -1}, {0, 0, 1}, {1, 0, 0}, {-1, 0, 0}};
+    private static final float[] DIRECTIONAL = {SHADE_TOP, SHADE_BOTTOM, SHADE_NORTH_SOUTH, SHADE_NORTH_SOUTH, SHADE_EAST_WEST, SHADE_EAST_WEST};
+    /**
+     * The four neighbours beside the lit cell of each face, in the order of vanilla's BlockModelLighter.AdjacencyInfo
+     * (read from the 26.3 client): edges 0 and 1 are opposite, 2 and 3 are opposite on the other axis. A vertex sits between
+     * one of {0, 1} and one of {2, 3}.
+     */
+    private static final int[][][] EDGES = {
+            {{1, 0, 0}, {-1, 0, 0}, {0, 0, -1}, {0, 0, 1}},  // TOP:    EAST WEST NORTH SOUTH
+            {{-1, 0, 0}, {1, 0, 0}, {0, 0, -1}, {0, 0, 1}},  // BOTTOM: WEST EAST NORTH SOUTH
+            {{0, 1, 0}, {0, -1, 0}, {1, 0, 0}, {-1, 0, 0}},  // NORTH:  UP DOWN EAST WEST
+            {{-1, 0, 0}, {1, 0, 0}, {0, -1, 0}, {0, 1, 0}},  // SOUTH:  WEST EAST DOWN UP
+            {{0, -1, 0}, {0, 1, 0}, {0, 0, -1}, {0, 0, 1}},  // EAST:   DOWN UP NORTH SOUTH
+            {{0, 1, 0}, {0, -1, 0}, {0, 0, -1}, {0, 0, 1}}}; // WEST:   UP DOWN NORTH SOUTH
+
+    /** What a face is lit with at each of its corners (index = x | y << 1 | z << 2 of the corner): sky and block light on the 0-15 scale (fractional), and the brightness factor (ambient occlusion times the directional shade). */
+    static final class FaceLight {
+        final float[] sky = new float[8], block = new float[8], shade = new float[8];
+    }
+
+    private static FaceLight flat(int sky, int block, float shade) {
+        FaceLight l = new FaceLight();
+        java.util.Arrays.fill(l.sky, sky);
+        java.util.Arrays.fill(l.block, block);
+        java.util.Arrays.fill(l.shade, shade);
+        return l;
+    }
+
+    /**
+     * The light of one face of the block at (lx, ly, lz), as vanilla computes it:
+     * <ul>
+     *   <li>fluids: the brighter of their own cell and the one above, with the directional shade only;</li>
+     *   <li>blocks that emit light (glowstone): the light of the cell in front of the face, with the directional shade only;</li>
+     *   <li>everything else, smooth lighting: each vertex averages the light of the four cells around it in front of the face (a
+     *       cell hidden behind two opaque neighbours is replaced by one of them, and a dark cell by the face's own), and the
+     *       same four cells give the ambient occlusion (a full block counts 0.2, anything else 1.0).</li>
+     * </ul>
+     */
+    private FaceLight faceLight(Face face, BlockType type, Chunk chunk, World world, int lx, int ly, int lz) {
+        int f = face.ordinal();
+        float dir = DIRECTIONAL[f];
+        int[] n = NORMAL[f];
+        int bx = lx + n[0], by = ly + n[1], bz = lz + n[2];
+        if (type == BlockType.WATER) {
+            int sky = Math.max(sampleSkyLight(chunk, world, lx, ly, lz), sampleSkyLight(chunk, world, lx, ly + 1, lz));
+            int block = Math.max(sampleBlockLight(chunk, world, lx, ly, lz), sampleBlockLight(chunk, world, lx, ly + 1, lz));
+            return flat(sky, block, dir);
+        }
+        if (!SMOOTH_LIGHTING || LightProperties.emission(type) > 0) {
+            return flat(sampleSkyLight(chunk, world, bx, by, bz), sampleBlockLight(chunk, world, bx, by, bz), dir);
+        }
+        int[][] e = EDGES[f];
+        int[] sk = new int[4], bl = new int[4];
+        float[] sh = new float[4];
+        boolean[] permeable = new boolean[4];
+        for (int i = 0; i < 4; i++) {
+            int ex = bx + e[i][0], ey = by + e[i][1], ez = bz + e[i][2];
+            sk[i] = sampleSkyLight(chunk, world, ex, ey, ez);
+            bl[i] = sampleBlockLight(chunk, world, ex, ey, ez);
+            sh[i] = LightProperties.shadeBrightness(sampleBlock(chunk, world, ex, ey, ez));
+            permeable[i] = LightProperties.isLightPermeable(sampleBlock(chunk, world, ex + n[0], ey + n[1], ez + n[2]));
+        }
+        int centreSky = sampleSkyLight(chunk, world, bx, by, bz), centreBlock = sampleBlockLight(chunk, world, bx, by, bz);
+        float centreShade = LightProperties.shadeBrightness(sampleBlock(chunk, world, bx, by, bz));
+
+        FaceLight out = new FaceLight();
+        int[] s = new int[4], b = new int[4];
+        for (int k = 0; k < 8; k++) {
+            int cx = k & 1, cy = (k >> 1) & 1, cz = (k >> 2) & 1;
+            // only the four corners on this face (the coordinate along the normal is 1 on a positive face, 0 on a negative one)
+            if ((n[0] != 0 && cx != (n[0] > 0 ? 1 : 0)) || (n[1] != 0 && cy != (n[1] > 0 ? 1 : 0)) || (n[2] != 0 && cz != (n[2] > 0 ? 1 : 0))) continue;
+            int[] sign = {cx * 2 - 1, cy * 2 - 1, cz * 2 - 1};
+            int i = e[0][0] * sign[0] + e[0][1] * sign[1] + e[0][2] * sign[2] > 0 ? 0 : 1;
+            int j = e[2][0] * sign[0] + e[2][1] * sign[1] + e[2][2] * sign[2] > 0 ? 2 : 3;
+            int dSky, dBlock;
+            float dShade;
+            if (permeable[i] || permeable[j]) {
+                int dx = bx + e[i][0] + e[j][0], dy = by + e[i][1] + e[j][1], dz = bz + e[i][2] + e[j][2];
+                dSky = sampleSkyLight(chunk, world, dx, dy, dz);
+                dBlock = sampleBlockLight(chunk, world, dx, dy, dz);
+                dShade = LightProperties.shadeBrightness(sampleBlock(chunk, world, dx, dy, dz));
+            } else { // the diagonal is hidden behind two opaque neighbours: vanilla uses the first edge's values
+                dSky = sk[0];
+                dBlock = bl[0];
+                dShade = sh[0];
+            }
+            s[0] = sk[j];
+            b[0] = bl[j];
+            s[1] = sk[i];
+            b[1] = bl[i];
+            s[2] = dSky;
+            b[2] = dBlock;
+            s[3] = centreSky;
+            b[3] = centreBlock;
+            fillDark(s, b);
+            out.sky[k] = (s[0] + s[1] + s[2] + s[3]) * 0.25f;
+            out.block[k] = (b[0] + b[1] + b[2] + b[3]) * 0.25f;
+            out.shade[k] = (sh[i] + sh[j] + dShade + centreShade) * 0.25f * dir;
+        }
+        return out;
+    }
+
+    /** Fills in dark neighbours from the centre cell (index 3) as vanilla's smoothBlend does, when the centre is dark. Returns nothing: edits s and b. */
+    private static void fillDark(int[] s, int[] b) {
+        if (s[3] <= 2 || b[3] <= 2) {
+            for (int k = 0; k < 3; k++) {
+                if (s[k] == 0 && b[k] == 0) {
+                    s[k] = s[3];
+                    b[k] = b[3];
+                } else if (s[k] == 0) {
+                    s[k] |= s[3];
+                }
+            }
+        }
+    }
+
     /** How far a side overlay sits outside the block face. It is opaque only where the base is
      *  transparent, so it can never visibly overlap; the offset just makes it win the depth test
      *  at mip distances where the base's edge texels average to a partly-opaque value. */
     private static final float OVERLAY_OFFSET = 0.002f;
 
-    private void emitFace(FloatBuffer buf, Face face, int x, int y, int z, float[] uv, float directionalShade,
-                           Chunk chunk, World world, int neighborLx, int neighborLy, int neighborLz, float topY,
-                           float[] tint, float windWeight) {
-        emitFace(buf, face, x, y, z, uv, directionalShade, chunk, world, neighborLx, neighborLy, neighborLz, topY, tint, windWeight, 0f);
-    }
-
-    private void emitFace(FloatBuffer buf, Face face, int x, int y, int z, float[] uv, float directionalShade,
-                           Chunk chunk, World world, int neighborLx, int neighborLy, int neighborLz, float topY,
+    private void emitFace(FloatBuffer buf, Face face, int x, int y, int z, float[] uv, FaceLight light, float topY,
                            float[] tint, float windWeight, float outwardOffset) {
-        float skyShade = (sampleSkyLight(chunk, world, neighborLx, neighborLy, neighborLz) / 15f) * directionalShade;
-        float blockLight = sampleBlockLight(chunk, world, neighborLx, neighborLy, neighborLz) / 15f;
-
         float u0 = uv[0], v0 = uv[1], u1 = uv[2], v1 = uv[3];
         // For the four side faces, texture V increases downward within a tile (artwork top = v0,
         // artwork bottom = v1), so the block's bottom edge (dy=0) must sample v1 and its top edge
@@ -366,7 +472,10 @@ public class ChunkMeshBuilder {
             case WEST -> ox = -outwardOffset;
         }
         for (float[] c : corners) {
-            buf.add(x + c[0] + ox, y + c[1] + oy, z + c[2] + oz, c[3], c[4], skyShade, blockLight, tint[0], tint[1], tint[2], windWeight);
+            int k = (c[0] > 0.5f ? 1 : 0) | (c[1] > 0.5f ? 2 : 0) | (c[2] > 0.5f ? 4 : 0);
+            float shade = light.shade[k];
+            buf.add(x + c[0] + ox, y + c[1] + oy, z + c[2] + oz, c[3], c[4], light.sky[k] / 15f, light.block[k] / 15f,
+                    tint[0] * shade, tint[1] * shade, tint[2] * shade, windWeight);
         }
     }
 

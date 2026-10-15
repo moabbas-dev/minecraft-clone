@@ -9,8 +9,8 @@ import java.util.Random;
 /**
  * Stars and clouds as the 26.3 client builds them (constants read from SkyRenderer, CloudRenderer, the cloud shader and the
  * overworld day timeline). Pure maths and vertex generation, no GL: vertices are the chunk shader's 11 floats
- * (x y z u v sky blockLight r g b wind). Lit through the block-light channel, which the day/night factor does not scale, with
- * the day-time dimming done here from the real keyframes instead.
+ * (x y z u v sky blockLight r g b wind). Drawn unlit (the shader's lit mode 1, no lightmap), with the day-time dimming done here
+ * from the real keyframes.
  */
 final class SkyDetails {
     private SkyDetails() {
@@ -43,7 +43,7 @@ final class SkyDetails {
         return new float[]{cyclic(r, tick), cyclic(g, tick), cyclic(b, tick)};
     }
 
-    private static float cyclic(float[][] keys, float tick) {
+    static float cyclic(float[][] keys, float tick) {
         float t = ((tick % 24000f) + 24000f) % 24000f;
         int n = keys.length;
         for (int i = 0; i < n; i++) {
@@ -98,7 +98,7 @@ final class SkyDetails {
         a[i++] = 0.5f; // u, v: any texel of the plain white texture
         a[i++] = 0.5f;
         a[i++] = 0f;
-        a[i++] = 1f;   // lit through the block-light channel so the day/night factor leaves it alone
+        a[i++] = 1f;   // light levels, ignored: these are drawn unlit
         a[i++] = r * shade;
         a[i++] = g * shade;
         a[i++] = b * shade;

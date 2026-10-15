@@ -312,7 +312,7 @@ Sources: Perplexity research on `SkyRenderer` / `LevelRenderer.renderSky`, `Agea
 
 Reference images: minecraft.wiki `DualWielding.png` (a real first-person iron sword, 1920x1017) and `OffhandSlotHighlighted.png` (the real inventory with the empty-slot outlines), both looked at in the browser.
 
-- [x] First-person hands (main, offhand, bare arm) are lit like the world: the sky and block light at the player's eye, the mesh's baked face brightness on the sky part. Checked at day and at night (both swords go dark at night).
+- [x] First-person hands (main, offhand, bare arm) are lit like the world: the sky and block light at the player's eye, the mesh's baked face brightness on the sky part (replaced in section 16: the light goes through the lightmap and the shader shades from the face normals). Checked at day and at night (both swords go dark at night).
 - [x] Empty armor slots show the helmet / chestplate / leggings / boots outlines and an empty offhand slot shows the shield outline (the real `container/slot/*.png` sprites), as in the reference.
 - [x] The preview player follows the mouse in the same direction: the head had been turning the wrong way (cancelling the body's turn) and looked up when the mouse was below. Now body 20 and head 40 degrees per atan unit towards the mouse, head up when the mouse is above, body leaning back; covered by `PlayerModelBuilderTest`.
 - [x] Held tools: the flat-item display rotation is the model JSON's [0,-90,25]. I measured it: the simulated left-edge silhouette of the iron sword matches the reference image row for row once the reference's wider screen (aspect 1.887 against 1.778) is allowed for (a uniform 42 px shift, which is exactly the aspect difference). The +90 used since the held-item rework was the cause of the tools looking wrong.
@@ -379,3 +379,33 @@ All numbers from the 26.3 client (SkyRenderer.buildStars, CloudRenderer, `clouds
 - **JVM crash log `hs_err_pid27744.log`** (2026-10-14 12:54): an EXCEPTION_ACCESS_VIOLATION inside `jvm.dll` on the "C2 CompilerThread1" thread while it was compiling `Game.renderHeldItem` (OpenJDK 25.0.2+10). The crash is in HotSpot's optimizing compiler, not in this game's Java or in LWJGL / OpenGL (no Java or native game frame is on the stack), and it has not come back in many runs since. Workarounds if it returns: a newer JDK 25 update, or `-XX:CompileCommand=exclude,com.example.game.Game::renderHeldItem` for the run.
 - Tests: 790 passing (`GoldToolsAndHoesTest`, the void test).
 
+
+## 16. The light system (G16)
+
+Everything below was read from the 26.3 client jar with `javap` (lightmap.fsh, sample_lightmap.glsl, light.glsl, `LightmapRenderStateExtractor`, `BlockModelLighter` and its `AdjacencyInfo`, `LightEngine`, `BlockLightEngine`, `SkyLightEngine`, `BlockBehaviour` light dampening, `timeline/day.json`, `WeatherAttributes`), not from memory. Before this the light was a per-chunk recompute with a made-up `max(sky * daylight, block)` curve.
+
+**Propagation (`world/LightEngine`, `LightProperties`)**
+- [x] Block and sky light are one engine across the whole loaded world, not per chunk: a light crosses chunk borders both when a chunk is lit and when a block changes, and no light is left behind when a source goes (two queues: first the light that depended on the changed cells is removed, then what remains spreads back in; checked for a glowstone next to a chunk border).
+- [x] A step loses `max(1, dampening)`; a block with dampening 15 stops light. Dampening: full opaque blocks 15; leaves, water, ice and mangrove roots 1; glass, plants and the chest 0 (the chest is not a full block). So light under a tree canopy or in water loses 1 per block, as in vanilla.
+- [x] Sky light: every cell above the highest light-dampening block of its column is a source at 15 (no loss straight down an open column); roofs let light in sideways at 1 per block. Placing or breaking a block moves the column's blocker and relights what changed.
+- [x] Emission: glowstone 15 (the only emitter among the blocks); a burning furnace, blast furnace or smoker gives 13 (`Blocks.litBlockEmission(13)`), set from `CookingStationManager.tickAll` through `World.setLightEmissionOverride` and removed with the block.
+- Tests: `LightEngineTest` (16: dampening, L1 diamond falloff, 14-block reach, walls, removal without ghost light across a border, two sources, furnace on/off, roofs, skylight holes, leaves, water, border meeting, relight idempotence, remesh marking) and the rewritten `CrossChunkLightingTest`.
+
+**Colours (`game/LightmapColors`, `LightmapTexture`, shader)**
+- [x] The lightmap is lightmap.fsh: `get_brightness(l) = l / (4 - 3 l)`, sky brightness times the day timeline's `sky_light_factor`, block brightness times `1.4 + flicker`; the sky colour `sky_light_color` goes from white by day to `#7a7aff` at night (keyframes 730 / 11270 / 13140 / 22860 of the 24000-tick day); ambient `#0a0a0a`; block colour mixes the warm tint `#ffd88c` towards white by `0.9 (2 b - 1)^2`; clamp; then the Brightness option mixes with the `notGamma` curve (`1 - (1 - max)^4`). Rain pulls factor and colour toward night with alpha 0.3125, thunder with 0.527 (weather layers, scaled by the eased storm level).
+- [x] The block-light flicker is vanilla's random walk, stepped 20 times a second: `f += (r1 - r2) r3 r4 0.1; f *= 0.9`.
+- [x] The vertex shader samples the 16x16 lightmap (linear filter, texel centres) per vertex with the light levels the mesher stores (fractional where four cells were averaged), exactly like sample_lightmap.glsl. The old `uDaylightFactor`/`uGamma` uniforms are gone. Tests: `LightmapColorsTest` (9).
+
+**Smooth lighting and ambient occlusion (`ChunkMeshBuilder.faceLight`)**
+- [x] Each face vertex averages the light of the four cells in front of the face around it (edge, edge, diagonal, centre) with vanilla's rules: a diagonal hidden behind two opaque neighbours is replaced by the first edge (the corner tables are the jar's `AdjacencyInfo`), dark cells are filled in from the centre when the centre is dark, and the same cells give the occlusion shade (0.2 beside a full block, 1.0 beside air, glass, mud, water...). The cardinal shade (top 1.0, bottom 0.5, north/south 0.8, east/west 0.6) is multiplied in. Light-emitting blocks (glowstone) use flat lighting with the shade only; water uses the brighter of its cell and the one above; cross plants are lit by their own cell.
+- [ ] [U] The exact `smoothBlend` dark-cell rule is from my reading of the bytecode (sky-only fix-up for cells that have block light but no sky); worth a second look against a screenshot of a cave corner.
+
+**Entities, items, particles**
+- [x] Mobs, dropped items, falling blocks and arrows are lit by the lightmap at their cell plus vanilla's two directional lights (`light.glsl`: `min(1, (max(0, n.L0) + max(0, n.L1)) 0.6 + 0.4)`, L0 = (0.2, 1, -0.7), L1 = (-0.2, 1, 0.7) normalised: top 1.0, north/south 0.742, east/west 0.498, bottom 0.4). The shader takes the normal from the screen-space derivatives of the position, so nothing is baked into the models any more. The first-person hands do the same in view space.
+- [x] The inventory preview uses a full-bright lightmap with the inventory lights. [P] the signs of the two inventory light vectors were mapped from vanilla's y-down GUI space to our y-up one, not measured.
+- [x] Particles, rain and its splashes use the lightmap without directional shading; the sky, sun, moon, stars, clouds and the crack overlay are drawn unlit.
+
+**Not done / known gaps**
+- The mob spawners still use the older `daylightFactor` instead of vanilla's `sky_light_level` (15 x timeline x weather); lightning does not change the lightmap (it does not in vanilla's overworld either, only the sky colour).
+- Entity light is sampled at one cell, not at the entity's eye probe; no night-vision, blindness or darkness effects; no torch, lava or other emitters exist as blocks yet.
+- Light is recomputed when a chunk is first meshed and is not saved.

@@ -15,7 +15,9 @@ public class Chunk {
 
     /** 0-15 light levels, recomputed by LightEngine whenever the chunk's mesh is rebuilt. */
     final byte[] skyLight = new byte[SIZE_X * SIZE_Y * SIZE_Z];
-    final byte[] blockLight = new byte[SIZE_X * SIZE_Y * SIZE_Z];
+    final byte[] blockLight = new byte[SIZE_X * SIZE_Z * SIZE_Y];
+    /** Per column, the y of the highest block that dampens light (-1 for none): every cell above it is a sky light source. */
+    private final int[] skyBlocker = new int[SIZE_X * SIZE_Z];
 
     // Per-column grass/foliage tint (RGB), computed once by the world generator - either right
     // after generating fresh terrain or right after loading saved blocks from disk, never
@@ -96,6 +98,14 @@ public class Chunk {
     public float[] getWaterTint(int x, int z) {
         int i = (z * SIZE_X + x) * 3;
         return new float[]{waterTint[i], waterTint[i + 1], waterTint[i + 2]};
+    }
+
+    int skyBlocker(int x, int z) {
+        return skyBlocker[z * SIZE_X + x];
+    }
+
+    void setSkyBlocker(int x, int z, int y) {
+        skyBlocker[z * SIZE_X + x] = y;
     }
 
     public int getSkyLight(int x, int y, int z) {

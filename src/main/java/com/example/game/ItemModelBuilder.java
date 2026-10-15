@@ -40,8 +40,6 @@ final class ItemModelBuilder {
             {{1, -1, 1}, {1, -1, -1}, {1, 1, -1}, {1, 1, 1}},      // east
             {{-1, -1, -1}, {-1, -1, 1}, {-1, 1, 1}, {-1, 1, -1}}, // west
     };
-    private static final float[] FACE_SHADE = {1.0f, 0.6f, 0.85f, 0.85f, 0.7f, 0.7f};
-
     /** Writes a rotated cube centered on (cx,cy,cz) with half-extent {@code half}; returns the new write index. */
     static int emitCube(float[] out, int n, float cx, float cy, float cz, float half, float cos, float sin,
                         Model m, float sky, float blockLight) {
@@ -49,15 +47,14 @@ final class ItemModelBuilder {
             float[] uv = f == 0 ? m.top() : f == 1 ? m.bottom() : m.side();
             float[] tint = f == 0 ? m.topTint() : m.sideTint();
             int[][] c = FACES[f];
-            float shadedSky = sky * FACE_SHADE[f];
-            n = quad(out, n, cx, cy, cz, half, cos, sin, c[0], c[1], c[2], c[3], uv, shadedSky, blockLight, tint);
+            n = quad(out, n, cx, cy, cz, half, cos, sin, c[0], c[1], c[2], c[3], uv, sky, blockLight, tint);
         }
         if (m.sideOverlay() != null) {
             // Slightly larger than the base cube so it wins the depth test on the (disjoint) pixels it covers.
             for (int f = 2; f < 6; f++) {
                 int[][] c = FACES[f];
                 n = quad(out, n, cx, cy, cz, half * 1.01f, cos, sin, c[0], c[1], c[2], c[3], m.sideOverlay(),
-                        sky * FACE_SHADE[f], blockLight, m.overlayTint());
+                        sky, blockLight, m.overlayTint());
             }
         }
         return n;
@@ -67,14 +64,12 @@ final class ItemModelBuilder {
 
     /**
      * An axis-aligned box centered on the origin with independent half-extents - the first-person
-     * arm. Written in the held-item lighting convention (sky 0, per-face brightness carried in the
-     * blockLight channel, which the shader does not scale by daylight), so the hand looks the same
-     * day or night like the held block does. Returns the new write index.
+     * arm. The light levels are placeholders (the game writes the light at the player when it draws the hand) and the face
+     * shading comes from the shader. Returns the new write index.
      */
     static int emitBox(float[] out, int n, float hx, float hy, float hz, float[] uv, float[] tint) {
         for (int f = 0; f < 6; f++) {
             int[][] c = FACES[f];
-            float shade = FACE_SHADE[f];
             float u0 = uv[0], v0 = uv[1], u1 = uv[2], v1 = uv[3];
             int[] order = {0, 1, 2, 0, 2, 3};
             float[][] corner = {{u0, v1}, {u1, v1}, {u1, v0}, {u0, v0}};
@@ -84,8 +79,8 @@ final class ItemModelBuilder {
                 out[n++] = c[k][2] * hz;
                 out[n++] = corner[k][0];
                 out[n++] = corner[k][1];
-                out[n++] = 0f;
-                out[n++] = shade;
+                out[n++] = 1f;
+                out[n++] = 1f;
                 out[n++] = tint[0];
                 out[n++] = tint[1];
                 out[n++] = tint[2];
@@ -97,7 +92,7 @@ final class ItemModelBuilder {
 
     /**
      * Writes a flat extruded sprite (the local mesh from {@code HeldItemModel.extrudedSprite}, centred on the origin,
-     * spanning -0.5..0.5, baked per-face brightness in its block-light slot) scaled by {@code scale}, turned about the
+     * spanning -0.5..0.5) scaled by {@code scale}, turned about the
      * vertical axis and centred on (cx,cy,cz) - a dropped tool, food or ingot. Returns the new write index.
      */
     static int emitSprite(float[] out, int n, float[] local, float cx, float cy, float cz, float scale,
@@ -109,7 +104,7 @@ final class ItemModelBuilder {
             out[n++] = cz - lx * sin + lz * cos;
             out[n++] = local[i + 3];
             out[n++] = local[i + 4];
-            out[n++] = sky * local[i + 6];
+            out[n++] = sky;
             out[n++] = blockLight;
             out[n++] = local[i + 7];
             out[n++] = local[i + 8];

@@ -22,6 +22,8 @@ import java.util.Map;
  */
 public class CookingStationManager {
     private final Map<Long, CookingStationState> stations = new HashMap<>();
+    /** Block light level of a burning furnace, blast furnace or smoker (Blocks.litBlockEmission(13)). */
+    public static final int LIT_EMISSION = 13;
 
     private static long packKey(int x, int y, int z) {
         return ((long) x & 0x3FFFFFFL) | (((long) z & 0x3FFFFFFL) << 26) | (((long) y & 0xFFFL) << 52);
@@ -57,7 +59,11 @@ public class CookingStationManager {
         for (CookingStationState station : stations.values()) {
             int cx = World.worldToChunk(station.getX()), cz = World.worldToChunk(station.getZ());
             var chunk = world.getChunk(cx, cz);
-            if (chunk != null && chunk.isGenerated()) station.tick();
+            if (chunk != null && chunk.isGenerated()) {
+                station.tick();
+                // a burning furnace, blast furnace or smoker gives off block light 13 (vanilla's lit block emission)
+                world.setLightEmissionOverride(station.getX(), station.getY(), station.getZ(), station.isBurning() ? LIT_EMISSION : 0);
+            }
         }
     }
 

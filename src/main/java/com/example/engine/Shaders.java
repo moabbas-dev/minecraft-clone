@@ -23,10 +23,15 @@ public final class Shaders {
             // and a single debug-tunable strength multiplier (0 disables wind entirely).
             uniform float uWindTime;
             uniform float uWindStrength;
+            // The 16 x 16 lightmap (column = block light, row = sky light), see game.LightmapColors.
+            uniform sampler2D uLightmap;
+            // How a draw is lit: 0 terrain and particles (lightmap), 1 unlit (sky objects), 2 entity in the world,
+            // 3 first-person held item, 4 inventory preview (full-bright lightmap). See the fragment shader.
+            uniform int uLitMode;
 
             out vec2 vUv;
-            out float vSkyShade;
-            out float vBlockLight;
+            out vec3 vLight;
+            out vec3 vPos;
             out float vDistance;
             out vec3 vTint;
 
@@ -61,8 +66,16 @@ public final class Shaders {
 
                 gl_Position = uProjection * uView * worldPos;
                 vUv = aUv;
-                vSkyShade = aSkyShade;
-                vBlockLight = aBlockLight;
+                // Vanilla samples the lightmap per vertex (sample_lightmap.glsl): the light levels (aSkyShade and
+                // aBlockLight carry level / 15, fractional where smooth lighting averaged four cells) pick a point between
+                // the texel centres of the 16 x 16 map, and the linear filter blends the neighbours.
+                vec3 light = vec3(1.0);
+                if (uLitMode != 1) {
+                    vec2 level = uLitMode == 4 ? vec2(15.0) : clamp(vec2(aBlockLight, aSkyShade) * 15.0, 0.0, 15.0);
+                    light = textureLod(uLightmap, (level + 0.5) / 16.0, 0.0).rgb;
+                }
+                vLight = light;
+                vPos = uLitMode == 2 ? worldPos.xyz : (uView * worldPos).xyz;
                 vDistance = length(worldPos.xyz - uCameraPos);
                 vTint = aTint;
             }
@@ -71,8 +84,8 @@ public final class Shaders {
     public static final String CHUNK_FRAGMENT = """
             #version 330 core
             in vec2 vUv;
-            in float vSkyShade;
-            in float vBlockLight;
+            in vec3 vLight;
+            in vec3 vPos;
             in float vDistance;
             in vec3 vTint;
 
@@ -81,23 +94,38 @@ public final class Shaders {
             uniform vec3 uFogColor;
             uniform float uFogStart;
             uniform float uFogEnd;
-            // Sky light fades toward night; block light (torches, glowstone...) does not.
-            uniform float uDaylightFactor;
-            // Brightness option: 0.5 is vanilla default (no change), below darkens the dim end, above lifts it.
-            uniform float uGamma;
+            uniform int uLitMode;
 
             out vec4 FragColor;
+
+            // Vanilla's entity lighting (shaders/include/light.glsl): two directional lights, 60% of their sum on top of 40% ambient.
+            float entityLight(vec3 n, vec3 l0, vec3 l1) {
+                return min(1.0, (max(0.0, dot(n, l0)) + max(0.0, dot(n, l1))) * 0.6 + 0.4);
+            }
 
             void main() {
                 vec4 texColor = texture(uTexture, vUv);
                 if (texColor.a < 0.05) discard;
-                float light = max(vSkyShade * uDaylightFactor, vBlockLight);
-                light = max(light, 0.04);
-                float lift = (uGamma - 0.5) * 2.0;
-                light = lift >= 0.0 ? mix(light, 1.0 - (1.0 - light) * (1.0 - light), lift) : mix(light, light * light, -lift);
+                float directional = 1.0;
+                if (uLitMode >= 2) {
+                    // The face normal from the screen-space derivatives of the position (flat faces only, which is all
+                    // the entity models are): it points toward the viewer for any face that is drawn.
+                    vec3 p = vPos;
+                    if (uLitMode == 4) p.y = -p.y; // the preview works in pixels with y down
+                    vec3 c = cross(dFdx(p), dFdy(p));
+                    if (dot(c, c) > 1e-18) {
+                        vec3 n = normalize(c);
+                        if (uLitMode == 4) {
+                            directional = entityLight(n, normalize(vec3(0.2, 1.0, 1.0)), normalize(vec3(-0.2, 1.0, 0.0)));
+                        } else {
+                            directional = entityLight(n, normalize(vec3(0.2, 1.0, -0.7)), normalize(vec3(-0.2, 1.0, 0.7)));
+                        }
+                    }
+                }
                 // vTint is (1,1,1) - a no-op multiply - for every face except grass-top/leaves,
-                // which carry the real per-column biome colormap color baked in at mesh time.
-                vec3 shaded = texColor.rgb * light * vTint;
+                // which carry the real per-column biome colormap color baked in at mesh time; terrain also folds the
+                // cardinal shade and the ambient occlusion into it.
+                vec3 shaded = texColor.rgb * vTint * vLight * directional;
                 float fogFactor = clamp((vDistance - uFogStart) / (uFogEnd - uFogStart), 0.0, 1.0);
                 vec3 finalColor = mix(shaded, uFogColor, fogFactor);
                 FragColor = vec4(finalColor, texColor.a * uAlpha);
