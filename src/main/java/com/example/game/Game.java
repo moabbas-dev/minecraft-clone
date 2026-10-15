@@ -1149,7 +1149,25 @@ public class Game implements GameAccess {
             use = true;
             forcedUse = true;
         }
+        if (use && aimingAtMob && targetedMob instanceof com.example.entity.mob.PassiveMob animal && feedAnimal(animal)) return;
         if (use && !useHand(false, hit, forcedUse)) useHand(true, hit, forcedUse);
+    }
+
+    /**
+     * Animal.mobInteract: a breeding item in a hand is eaten by the animal in the crosshair - an adult falls in love, a baby
+     * grows up a tenth sooner - and costs one item. Returns true when the animal took it.
+     */
+    private boolean feedAnimal(com.example.entity.mob.PassiveMob animal) {
+        for (boolean offhand : new boolean[]{false, true}) {
+            ItemStack held = offhand ? inventory.getOffhand() : inventory.selected();
+            if (held.isEmpty() || !animal.feed(held.type())) continue;
+            if (offhand) inventory.setOffhand(held.count() > 1 ? held.withCount(held.count() - 1) : ItemStack.EMPTY);
+            else inventory.removeOne(inventory.getSelectedSlot());
+            startSwing();
+            gameAudio.play("eat", null);
+            return true;
+        }
+        return false;
     }
 
     /** One tick of thunderstorm strikes and of the bolts alight. */
@@ -2358,6 +2376,7 @@ public class Game implements GameAccess {
                     new String[]{"textures/entity/chicken/chicken_temperate.png", "textures/entity/chicken/temperate_chicken.png", "textures/entity/chicken.png"},
                     64, 32, 0xF0F0F0));
             // 26.x gives the baby pig, cow and chicken their own textures (and models).
+            mobSkins.put("zombie_baby", com.example.engine.EntityTexture.load("textures/entity/zombie/zombie_baby.png", 64, 64, 0x5E874C));
             mobSkins.put("pig_baby", com.example.engine.EntityTexture.loadFirst(
                     new String[]{"textures/entity/pig/pig_temperate_baby.png"}, 32, 32, 0xECA0A0));
             mobSkins.put("cow_baby", com.example.engine.EntityTexture.loadFirst(
@@ -2404,9 +2423,10 @@ public class Game implements GameAccess {
                         n = MobModelBuilder.emitCreeper(mobScratch, n, px, py, pz, yaw, tilt, pose, swell, sky, blk, t2);
                     }
                     case "skeleton" -> n = MobModelBuilder.emitSkeleton(mobScratch, n, px, py, pz, yaw, tilt, pose, sky, blk, tint);
-                    case "spider" -> n = MobModelBuilder.emitSpider(mobScratch, n, px, py, pz, yaw, tilt, walk, amt, sky, blk, tint);
+                    case "spider" -> n = MobModelBuilder.emitSpider(mobScratch, n, px, py, pz, yaw, tilt, pose, sky, blk, tint);
                     case "cow" -> n = MobModelBuilder.emitCow(mobScratch, n, px, py, pz, yaw, tilt, pose, sky, blk, tint);
                     case "chicken" -> n = MobModelBuilder.emitChicken(mobScratch, n, px, py, pz, yaw, tilt, pose, sky, blk, tint);
+                    case "zombie_baby" -> n = MobModelBuilder.emitBabyZombie(mobScratch, n, px, py, pz, yaw, tilt, pose, sky, blk, tint);
                     default -> n = MobModelBuilder.emitZombie(mobScratch, n, px, py, pz, yaw, tilt, pose, sky, blk, tint, m.isBaby() ? 0.5f : 1f);
                 }
             }
@@ -2421,7 +2441,7 @@ public class Game implements GameAccess {
     /** The skin (and model) a mob is drawn with: baby pigs, cows and chickens have their own, other babies are scaled adults. */
     private static String skinKeyOf(Mob m) {
         String id = m.typeId();
-        return m.isBaby() && (id.equals("pig") || id.equals("cow") || id.equals("chicken")) ? id + "_baby" : id;
+        return m.isBaby() && (id.equals("pig") || id.equals("cow") || id.equals("chicken") || id.equals("zombie")) ? id + "_baby" : id;
     }
 
     /** Experience orbs: small camera-facing quads, full bright, pulsing between green and yellow like vanilla. */

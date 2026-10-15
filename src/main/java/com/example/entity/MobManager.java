@@ -133,6 +133,7 @@ public class MobManager {
             m.setLightLevel(lightAt(world, m));
             m.setNeighbors(mobs);
             m.tick(world, candidates, dt);
+            if (m.isAlive() && m instanceof com.example.entity.mob.PassiveMob parent && parent.takeBirth()) giveBirth(parent, random);
             com.example.world.BlockType laid = m.isAlive() ? m.takeLaidItem() : null;
             if (laid != null) {
                 items.spawn(laid, 1, new Vector3f(m.position.x, m.position.y + 0.3f, m.position.z), random);
@@ -192,6 +193,25 @@ public class MobManager {
                 corpseTimers.remove(m);
             }
         }
+    }
+
+    /** BreedGoal.breed: a baby of the parents' kind is born where they stand and 1-7 experience drops. */
+    private void giveBirth(com.example.entity.mob.PassiveMob parent, Random random) {
+        Vector3f at = new Vector3f(parent.position);
+        float yaw = parent.getBodyYaw();
+        com.example.entity.mob.PassiveMob baby = switch (parent.typeId()) {
+            case "pig" -> new com.example.entity.mob.Pig(at, yaw);
+            case "cow" -> new com.example.entity.mob.Cow(at, yaw);
+            case "chicken" -> new com.example.entity.mob.Chicken(at, yaw);
+            default -> null;
+        };
+        if (baby != null) {
+            baby.makeBaby();
+            spawn(baby);
+        }
+        int xp = 1 + random.nextInt(7);
+        if (xpOrbs != null) xpOrbs.spawn(xp, new Vector3f(at.x, at.y + 0.5f, at.z), random);
+        else pendingExperience += xp;
     }
 
     /** Nearest living mob whose bounding box the ray enters within {@code maxDistance}, or null.

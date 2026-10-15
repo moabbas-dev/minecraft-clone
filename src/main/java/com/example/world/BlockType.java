@@ -230,7 +230,13 @@ public enum BlockType {
     // The bow while it is drawn: only ever shown in the hand, never an item in a slot.
     BOW_PULLING_0(223, "Bow", false, true, -1f, 0f),
     BOW_PULLING_1(224, "Bow", false, true, -1f, 0f),
-    BOW_PULLING_2(225, "Bow", false, true, -1f, 0f);
+    BOW_PULLING_2(225, "Bow", false, true, -1f, 0f),
+    // Breeding items and two foods (no farming exists, so these only come from the test controller for now).
+    WHEAT(226, "Wheat", false, true, -1f, 0f),
+    WHEAT_SEEDS(227, "Wheat Seeds", false, true, -1f, 0f),
+    CARROT(228, "Carrot", false, true, -1f, 0f),
+    BEETROOT(229, "Beetroot", false, true, -1f, 0f),
+    BEETROOT_SEEDS(230, "Beetroot Seeds", false, true, -1f, 0f);
 
     public final int id;
     public final String displayName;

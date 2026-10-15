@@ -30,6 +30,12 @@ public class Pig extends PassiveMob {
         return MOVE_SPEED;
     }
 
+    /** PIG_FOOD: carrots, potatoes and beetroot. */
+    @Override
+    public boolean isBreedingItem(BlockType item) {
+        return item == BlockType.CARROT || item == BlockType.POTATO || item == BlockType.BEETROOT;
+    }
+
     @Override
     public String typeId() {
         return "pig";

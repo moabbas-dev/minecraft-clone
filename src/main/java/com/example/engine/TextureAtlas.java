@@ -67,7 +67,7 @@ public class TextureAtlas {
             Tile.FLINT, Tile.CLAY_BALL, Tile.SNOWBALL, Tile.GLOWSTONE_DUST, Tile.BOOK,
             Tile.GUNPOWDER, Tile.BONE, Tile.ARROW, Tile.STRING, Tile.SPIDER_EYE,
             Tile.GOLD_SWORD, Tile.GOLD_AXE, Tile.GOLD_PICKAXE, Tile.GOLD_SHOVEL, Tile.WOODEN_HOE, Tile.STONE_HOE, Tile.IRON_HOE, Tile.GOLD_HOE, Tile.DIAMOND_HOE,
-            Tile.TORCH, Tile.GOLDEN_APPLE, Tile.BOW, Tile.BOW_PULLING_0, Tile.BOW_PULLING_1, Tile.BOW_PULLING_2, Tile.COPPER_SWORD, Tile.COPPER_AXE, Tile.COPPER_PICKAXE, Tile.COPPER_SHOVEL, Tile.COPPER_HOE, Tile.WOODEN_SPEAR, Tile.STONE_SPEAR, Tile.COPPER_SPEAR, Tile.IRON_SPEAR, Tile.GOLD_SPEAR, Tile.DIAMOND_SPEAR);
+            Tile.TORCH, Tile.GOLDEN_APPLE, Tile.BOW, Tile.BOW_PULLING_0, Tile.BOW_PULLING_1, Tile.BOW_PULLING_2, Tile.WHEAT, Tile.WHEAT_SEEDS, Tile.CARROT, Tile.BEETROOT, Tile.BEETROOT_SEEDS, Tile.COPPER_SWORD, Tile.COPPER_AXE, Tile.COPPER_PICKAXE, Tile.COPPER_SHOVEL, Tile.COPPER_HOE, Tile.WOODEN_SPEAR, Tile.STONE_SPEAR, Tile.COPPER_SPEAR, Tile.IRON_SPEAR, Tile.GOLD_SPEAR, Tile.DIAMOND_SPEAR);
 
     static {
         REAL_TEXTURE_PATHS.put(Tile.STONE, "textures/block/stone.png");
@@ -205,6 +205,11 @@ public class TextureAtlas {
         REAL_TEXTURE_PATHS.put(Tile.DIAMOND_SPEAR, "textures/item/diamond_spear.png");
         REAL_TEXTURE_PATHS.put(Tile.TORCH, "textures/block/torch.png");
         REAL_TEXTURE_PATHS.put(Tile.GOLDEN_APPLE, "textures/item/golden_apple.png");
+        REAL_TEXTURE_PATHS.put(Tile.WHEAT, "textures/item/wheat.png");
+        REAL_TEXTURE_PATHS.put(Tile.WHEAT_SEEDS, "textures/item/wheat_seeds.png");
+        REAL_TEXTURE_PATHS.put(Tile.CARROT, "textures/item/carrot.png");
+        REAL_TEXTURE_PATHS.put(Tile.BEETROOT, "textures/item/beetroot.png");
+        REAL_TEXTURE_PATHS.put(Tile.BEETROOT_SEEDS, "textures/item/beetroot_seeds.png");
         REAL_TEXTURE_PATHS.put(Tile.BOW, "textures/item/bow.png");
         REAL_TEXTURE_PATHS.put(Tile.BOW_PULLING_0, "textures/item/bow_pulling_0.png");
         REAL_TEXTURE_PATHS.put(Tile.BOW_PULLING_1, "textures/item/bow_pulling_1.png");

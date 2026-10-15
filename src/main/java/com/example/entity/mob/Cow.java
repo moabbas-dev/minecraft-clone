@@ -35,6 +35,12 @@ public class Cow extends PassiveMob {
         return 1.25f;
     }
 
+    /** Cows are bred with wheat. */
+    @Override
+    public boolean isBreedingItem(BlockType item) {
+        return item == BlockType.WHEAT;
+    }
+
     @Override
     public String typeId() {
         return "cow";

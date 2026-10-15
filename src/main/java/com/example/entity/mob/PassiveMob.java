@@ -26,7 +26,13 @@ public abstract class PassiveMob extends Mob {
     /** Chance that a later member of a naturally spawned group is a baby (AgeableMob's default 0.05). */
     public static final float BABY_SPAWN_CHANCE = 0.05f;
 
+    /** Animal.setInLove: 600 ticks; after breeding the parents wait 6000 ticks (AgeableMob.setAge(6000)). */
+    public static final float LOVE_SECONDS = 30f;
+    public static final float BREED_COOLDOWN_SECONDS = 300f;
+
     private float babySecondsLeft;
+    private float loveSeconds, cooldownSeconds;
+    private boolean birthPending;
 
     protected PassiveMob(Vector3f spawnPosition, float yaw, float maxHealth, float panicMultiplier) {
         super(spawnPosition, yaw, maxHealth);
@@ -34,6 +40,7 @@ public abstract class PassiveMob extends Mob {
         getGoals()
                 .add(0, new FloatGoal())
                 .add(1, new PanicGoal(panicMultiplier))
+                .add(2, new com.example.entity.ai.BreedGoal())
                 .add(4, new com.example.entity.ai.FollowParentGoal())
                 .add(5, new RandomStrollGoal())
                 .add(6, new LookAtPlayerGoal())
@@ -65,8 +72,59 @@ public abstract class PassiveMob extends Mob {
         return isBaby() ? 0.5f : 1f;
     }
 
+    /** What this species can be fed to breed it (or to grow a baby faster); nothing by default. */
+    public boolean isBreedingItem(BlockType item) {
+        return false;
+    }
+
+    public boolean isInLove() {
+        return loveSeconds > 0f;
+    }
+
+    /** Fed a breeding item: an adult that is not on cooldown falls in love for 30 s; a baby grows up 10% of its remaining time sooner. */
+    public boolean feed(BlockType item) {
+        if (!isBreedingItem(item)) return false;
+        if (isBaby()) {
+            babySecondsLeft = Math.max(0.05f, babySecondsLeft - (float) Math.floor(babySecondsLeft * 0.1f));
+            return true;
+        }
+        if (loveSeconds > 0f || cooldownSeconds > 0f) return false;
+        loveSeconds = LOVE_SECONDS;
+        return true;
+    }
+
+    /** BreedGoal.breed: both parents leave love and start their cooldown; this one asks for the baby. */
+    public void breedWith(PassiveMob partner) {
+        endLove();
+        partner.endLove();
+        birthPending = true;
+    }
+
+    private void endLove() {
+        loveSeconds = 0f;
+        cooldownSeconds = BREED_COOLDOWN_SECONDS;
+    }
+
+    /** True once after {@link #breedWith}: the manager then spawns the baby. */
+    public boolean takeBirth() {
+        boolean b = birthPending;
+        birthPending = false;
+        return b;
+    }
+
+    /** Seconds left of the love state (for tests and the HUD-less hearts). */
+    public float loveSecondsLeft() {
+        return loveSeconds;
+    }
+
+    public float cooldownSecondsLeft() {
+        return cooldownSeconds;
+    }
+
     @Override
     protected void onTick(com.example.world.World world, float dt) {
+        if (loveSeconds > 0f) loveSeconds = Math.max(0f, loveSeconds - dt);
+        if (cooldownSeconds > 0f) cooldownSeconds = Math.max(0f, cooldownSeconds - dt);
         if (babySecondsLeft > 0f) {
             babySecondsLeft = Math.max(0f, babySecondsLeft - dt);
             if (babySecondsLeft == 0f) grewUp();

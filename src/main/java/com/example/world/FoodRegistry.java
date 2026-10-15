@@ -47,6 +47,8 @@ public final class FoodRegistry {
         // Real vanilla value; real vanilla also gives rotten flesh an 80% chance of inflicting
         // Hunger on eating - not modeled (no status-effect system exists), documented simplification.
         FOODS.put(BlockType.SPIDER_EYE, new FoodProperties(2f, 3.2f, false)); // poisons for 5 s, see PlayerSurvival.applyFoodEffects
+        FOODS.put(BlockType.CARROT, new FoodProperties(3f, 3.6f, false));
+        FOODS.put(BlockType.BEETROOT, new FoodProperties(1f, 1.2f, false));
         FOODS.put(BlockType.GOLDEN_APPLE, new FoodProperties(4f, 9.6f, true)); // always edible; regeneration II 5 s + absorption 2 min
         FOODS.put(BlockType.ROTTEN_FLESH, new FoodProperties(4f, 0.8f, false));
     }

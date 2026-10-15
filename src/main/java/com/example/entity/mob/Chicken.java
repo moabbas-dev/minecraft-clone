@@ -47,6 +47,12 @@ public class Chicken extends PassiveMob {
         return MOVE_SPEED;
     }
 
+    /** CHICKEN_FOOD: seeds (the wheat and beetroot ones exist here). */
+    @Override
+    public boolean isBreedingItem(BlockType item) {
+        return item == BlockType.WHEAT_SEEDS || item == BlockType.BEETROOT_SEEDS;
+    }
+
     @Override
     public String typeId() {
         return "chicken";

@@ -286,7 +286,8 @@ public class ChunkMeshBuilder {
             BlockType.GUNPOWDER, BlockType.BONE, BlockType.ARROW, BlockType.STRING, BlockType.SPIDER_EYE);
 
     public static boolean isFlatIconItem(BlockType type) {
-        return isCrossShapedPlant(type) || type == BlockType.TORCH || type == BlockType.GOLDEN_APPLE || type == BlockType.BOW
+        return isCrossShapedPlant(type) || type == BlockType.TORCH || type == BlockType.GOLDEN_APPLE || type == BlockType.WHEAT || type == BlockType.WHEAT_SEEDS
+                || type == BlockType.CARROT || type == BlockType.BEETROOT || type == BlockType.BEETROOT_SEEDS || type == BlockType.BOW
                 || type == BlockType.BOW_PULLING_0 || type == BlockType.BOW_PULLING_1 || type == BlockType.BOW_PULLING_2 || ToolEffectiveness.isTool(type) || FoodRegistry.isFood(type)
                 || SMELTING_ITEMS.contains(type);
     }

@@ -355,23 +355,61 @@ final class MobModelBuilder {
         return w.n;
     }
 
-    static int emitSpider(float[] out, int n, float px, float py, float pz, float yaw, float tilt, float walkPhase,
-                          float walkAmount, float sky, float blockLight, float[] tint) {
+    /**
+     * SpiderModel.setupAnim: every leg pair starts from its resting yaw and roll and the walk adds a swing,
+     * {@code -cos(2 a + phase) * 0.4 * speed} to the yaw and a lift of {@code |sin(a + phase) * 0.4| * speed} to the roll,
+     * with a = position * 0.6662 and the four pairs a quarter of a cycle apart (0, 180, 90, 270 degrees); the head follows
+     * the look direction.
+     */
+    static int emitSpider(float[] out, int n, float px, float py, float pz, float yaw, float tilt, Pose pose,
+                          float sky, float blockLight, float[] tint) {
         Writer w = new Writer(out, n, px, py, pz, yaw, tilt, sky, blockLight, tint, ANIMAL_TEX_W, ANIMAL_TEX_H);
+        w.part = w.joint(0, 15, -3, pose.headPitch(), pose.headYaw(), 0);
         w.box(0, 15, -7, 8, 8, 8, 32, 4, 0, false);                    // head
+        w.part = null;
         w.box(0, 15, 0, 6, 6, 6, 0, 0, 0, false);                      // neck
         w.box(0, 15, 9, 10, 8, 12, 0, 12, 0, false);                   // abdomen
         float[] yawBase = {-45f, -22.5f, 22.5f, 45f};
         float[] roll = {45f, 33.3f, 33.3f, 45f};
+        float[] phases = {0f, (float) Math.PI, (float) Math.PI / 2f, (float) Math.PI * 1.5f};
+        float a = pose.limbPos() * 0.6662f;
         for (int i = 0; i < 4; i++) {
             float z = (2 - i) / 16f;
+            float swing = (float) Math.cos(a * 2f + phases[i]) * 0.4f * pose.limbSpeed();
+            float lift = Math.abs((float) Math.sin(a + phases[i]) * 0.4f) * pose.limbSpeed();
             for (int side = -1; side <= 1; side += 2) {
-                float phase = walkPhase * 1.3f + i * 1.6f + (side > 0 ? (float) Math.PI : 0f);
-                float swing = (float) Math.sin(phase) * 0.3f * walkAmount;
-                w.leg(side * 0.25f, 0.5625f, z, side, (float) Math.toRadians(roll[i]),
+                w.leg(side * 0.25f, 0.5625f, z, side, (float) Math.toRadians(roll[i]) - lift,
                         side * ((float) Math.toRadians(yawBase[i]) + swing), 16f);
             }
         }
+        return w.n;
+    }
+
+    /**
+     * BabyZombieModel: its own small boxes (head 6 cubed with an 0.25 outer layer, a 4x5x2 body, 2x5x2 arms, 2x4x2 legs), posed
+     * like the adult - head turn, arms raised, legs swinging as a humanoid's.
+     */
+    static int emitBabyZombie(float[] out, int n, float px, float py, float pz, float yaw, float tilt, Pose pose,
+                              float sky, float blockLight, float[] tint) {
+        Writer w = new Writer(out, n, px, py, pz, yaw, tilt, sky, blockLight, tint, ZOMBIE_TEX_W, ZOMBIE_TEX_H);
+        float[] swing = humanoidSwing(pose.limbPos(), pose.limbSpeed());
+        w.part = w.joint(0, 15.25f, 0, pose.headPitch(), pose.headYaw(), 0);
+        w.box(0, 12f, 0, 6, 6, 6, 3, 3, 0, false);                                   // head
+        w.inflate = 0.25f;
+        w.box(0, 12.1f, 0, 6, 6, 6, 35, 3, 0, false);                                // outer head layer
+        w.inflate = 0f;
+        w.part = null;
+        w.box(0, 17.5f, 0, 4, 5, 2, 16, 16, 0, false);                               // body
+        float raise = zombieArmRaise(pose.aggressive());
+        w.part = w.joint(-3, 15.5f, 0, raise + armBobX(pose.ageTicks(), 1f), -0.1f, armBobZ(pose.ageTicks(), 1f));
+        w.box(-3, 18f, 0, 2, 5, 2, 36, 16, 0, false);                                // right arm
+        w.part = w.joint(3, 15.5f, 0, raise + armBobX(pose.ageTicks(), -1f), 0.1f, armBobZ(pose.ageTicks(), -1f));
+        w.box(3, 18f, 0, 2, 5, 2, 28, 16, 0, false);                                 // left arm
+        w.part = w.joint(-1, 20, 0, swing[2], 0, 0);
+        w.box(-1, 22, 0, 2, 4, 2, 8, 16, 0, false);                                  // right leg
+        w.part = w.joint(1, 20, 0, swing[3], 0, 0);
+        w.box(1, 22, 0, 2, 4, 2, 0, 16, 0, false);                                   // left leg
+        w.part = null;
         return w.n;
     }
 
