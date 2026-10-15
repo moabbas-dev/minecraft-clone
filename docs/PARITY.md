@@ -354,3 +354,15 @@ Rules read from the 26.3 client with `javap` (LookControl, BodyRotationControl, 
 - Not done: spider leg animation (still the old sway), baby zombie model (still a half-scale adult), breeding, mob attack swing for zombies, the 26.x animation-keyframe walk if any mob uses it.
 - Tests: 770 passing (`HeadAndWalkTest`, `MobModelPoseTest`, `BabyBehaviourTest` are new).
 
+## 14. Sky and weather (G14)
+
+All numbers from the 26.3 client (SkyRenderer.buildStars, CloudRenderer, `clouds.vsh`, `AtmosphericFogEnvironment`, `ClientLevel.tickWeatherEffects`, `WaterDropParticle`) and its data (`timeline/day.json`, `dimension_type/overworld.json`).
+
+- [x] Stars: the vanilla field (seed 10842, 1500 tries, those with squared length outside (0.01, 1) dropped, 100 blocks away, half-size 0.15 + 0.1 * random, random roll), turning with the sun and moon. Brightness is the timeline's `star_brightness` keyframes (0 by day, 0.5 from tick 13228 to 22772, ramping in between) times (1 - rain). `SkyDetails.buildStars`.
+- [x] Clouds from the real `clouds.png`: 12 x 4 x 12 block boxes per cloudy texel (alpha > 0) at height 192.33, the pattern repeating every 256 cells, drifting 0.03 blocks per tick toward -X with a 3.96 block z offset, face shades top 1.0 / sides 0.9 and 0.8 / bottom 0.7, colour `#ccffffff` (80% opaque) times the timeline's cloud colour (white by day, `#191926` at night). Drawn in two passes (depth first) so only the nearest surface is blended.
+- **Differences:** the field is 24 cells (288 blocks) wide with only the outer rim fading out, because vanilla's fog end is up to 2048 blocks and draws every cell on the GPU; the fast (flat) cloud mode and the cloud options do not exist; vanilla's cloud colour has no rain darkening in the data I found, so none is applied.
+- [x] Rain splashes: every tick (int)(0.225 * 21^2 * rain^2) tries (99 at full rain) choose a column within 10 blocks whose surface is within 10 blocks of the camera's height; a drop rises at 0.1-0.3 blocks per tick, gravity 0.06, 2% drag, lives 8 / (0.2..1.0) ticks, 50% to vanish each tick on the ground, drawn as 0.1-0.2 half-size quads with the real `splash_0..3` sprites. `RainSplashes`.
+- Moon phase quad: each phase is its own real sprite under `celestial/moon/`, so the quad's texture orientation does not depend on the phase (the reversed axes found earlier apply to all of them).
+- Not done: rain / snow particles for snow biomes, lava and campfire smoke in the rain, the rain sound variants by position, thunder flash tweaks, the sunrise / sunset glow (`sunrise_sunset_color` keyframes) and the real sky colour keyframes (the sky colour is still this game's own blend).
+- Tests: 784 passing (`SkyDetailsTest`, `RainSplashesTest`).
+

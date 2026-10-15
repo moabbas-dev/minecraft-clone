@@ -20,6 +20,8 @@ None of these files are committed: `textures/`, `texts/`, `sounds/`, `minecraft-
 | `textures/gui/sprites/hud/crosshair.png` | `game/Game.renderHud` | no | two white quads |
 | `texts/splashes.txt` | `ui/Splashes` | no | no splash text |
 | `textures/entity/experience/experience_orb.png` | `game/Game.renderXpOrbs` | no | orbs are not drawn |
+| `textures/environment/clouds.png` | `game/Game.renderClouds` (`game/SkyDetails`) | no | no clouds |
+| `textures/particle/splash_{0,1,2,3}.png` | `game/Game.drawRainSplashes` (`fx/RainSplashes`) | no | no rain splashes |
 | `textures/particle/{critical_hit,damage}.png` | `game/Game` -> `fx/SpriteParticles` | no | those particles are not drawn |
 | `textures/environment/{rain.png,celestial/sun.png,celestial/moon/full_moon.png}` | `game/Game` (`renderRain`, `renderSunAndMoon`) | no | no rain streaks / sun / moon |
 | `textures/entity/player/wide/steve.png` | `game/Game.renderHeldItem` (bare hand), `renderPlayerPreview` | no | the bare hand and the inventory player preview are not drawn |

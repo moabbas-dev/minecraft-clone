@@ -162,6 +162,8 @@ public class Game implements GameAccess {
     /** Reused every frame - dropped items and particles never allocate per-frame vertex arrays. */
     private final float[] itemScratch = new float[ItemEntityManager.MAX_ENTITIES * ItemModelBuilder.MAX_FLOATS_PER_ITEM];
     private final float[] particleScratch = new float[ParticleSystem.maxVertexFloats()];
+    private final com.example.fx.RainSplashes rainSplashes = new com.example.fx.RainSplashes(new java.util.Random());
+    private final float[] splashScratch = new float[com.example.fx.RainSplashes.maxVertexFloats()];
     private final Map<BlockType, ItemModelBuilder.Model> itemModels = new EnumMap<>(BlockType.class);
     private static final Matrix4f IDENTITY = new Matrix4f();
     /** Test-controller-only input overrides (see GameAccess.holdAttack/useItem) - the controller
@@ -238,6 +240,16 @@ public class Game implements GameAccess {
     private TestController testController;
 
     private Mesh rainMesh;
+    // Stars and clouds (SkyDetails): built once / when the cloud cell or tint changes
+    private Mesh starMesh, cloudMesh;
+    private int starFloats, cloudFloats;
+    private com.example.engine.EntityTexture whiteTexture;
+    private boolean[] cloudMask;
+    private int cloudMaskW, cloudMaskH;
+    private boolean cloudMaskTried;
+    private int cloudCellX = Integer.MIN_VALUE, cloudCellZ, cloudTintStep = -1;
+    private static final int CLOUD_RADIUS_CELLS = 24;
+    private final float[] cloudScratch = new float[(2 * CLOUD_RADIUS_CELLS + 1) * (2 * CLOUD_RADIUS_CELLS + 1) * 5 * 6 * SkyDetails.FLOATS_PER_VERTEX];
     /** Seconds of rain animation (vanilla counts ticks: 20 per second). */
     private float rainTime = 0f;
     /** The item shown in the first-person hand (null = bare hand); it lags the selection while the hand lowers and raises. */
@@ -321,6 +333,8 @@ public class Game implements GameAccess {
         hudTextures = HudTextures.loadOrNull();
         sunMoonMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
         rainMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
+        starMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
+        cloudMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
         heldItemMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
         itemMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
         mobMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
@@ -721,6 +735,7 @@ public class Game implements GameAccess {
         pickups.clear();
         critParticles.clear();
         damageParticles.clear();
+        rainSplashes.clear();
         shownHeld = inventory.selected().isEmpty() ? null : inventory.selected().type();
         equipRaised = 0f; // the hand rises when the world opens, like a freshly equipped item
         shownOffhand = inventory.getOffhand().isEmpty() ? null : inventory.getOffhand().type();
@@ -1728,6 +1743,7 @@ public class Game implements GameAccess {
         particles.update(dt);
         critParticles.update(dt);
         damageParticles.update(dt);
+        rainSplashes.update(dt, weather.getStormIntensity(), player.renderEyePosition(), (sx, sz) -> world.getColumnHeightAt(sx, sz) + 1);
     }
 
     /** Cached per-block-type UVs/tints for dropped items and particles (built once, on first use). */
@@ -1907,7 +1923,9 @@ public class Game implements GameAccess {
         renderParticles();
         renderSpriteParticles();
 
+        renderStars(eye, sunDir, stormFactor);
         renderSunAndMoon(eye, sunDir, stormFactor, weather.isThundering());
+        renderClouds();
         renderRain();
         renderHeldItem();
 
@@ -2382,6 +2400,31 @@ public class Game implements GameAccess {
     private void renderSpriteParticles() {
         drawSpriteParticles(critParticles, "particle.critical_hit", "textures/particle/critical_hit.png");
         drawSpriteParticles(damageParticles, "particle.damage", "textures/particle/damage.png");
+        drawRainSplashes();
+    }
+
+    /** The drops hopping off the ground in the rain, one batch per splash sprite (splash_0 .. splash_3). */
+    private void drawRainSplashes() {
+        if (rainSplashes.count() == 0) return;
+        Vector3f front = player.frontVector();
+        Vector3f right = new Vector3f(-front.z, 0, front.x);
+        if (right.lengthSquared() < 1e-6f) right.set(1, 0, 0);
+        right.normalize();
+        Vector3f up = new Vector3f(right).cross(front).normalize();
+        Vector3f at = player.position;
+        int bx = (int) Math.floor(at.x), by = (int) Math.floor(at.y + 1f), bz = (int) Math.floor(at.z);
+        float sky = world.getSkyLight(bx, by, bz) / 15f, blk = world.getBlockLight(bx, by, bz) / 15f;
+        chunkShader.setUniform("uModel", IDENTITY);
+        for (int s = 0; s < com.example.fx.RainSplashes.SPRITES; s++) {
+            int floats = rainSplashes.buildVertices(splashScratch, s, right, up, sky, blk);
+            if (floats == 0) continue;
+            com.example.engine.EntityTexture tex = realTexture("particle.splash_" + s, "textures/particle/splash_" + s + ".png", false);
+            if (tex == null) continue;
+            particleMesh.upload(splashScratch, floats);
+            tex.bind(0);
+            particleMesh.draw();
+        }
+        atlas.bind(0);
     }
 
     private void drawSpriteParticles(com.example.fx.SpriteParticles ps, String key, String path) {
@@ -2607,6 +2650,90 @@ public class Game implements GameAccess {
     static float rainColumnAlpha(float distanceFraction, float rainLevel) {
         float d = Math.min(1f, distanceFraction);
         return ((1f - d * d) * 0.5f + 0.5f) * rainLevel;
+    }
+
+    /**
+     * The 1500 vanilla stars (seed 10842) on a 100 block sphere that turns with the sun and moon, white at the timeline's star
+     * brightness (0 by day, 0.5 at night) and faded out by rain.
+     */
+    private void renderStars(Vector3f eye, Vector3f sunDir, float stormIntensity) {
+        float brightness = SkyDetails.starBrightness(SkyDetails.dayTick(dayTime)) * (1f - Math.max(0f, Math.min(1f, stormIntensity)));
+        if (brightness < 0.004f) return;
+        if (whiteTexture == null) whiteTexture = com.example.engine.EntityTexture.solid(0xFFFFFF);
+        if (starFloats == 0) {
+            float[] stars = SkyDetails.buildStars();
+            starMesh.upload(stars, stars.length);
+            starFloats = stars.length;
+        }
+        float angle = (float) Math.atan2(sunDir.y, sunDir.x);
+        chunkShader.setUniform("uModel", new Matrix4f().translation(eye).rotateZ(angle));
+        chunkShader.setUniform("uFogStart", 1_000_000f);
+        chunkShader.setUniform("uFogEnd", 2_000_000f);
+        chunkShader.setUniform("uAlpha", brightness);
+        whiteTexture.bind(0);
+        glDepthMask(false);
+        glDisable(GL_CULL_FACE);
+        starMesh.draw();
+        glEnable(GL_CULL_FACE);
+        glDepthMask(true);
+        atlas.bind(0);
+    }
+
+    /**
+     * Fancy clouds from the real clouds.png: a 12 x 4 x 12 block box per cloudy texel at height 192.33, drifting 0.6 blocks per
+     * second toward -X, white by day and dark blue at night (timeline colours), 80% opaque, fading out at the rim of the field.
+     */
+    private void renderClouds() {
+        if (!cloudMaskTried) {
+            cloudMaskTried = true;
+            java.io.File file = new java.io.File("textures/environment/clouds.png");
+            try {
+                if (file.isFile()) {
+                    java.awt.image.BufferedImage img = com.example.engine.TextureIo.read(file);
+                    if (img != null) {
+                        cloudMask = SkyDetails.cloudMask(img);
+                        cloudMaskW = img.getWidth();
+                        cloudMaskH = img.getHeight();
+                    }
+                }
+            } catch (java.io.IOException | RuntimeException e) {
+                cloudMask = null;
+            }
+        }
+        if (cloudMask == null) return; // no clouds.png: no clouds (nothing is invented in its place)
+        if (whiteTexture == null) whiteTexture = com.example.engine.EntityTexture.solid(0xFFFFFF);
+        Vector3f cam = player.renderEyePosition();
+        float drift = rainTime * 20f * SkyDetails.DRIFT_PER_TICK;
+        int ci = SkyDetails.cellAt(cam.x, drift), cj = SkyDetails.cellAt(cam.z, SkyDetails.Z_OFFSET);
+        float[] tint = SkyDetails.cloudTint(SkyDetails.dayTick(dayTime));
+        int tintStep = Math.round(tint[0] * 40f) * 100 + Math.round(tint[2] * 40f);
+        if (ci != cloudCellX || cj != cloudCellZ || tintStep != cloudTintStep) {
+            cloudCellX = ci;
+            cloudCellZ = cj;
+            cloudTintStep = tintStep;
+            cloudFloats = SkyDetails.buildClouds(cloudScratch, cloudMask, cloudMaskW, cloudMaskH, ci, cj, CLOUD_RADIUS_CELLS, tint);
+            cloudMesh.upload(cloudScratch, cloudFloats);
+        }
+        if (cloudFloats == 0) return;
+        chunkShader.setUniform("uModel", new Matrix4f().translation(ci * SkyDetails.CELL - drift, SkyDetails.CLOUD_HEIGHT,
+                cj * SkyDetails.CELL - SkyDetails.Z_OFFSET));
+        // vanilla fades clouds out over up to 2048 blocks; this field is smaller, so only its outer rim fades into the sky
+        chunkShader.setUniform("uFogStart", (CLOUD_RADIUS_CELLS - 8) * SkyDetails.CELL);
+        chunkShader.setUniform("uFogEnd", CLOUD_RADIUS_CELLS * SkyDetails.CELL);
+        chunkShader.setUniform("uAlpha", 0.8f); // the cloud colour is #ccffffff: 80% opaque
+        whiteTexture.bind(0);
+        glDisable(GL_CULL_FACE);
+        // Depth pre-pass: only the nearest cloud surface of each pixel is then blended, instead of every layer stacking up.
+        glColorMask(false, false, false, false);
+        cloudMesh.draw();
+        glColorMask(true, true, true, true);
+        glDepthMask(false);
+        glDepthFunc(GL_LEQUAL);
+        cloudMesh.draw();
+        glDepthFunc(GL_LESS);
+        glDepthMask(true);
+        glEnable(GL_CULL_FACE);
+        atlas.bind(0);
     }
 
     private void renderRain() {

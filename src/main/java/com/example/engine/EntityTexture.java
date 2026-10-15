@@ -91,6 +91,13 @@ public final class EntityTexture {
         }
     }
 
+    /** A plain one-colour texture (opaque), for geometry that only needs a colour such as the stars. */
+    public static EntityTexture solid(int rgb) {
+        BufferedImage img = new BufferedImage(2, 2, BufferedImage.TYPE_INT_ARGB);
+        for (int y = 0; y < 2; y++) for (int x = 0; x < 2; x++) img.setRGB(x, y, 0xFF000000 | (rgb & 0xFFFFFF));
+        return upload(img);
+    }
+
     static BufferedImage placeholder(int w, int h, int rgb) {
         BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
         Random r = new Random(rgb);
