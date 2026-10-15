@@ -1476,7 +1476,7 @@ public class Game implements GameAccess {
         chunkShader.setUniform("uModel", new Matrix4f(preview).mul(PlayerModelBuilder.handItemMatrix(pose, left, flat)));
         atlas.bind(0);
         heldItemMesh.upload(verts);
-        heldItemMesh.draw();
+        drawHeldMesh(flat, true);
     }
 
     private void drawPreviewLayer(com.example.engine.EntityTexture texture, int floats) {
@@ -1961,6 +1961,12 @@ public class Game implements GameAccess {
      * spinning while they fly to the player (vanilla's pickup animation: 3 ticks, easing in).
      */
     private void renderDroppedItems() {
+        // Flat items (a front and a back face with walls) are drawn first with back-face culling, so the back face does not
+        // show through the transparent texels of the front one; cubes and crossed plants follow without it.
+        for (int pass = 0; pass < 2; pass++) renderDroppedItemsPass(pass == 0);
+    }
+
+    private void renderDroppedItemsPass(boolean sprites) {
         java.util.List<ItemEntity> list = itemEntities.entities();
         int n = 0;
         for (int i = 0; i < list.size(); i++) {
@@ -1968,7 +1974,7 @@ public class Game implements GameAccess {
             float half = itemModelFor(e.getType()).cross() ? 0.25f : 0.125f;
             int seed = System.identityHashCode(e);
             float hover = droppedItemHover(e.getAge(), droppedItemPhase(seed));
-            n = emitItemVisual(n, e.getType(), e.getCount(), e.position.x, e.position.y + half + hover, e.position.z, e.getAge(), seed);
+            n = emitItemVisual(n, e.getType(), e.getCount(), e.position.x, e.position.y + half + hover, e.position.z, e.getAge(), seed, sprites);
         }
         for (Pickup pk : pickups) {
             float f = Math.min(1f, pk.t / PICKUP_SECONDS);
@@ -1978,14 +1984,15 @@ public class Game implements GameAccess {
             int seed = System.identityHashCode(pk);
             float startY = pk.y + half + droppedItemHover(pk.age, droppedItemPhase(seed));
             n = emitItemVisual(n, pk.type, pk.count, pk.x + (to.x - pk.x) * f, startY + (to.y + 0.9f - startY) * f,
-                    pk.z + (to.z - pk.z) * f, pk.age + pk.t, seed);
+                    pk.z + (to.z - pk.z) * f, pk.age + pk.t, seed, sprites);
         }
-        flushItems(n);
+        flushItems(n, sprites);
     }
 
     /** Writes one dropped stack's model(s) centred on (x, cy, z), spun by its age; returns the new write index. */
-    private int emitItemVisual(int n, BlockType type, int count, float x, float cy, float z, float age, int seed) {
+    private int emitItemVisual(int n, BlockType type, int count, float x, float cy, float z, float age, int seed, boolean sprites) {
         ItemModelBuilder.Model m = itemModelFor(type);
+        if (m.cross() != sprites) return n; // this pass draws the other kind
         float spin = droppedItemSpin(age, droppedItemPhase(seed));
         float cos = (float) Math.cos(spin), sin = (float) Math.sin(spin);
         float half = m.cross() ? 0.25f : 0.125f;
@@ -2002,13 +2009,13 @@ public class Game implements GameAccess {
             if (m.cross()) {
                 float[] sprite = heldMeshCache.computeIfAbsent(type, this::buildFlatItemHeldVerts);
                 if (n + sprite.length > itemScratch.length) {
-                    flushItems(n);
+                    flushItems(n, true);
                     n = 0;
                 }
                 n = ItemModelBuilder.emitSprite(itemScratch, n, sprite, x + ox, cy + oy, z + oz, 0.5f, cos, sin, sky, blk);
             } else {
                 if (n + ItemModelBuilder.MAX_FLOATS_PER_ITEM > itemScratch.length) {
-                    flushItems(n);
+                    flushItems(n, false);
                     n = 0;
                 }
                 n = ItemModelBuilder.emitCube(itemScratch, n, x + ox, cy + oy, z + oz, half, cos, sin, m, sky, blk);
@@ -2045,11 +2052,20 @@ public class Game implements GameAccess {
         return 5;
     }
 
-    private void flushItems(int floats) {
+    private void flushItems(int floats, boolean culled) {
         if (floats == 0) return;
         itemMesh.upload(itemScratch, floats);
         chunkShader.setUniform("uModel", IDENTITY);
+        if (!culled) {
+            itemMesh.draw();
+            return;
+        }
+        boolean wasCulling = glIsEnabled(GL_CULL_FACE);
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
+        glFrontFace(GL_CCW);
         itemMesh.draw();
+        if (!wasCulling) glDisable(GL_CULL_FACE);
     }
 
     private void renderFallingBlocks() {
@@ -2505,7 +2521,7 @@ public class Game implements GameAccess {
 
         uploadLitHeld(verts);
         if (armSkin != null) armSkin.bind(0);
-        heldItemMesh.draw();
+        drawHeldMesh(shown != null && ChunkMeshBuilder.isFlatIconItem(shown), false);
         if (armSkin != null) atlas.bind(0);
         renderOffhandItem();
     }
@@ -2529,7 +2545,26 @@ public class Game implements GameAccess {
                 .mul(flat ? HeldItemModel.flatItem(0f, drop) : HeldItemModel.block(0f, drop));
         chunkShader.setUniform("uModel", model);
         uploadLitHeld(verts);
+        drawHeldMesh(flat, true);
+    }
+
+    /**
+     * Draws the held-item mesh. A flat item is a front and a back face joined by thin walls, and the faces have transparent
+     * texels, so without back-face culling the back face shows through the front one and, seen at an angle, reads as a
+     * second tool; vanilla culls the faces turned away. {@code mirrored} when the model matrix flips the winding.
+     */
+    private void drawHeldMesh(boolean flat, boolean mirrored) {
+        if (!flat) {
+            heldItemMesh.draw();
+            return;
+        }
+        boolean wasCulling = glIsEnabled(GL_CULL_FACE);
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
+        glFrontFace(mirrored ? GL_CW : GL_CCW);
         heldItemMesh.draw();
+        glFrontFace(GL_CCW);
+        if (!wasCulling) glDisable(GL_CULL_FACE);
     }
 
     private float[] heldLit = new float[0];
@@ -2672,9 +2707,10 @@ public class Game implements GameAccess {
         chunkShader.setUniform("uAlpha", brightness);
         whiteTexture.bind(0);
         glDepthMask(false);
+        boolean culled = glIsEnabled(GL_CULL_FACE);
         glDisable(GL_CULL_FACE);
         starMesh.draw();
-        glEnable(GL_CULL_FACE);
+        if (culled) glEnable(GL_CULL_FACE);
         glDepthMask(true);
         atlas.bind(0);
     }
@@ -2722,6 +2758,7 @@ public class Game implements GameAccess {
         chunkShader.setUniform("uFogEnd", CLOUD_RADIUS_CELLS * SkyDetails.CELL);
         chunkShader.setUniform("uAlpha", 0.8f); // the cloud colour is #ccffffff: 80% opaque
         whiteTexture.bind(0);
+        boolean culled = glIsEnabled(GL_CULL_FACE);
         glDisable(GL_CULL_FACE);
         // Depth pre-pass: only the nearest cloud surface of each pixel is then blended, instead of every layer stacking up.
         glColorMask(false, false, false, false);
@@ -2732,7 +2769,7 @@ public class Game implements GameAccess {
         cloudMesh.draw();
         glDepthFunc(GL_LESS);
         glDepthMask(true);
-        glEnable(GL_CULL_FACE);
+        if (culled) glEnable(GL_CULL_FACE);
         atlas.bind(0);
     }
 

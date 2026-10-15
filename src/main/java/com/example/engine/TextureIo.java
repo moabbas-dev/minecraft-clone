@@ -22,14 +22,19 @@ public final class TextureIo {
 
     /** {@code img} with grayscale samples expanded as they are (all other image types are returned unchanged). */
     static BufferedImage exact(BufferedImage img) {
-        int type = img.getType();
-        if (type != BufferedImage.TYPE_BYTE_GRAY && type != BufferedImage.TYPE_USHORT_GRAY) return img;
-        int shift = type == BufferedImage.TYPE_USHORT_GRAY ? 8 : 0;
+        // Grey images (with or without an alpha band - the empty armor slot outlines are grey + alpha PNGs, which Java
+        // reports as a custom type) are all expanded from their raw samples.
+        java.awt.image.ColorModel cm = img.getColorModel();
+        if (cm.getColorSpace().getType() != java.awt.color.ColorSpace.TYPE_GRAY) return img;
+        int bands = img.getRaster().getNumBands();
+        if (bands < 1 || bands > 2) return img;
+        int shift = cm.getComponentSize(0) > 8 ? cm.getComponentSize(0) - 8 : 0;
         BufferedImage out = new BufferedImage(img.getWidth(), img.getHeight(), BufferedImage.TYPE_INT_ARGB);
         for (int y = 0; y < img.getHeight(); y++) {
             for (int x = 0; x < img.getWidth(); x++) {
                 int v = img.getRaster().getSample(x, y, 0) >> shift;
-                out.setRGB(x, y, 0xFF000000 | (v << 16) | (v << 8) | v);
+                int a = bands == 2 ? img.getRaster().getSample(x, y, 1) >> shift : 255;
+                out.setRGB(x, y, (a << 24) | (v << 16) | (v << 8) | v);
             }
         }
         return out;
