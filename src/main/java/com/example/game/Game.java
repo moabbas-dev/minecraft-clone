@@ -3289,10 +3289,7 @@ public class Game implements GameAccess {
             glBlendFuncSeparate(GL_ONE_MINUS_DST_COLOR, GL_ONE_MINUS_SRC_COLOR, GL_ONE, GL_ZERO);
             com.example.engine.HudTextures.draw(uiRenderer, crosshair, (float) Math.floor(cx - 7.5f * cs), (float) Math.floor(cy - 7.5f * cs), cs);
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        } else {
-            uiRenderer.drawColorQuad(cx - 5, cy - 1, 10, 2, 1, 1, 1, 0.9f);
-            uiRenderer.drawColorQuad(cx - 1, cy - 5, 2, 10, 1, 1, 1, 0.9f);
-        }
+        } // no crosshair file: nothing is drawn (the HUD is only ever the user's real sprites)
 
         if (hudTextures != null && inventory.getHotbarSize() == 9) {
             renderRealHud();
@@ -3301,45 +3298,11 @@ public class Game implements GameAccess {
             return;
         }
 
-        int visibleSlots = inventory.getHotbarSize();
-        float slotSize = 44f;
-        float margin = 4f;
-        float totalWidth = visibleSlots * (slotSize + margin) - margin;
-        float startX = (window.getWidth() - totalWidth) / 2f;
-        float y = window.getHeight() - slotSize - 12f;
-
-        drawSurvivalHud(startX, startX + totalWidth, y);
-
-        float selectedSlotX = startX;
-        for (int i = 0; i < visibleSlots; i++) {
-            float x = startX + i * (slotSize + margin);
-            boolean selected = i == inventory.getSelectedSlot();
-            if (selected) {
-                uiRenderer.drawColorQuad(x - 3, y - 3, slotSize + 6, slotSize + 6, 1f, 1f, 0.4f, 0.95f);
-                selectedSlotX = x;
-            }
-            uiRenderer.drawColorQuad(x, y, slotSize, slotSize, 0.1f, 0.1f, 0.1f, 0.55f);
-
-            ItemStack stack = inventory.get(i);
-            if (!stack.isEmpty()) {
-                drawBlockIcon(stack.type(), x, y, slotSize);
-                if (stack.count() > 1) drawStackCount(stack.count(), x, y, slotSize);
-            }
-        }
-        drawHotbarLabel(selectedSlotX, y, slotSize);
-
+        // The hotbar, hearts and hunger sprites are missing (or the hotbar is not the 9-slot one): there is no art to draw them
+        // with, so nothing is drawn rather than stand-ins made of coloured squares.
         renderDebugOverlay();
     }
 
-    /**
-     * Health hearts (left, above the hotbar's left edge) and hunger icons (right, mirrored) -
-     * 10 icons each, 2 points per icon, a proportional partial fill for an odd (half-heart-style)
-     * value. No heart/drumstick texture exists in this project (only block textures were ever
-     * copied in - see TextureAtlas's own docs), so these are plain colored squares over a dark
-     * backing, the same "colored quad primitive" convention every other HUD element here
-     * already uses (the hotbar slots/selection highlight/crosshair) - not a redesign of the HUD,
-     * the smallest layer that actually shows the two new survival stats.
-     */
     /** The HUD drawn from the real Minecraft sprites at the menu's GUI scale: 182x22 hotbar with its
      *  selection frame, hearts (8px pitch) left of the bar and hunger icons mirrored on the right,
      *  10 icons each, container + full/half overlay exactly like vanilla. */
@@ -3504,35 +3467,6 @@ public class Game implements GameAccess {
             float x = i == 0 ? w / 2f - size * 1.05f : w / 2f + size * 0.05f;
             uiRenderer.drawTexturedQuad(x, h - size, size, size, new float[]{0f, v0, 1f, v1}, fire.id(), 1f, 1f, 1f, 0.9f);
         }
-    }
-
-    private void drawSurvivalHud(float hotbarLeftX, float hotbarRightX, float hotbarY) {
-        float iconSize = 14f, gap = 2f;
-        float rowY = hotbarY - iconSize - 6f;
-
-        float health = survival.getHealth().getCurrentHealth();
-        for (int i = 0; i < 10; i++) {
-            float x = hotbarLeftX + i * (iconSize + gap);
-            float value = Math.max(0f, Math.min(2f, health - i * 2f));
-            drawSurvivalIcon(x, rowY, iconSize, value, 0.82f, 0.14f, 0.14f, 0.28f, 0.06f, 0.06f);
-        }
-        float food = survival.getHunger().getFoodLevel();
-        for (int i = 0; i < 10; i++) {
-            float x = hotbarRightX - iconSize - i * (iconSize + gap);
-            float value = Math.max(0f, Math.min(2f, food - i * 2f));
-            drawSurvivalIcon(x, rowY, iconSize, value, 0.62f, 0.42f, 0.20f, 0.22f, 0.16f, 0.09f);
-        }
-    }
-
-    /** One heart/hunger icon: a dark empty backing, then a fill whose width is proportional to
-     *  {@code value} (0..2 - 0 empty, 1 half, 2 full), so a half point of health/food reads as a
-     *  half-filled icon rather than rounding away. */
-    private void drawSurvivalIcon(float x, float y, float size, float value, float fr, float fg, float fb,
-                                  float er, float eg, float eb) {
-        uiRenderer.drawColorQuad(x, y, size, size, er, eg, eb, 0.92f);
-        if (value <= 0f) return;
-        float fillWidth = size * (value / 2f);
-        uiRenderer.drawColorQuad(x, y, fillWidth, size, fr, fg, fb, 1f);
     }
 
     /** Vanilla durability bar: 13x2 of a 16-unit icon, green to red, only once the item has been used. */

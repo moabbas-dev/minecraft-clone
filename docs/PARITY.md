@@ -351,7 +351,7 @@ Rules read from the 26.3 client with `javap` (LookControl, BodyRotationControl, 
 - [x] Chicken wings flap like Chicken.aiStep (flapSpeed +1.2 per tick in the air, -0.3 on the ground, flapping decays by 0.9, wings open by (sin(flap) + 1) * flapSpeed).
 - [x] Baby voice: say / hurt / death at pitch x1.5 (vanilla getVoicePitch 1.5 against 1.0); footsteps keep their pitch.
 - [x] Babies follow their parent (FollowParentGoal: nearest adult of the same kind within 8 blocks and 4 vertically, not closer than 3, kept up to 16 blocks, x1.1, cow x1.25). Goals that steer the mob now share vanilla's MOVE flag, so a higher-priority one (panic, then follow, then stroll) blocks the lower ones; before, the stroll goal could override.
-- Not done: spider leg animation (still the old sway), baby zombie model (still a half-scale adult), breeding, mob attack swing for zombies, the 26.x animation-keyframe walk if any mob uses it.
+- Not done at the time (spider legs, the baby zombie model and breeding are now in section 23): mob attack swing for zombies, the 26.x animation-keyframe walk if any mob uses it.
 - Tests: 770 passing (`HeadAndWalkTest`, `MobModelPoseTest`, `BabyBehaviourTest` are new).
 
 ## 14. Sky and weather (G14)
@@ -406,6 +406,90 @@ Everything below was read from the 26.3 client jar with `javap` (lightmap.fsh, s
 - [x] Particles, rain and its splashes use the lightmap without directional shading; the sky, sun, moon, stars, clouds and the crack overlay are drawn unlit.
 
 **Not done / known gaps**
-- The mob spawners still use the older `daylightFactor` instead of vanilla's `sky_light_level` (15 x timeline x weather); lightning does not change the lightmap (it does not in vanilla's overworld either, only the sky colour).
-- Entity light is sampled at one cell, not at the entity's eye probe; no night-vision, blindness or darkness effects; no torch, lava or other emitters exist as blocks yet.
-- Light is recomputed when a chunk is first meshed and is not saved.
+- (Fixed later, section 17: the mob spawners now use `sky_light_level`; entities are lit at their eye cell.) Lightning does not change the lightmap (it does not in vanilla's overworld either, only the sky colour).
+- No night-vision, blindness or darkness effects (no source for them exists). Torches and lava are emitters now (sections 20 and 24).
+- Light is recomputed when a chunk is first meshed and is not saved (by design: it is derived data).
+- The [U] smoothBlend rule above was checked again against the bytecode in section 17 and holds; the two inventory light vectors are the jar's constants, only their mapping from the y-down GUI space is inferred.
+
+
+## 17. Spawn light, eye-cell light and the smoothBlend check (G17)
+
+- [x] `sky_light_level` as vanilla has it: `World.getSkyDarken` is 0 at noon and 11 on a clear night (the timeline's `sky_light_factor` and the weather layers); `getRawBrightness` = max(block light, sky light - skyDarken). `Monster.isDarkEnoughToSpawn`: block light 0 and a random 0..7 against the raw brightness (thunder compares with 10), in `MobSpawner.isValidSpawn(world, x, y, z, player, thundering, random)`; animals need raw brightness above 8 on grass.
+- [x] Mobs are lit at the cell of their **eye position**, and a burning mob at block light 15 (`entity.getLightCoords`).
+- [x] `smoothBlend` re-read: the fix-up of dark neighbours is `if (centre sky <= 2 || centre block <= 2)` per neighbour, sky-only when only the sky is zero - implemented that way in `ChunkMeshBuilder.fillDark`.
+- Tests: `MobSpawnerTest` and `DayNightTest` updated.
+
+## 18. Sky, fog, clouds and the sunrise from the real timeline (G18)
+
+All from the 26.3 client (`SkyColors`, `timeline/day.json`, the biome `sky_color` / `fog_color` / `water_fog_color` values, `AtmosphericFogEnvironment`, `FogRenderer`, `SkyRenderer`):
+
+- [x] The sky colour is the biome's `sky_color` times the day timeline's brightness curve, blended toward grey by rain and thunder (the weather layers: multiply and `BlendToGray`), and the flash of lightning lerps 0.22 toward (0.8, 0.8, 1). The fog colour is `#c0d8ff` (overworld) or the biome's, same layers. The clear colour is the fog colour, and the sky disc (radius 512 at +16) fades into it toward the horizon. The old `computeSkyColor` / `computeDaylightFactor` (this game's own blend) are gone.
+- [x] The sun and moon angle is eased by the timeline's cubic bezier (`SkyDetails.sunAngleDegrees`; the sun crosses the horizon at ticks about 12542 and 23460), and the sunrise / sunset fan uses the 32 real `sunrise_sunset_color` keyframes (#AARRGGBB).
+- [x] Fog: start = d - clamp(d / 10, 4, 64) for render distance d, end = d; rain adds the environment fog from -160 to 768 (strength eased, 0.5 in deserts, savannas and badlands, less without sky light); underwater -8 to 96 x max(0.25, vision); lava 0.25 to 1 (section 24). The cloud field is 48 cells in radius.
+- [x] Biome tables (water colour, underwater fog, sky, fog) are the real values; the white lightning overlay was removed (vanilla only changes the sky colour).
+- **Differences:** the underwater fog eases between surface and water (vanilla switches at once); swamp / mangrove water fog end x0.85 is not applied; the dark disc below the horizon is not drawn.
+- Tests: `DayNightTest`, `CelestialWeatherTest`, `BiomeAtmosphereTest` rewritten.
+
+## 19. Copper tools and the six spears (G19)
+
+- [x] Copper sword, axe, pickaxe, shovel and hoe: stone stats, 190 uses, mining speed 5, real icons and recipes (copper ingots in the stone-tool shapes).
+- [x] Spears (wood, stone, copper, iron, gold, diamond): jab only. Damage 1 + the tier bonus + the spear's own value: wood 1, stone 2, copper 2, iron 3, gold 1, diamond 4; attack speed 1 / swing 0.65, 0.75, 0.85, 0.95, 0.95, 1.05; one use per attack.
+- **Not done:** the spear's charge, lunge and kinetic attack, and its held pose (jab only, shown as the flat icon like the other tools).
+- Tests: `CopperToolsAndSpearsTest`.
+
+## 20. Torches, farmland, hoes and random ticks (G20)
+
+- [x] Torches: floor torch and four wall torches (`BlockSupport`: a torch needs a sturdy face, and drops as an item when it loses it), light 14, real model (a 2 x 10 x 2 px box, the wall one leaning 22.5 degrees), recipe coal or charcoal over a stick (4). Not done: the flame and smoke particles (needs a new sprite-particle emitter).
+- [x] Farmland: a hoe turns grass or dirt into farmland (not from below, with the block above free), 15/16 high with the indented side. `RandomTicks` (3 random ticks per 16-cubed section per tick within 8 chunks) dries and wets it: moist with water within 4 blocks or rain, otherwise a dry one has a 1-in-7 chance each tick to become dirt, and any solid block above turns it to dirt. **Approximation:** vanilla keeps a moisture level 0-7 and steps it per tick; this has two states. Not done: trampling and crops (no farming exists).
+- [x] Fixes found on the way: glass was walk-through (now solid); the translucent pass drew everything at alpha 0.85 - now the texture's own alpha (water 180, ice 190), and glass, plants and torches are cutouts in the opaque pass; a non-solid block can be placed where the player stands.
+- Tests: `TorchAndFarmlandTest`.
+
+## 21. Status effects, golden apple, lightning and burning (G21)
+
+Numbers from `MobEffects`, `Foods`, `LightningBolt`, `Entity.baseTick` and the damage-type data in the 26.3 jar:
+
+- [x] Effects (`StatusEffect`, `PlayerEffects`): hunger adds 0.005 x (amplifier + 1) exhaustion per tick; poison 1 damage every 25 >> amplifier ticks and never below 1 health; regeneration heals 1 every 50 >> amplifier ticks; absorption is 4 x (amplifier + 1) soaked up first. Food effects: rotten flesh hunger 600 ticks (80%), raw chicken hunger (30%), spider eye poison 100 ticks, golden apple regeneration II 100 ticks + absorption 2400 ticks (recipe: an apple in eight gold ingots).
+- [x] HUD: poisoned hearts, the regeneration hop (`tick % ceil(max + 5)`), the absorption row, the effect icons (real `mob_effect/*.png`) with the 24 px background and the blink in the last 10 s.
+- [x] Burning player: 1 damage a second (ignores armor), put out by water or rain, the `fire_1.png` overlay (flattened to two sheets, not the 3D wrap).
+- [x] Real lightning (`entity/LightningBolts`): a bolt lives 2 ticks with the first flash and 1-3 more; 1 in 100000 per chunk per tick in a thunderstorm (prefers a living thing near); it hits everything within 3 blocks of 5 damage (reduced by armor) and 8 seconds of fire. The geometry is the jagged additive bolt; its algorithm was recalled and checked only for constants.
+- [x] `World.monstersBurn` is the timeline's `monsters_burn` (true tick >= 23460 or < 12542): zombies and skeletons burn then, in sunlight only.
+- **Not done:** creepers charged by lightning, fire blocks from lightning, night vision / blindness / darkness.
+- Tests: `StatusEffectsTest`.
+
+## 22. The bow (G22)
+
+From `BowItem`, `AbstractArrow` and `Items` in the jar: draw power `(f^2 + 2f) / 3` capped at 1 (f = ticks / 20), nothing under 0.1, arrow speed 3 blocks a tick times the power, damage `ceil(speed x 2)` and a critical roll `nextInt(damage / 2 + 2) + damage` at full draw, 384 uses, one arrow and one use per shot, the pull textures at 0.65 and 0.9, and the FOV squeeze `1 - 0.15 f^2`.
+
+- [x] Hold use with a bow (main hand) and an arrow in the inventory to draw, release to shoot; the player's arrows hurt mobs, not the player, and a lodged one can be picked up again. Recipes: arrow (flint over stick over feather, 4) and bow (sticks and strings, both orientations). Arrows are swept in quarter-block pieces now, which fixed fast arrows flying through walls and mobs.
+- **Not done:** offhand bow use, crossbow, enchantments, arrow types, the arrow's own 3D model (the crossed-quad arrow is kept).
+- Tests: `BowTest`.
+
+## 23. Spider legs, the baby zombie model and breeding (G23)
+
+- [x] Spider legs swing like `SpiderModel.setupAnim`: four pairs a quarter cycle apart (0, 180, 90, 270 degrees), yaw `-cos(2a + phase) x 0.4 x speed`, lift `|sin(a + phase) x 0.4| x speed` (a = walk position x 0.6662); the head turns with the look direction.
+- [x] The baby zombie has its own model (`BabyZombieModel`: head 6 cubed with an 0.25 outer layer, a 4x5x2 body, 2x5x2 arms, 2x4x2 legs) and `zombie_baby.png`, no longer the adult at half scale. The test controller's `spawnMob?type=zombie_baby` makes one.
+- [x] Breeding (`Animal`, `BreedGoal`): feed an adult its food with right click - pig carrot, potato or beetroot; cow wheat; chicken wheat or beetroot seeds - and it is in love for 600 ticks; two animals of one kind in love within 8 blocks walk to each other and after 60 ticks within 3 blocks they breed: a baby, 1-7 XP, 6000 ticks of waiting for both parents. Feeding a baby grows it up a tenth of its remaining time sooner.
+- New items WHEAT, WHEAT_SEEDS, CARROT (food 3 / 3.6), BEETROOT (food 1 / 1.2), BEETROOT_SEEDS (ids 226-230, real icons). No farming exists, so they only come from the test controller (`giveItem`).
+- **Not done:** the heart particles (`heart.png` exists; needs a new particle kind), mob-specific breeding sounds, and species other than pig, cow and chicken.
+- Tests: `BreedingTest`, `SpiderAndBabyZombieModelTest`.
+
+## 24. Fluids, buckets and lava (G24)
+
+Read from `FlowingFluid`, `WaterFluid`, `LavaFluid`, `LiquidBlock`, `FluidRenderer` and `LavaFogEnvironment`:
+
+- [x] Flowing fluid (`world/FluidSim`, ticked 20 times a second by the game): water tick delay 5, overworld lava 30 (four times that, three times in four, when a lava block rises); level loses 1 per block for water and 2 for lava (so lava reaches 3 blocks: 6, 4, 2); it goes down first and then sideways towards the nearest hole within 4 blocks (water) or 2 (lava); falling columns are full height; two water sources beside a cell with something solid or a source below make a source (lava does not); lava beside water or with water above becomes obsidian (a source) or cobblestone, and lava flowing down onto water makes stone. A cell in an unloaded chunk acts as a wall. Plants and torches in the way drop and are replaced.
+- [x] Every state is its own block id (231-243), so saves need nothing new; `BlockType.isWater / isLava / isFluid / fluidAmount` replace the old `== WATER` checks everywhere (swimming, spawning, explosions, raycast, farmland moisture, fall damage, light dampening 1).
+- [x] Rendering: corner heights averaged over the four cells at each corner (a nearly full cell weighs ten times, 1 when the fluid is above), sloped surfaces, side faces cut to those heights with the flowing sprite, the still sprite on top (the flowing one, turned in quarter turns to the flow, where it moves), 0.001 inset, no face against the same fluid. Lava is lit 15 and drawn opaque; water is tinted by the biome and blended.
+- [x] Buckets: recipe three iron ingots, scoop a still source (the empty bucket's ray stops at sources), pour into the aimed cell (the clicked block when a plant, else the cell in front of the face); empty buckets stack to 16, full ones to 1.
+- [x] Lava: 4 damage per hit (armor reduces it, `DamageSource.LAVA`) and 15 seconds of fire for the player and for mobs; the dark red fog (0.6, 0, 0) seen from 0.25 to 1 block; swimming in lava is 0.4 x the water speed (drag 0.5 against 0.8) and does not lift the swimmer. Thin flowing water (surface less than 0.3 above the feet) is waded, not swum.
+- **Differences / not done:** the water and lava textures show their first frame only (no animation); the top texture is turned in 90 degree steps, not smoothly; fluids do not push entities; lava does not start fires or burn items; no bucket, fizz or splash sounds (none among the user's files); no waterlogging, cauldrons, milk, powder snow or fish buckets; scheduled fluid ticks are not saved (unsettled flow freezes after a reload); the nether lava numbers (delay 10, spread 4) are not used.
+- Tests: `FluidSimTest` (11), `BucketTest` (4).
+
+## 25. What is still wrong or open (end of the "fix everything" day)
+
+- Title-screen panorama: the files in the user's jar are 1x1 stubs, so it cannot be drawn.
+- No farming (crops, trampling), so the new food and seed items are test-controller only; no torch / flame particles, heart particles or snow-biome rain particles.
+- The spear has no charge or lunge; the bow has no offhand use.
+- Fire blocks, charged creepers, night vision, blindness and darkness are missing.
+- Dry-farmland decay is a 1-in-7 step instead of vanilla's moisture levels; the burning overlay is flattened.
+- Tests: 887 passing.

@@ -12,12 +12,12 @@ None of these files are committed: `textures/`, `texts/`, `sounds/`, `minecraft-
 |---|---|---|---|
 | `textures/block/*.png` | `engine/TextureAtlas` (`REAL_TEXTURE_PATHS`), `engine/CrackOverlay` | no | magenta-and-black "missing texture" tile (logged); no cracks are drawn when `destroy_stage_*` are missing |
 | `textures/item/*.png` | `engine/TextureAtlas` (`REAL_TEXTURE_PATHS`) | no | "missing texture" tile |
-| `textures/gui/sprites/hud/**` | `engine/HudTextures` | no | the 8 core sprites are all-or-nothing, else the plain colored-quad HUD; the rest are optional per group |
+| `textures/gui/sprites/hud/**` | `engine/HudTextures` | no | the 8 core sprites are all-or-nothing, else **no hotbar, hearts or hunger are drawn** (no stand-in art); the rest are optional per group |
 | `textures/gui/container/{inventory,crafting_table,furnace,blast_furnace,smoker}.png`, `textures/gui/sprites/container/<station>/{lit,burn}_progress.png` | `game/Game` -> `ui/GuiPainter.background`, `engine/HudTextures.loadFile` | no | plain grey panel and slots; no progress sprites |
 | `textures/font/ascii.png` | `engine/PixelFont` (glyph widths and the atlas `engine/Font` draws) | no | no text is drawn (every character advances 6, spaces 4) |
 | `textures/gui/sprites/widget/{button*,slider*,slider_handle*,text_field*,scroller*}.png`, `textures/gui/sprites/tooltip/{background,frame}.png`, `textures/gui/sprites/container/slot_highlight_{back,front}.png` | `ui/UiSprites` (9-slice) via `ui/GuiContext`, `ui/GuiPainter` | no | plain flat boxes (buttons, fields), a dark tooltip box, a white 50% hover square |
 | `textures/gui/{menu_background,menu_list_background,header_separator,footer_separator}.png`, `textures/gui/title/{minecraft,edition}.png` | `ui/GuiContext`, `ui/TitleScreen` | no | a dark plain fill; the title is drawn as the word MINECRAFT |
-| `textures/gui/sprites/hud/crosshair.png` | `game/Game.renderHud` | no | two white quads |
+| `textures/gui/sprites/hud/crosshair.png` | `game/Game.renderHud` | no | no crosshair is drawn |
 | `texts/splashes.txt` | `ui/Splashes` | no | no splash text |
 | `textures/entity/experience/experience_orb.png` | `game/Game.renderXpOrbs` | no | orbs are not drawn |
 | `textures/environment/clouds.png` | `game/Game.renderClouds` (`game/SkyDetails`) | no | no clouds |
@@ -27,6 +27,11 @@ None of these files are committed: `textures/`, `texts/`, `sounds/`, `minecraft-
 | `textures/entity/player/wide/steve.png` | `game/Game.renderHeldItem` (bare hand), `renderPlayerPreview` | no | the bare hand and the inventory player preview are not drawn |
 | `textures/entity/equipment/{humanoid,humanoid_leggings}/<material>.png` (+ `leather_overlay.png`) | `game/Game.renderPlayerPreview` | no | that armor layer is not drawn in the inventory preview |
 | `textures/gui/sprites/hud/hotbar_offhand_left.png` | `game/Game.renderRealHud` | no | the offhand item is drawn without its slot frame |
+| `textures/gui/sprites/hud/heart/{poisoned,absorbing}_{full,half}.png`, `textures/gui/sprites/hud/effect_background.png`, `textures/mob_effect/*.png` | `game/Game` (`drawHealthAndFood`, `drawEffectIcons`) | no | that heart variant / the effect icon or its background is not drawn (`mob_effect/` is a bulk folder of `restore-assets.py`) |
+| `textures/block/fire_1.png` | `game/Game.drawFireOverlay` | no | no burning overlay |
+| `textures/block/{water_still,water_flow,lava_still,lava_flow}.png` | `engine/TextureAtlas` (first 16x16 of the first frame; no animation) | no | "missing texture" tile |
+| `textures/item/{bucket,water_bucket,lava_bucket,bow,bow_pulling_0,bow_pulling_1,bow_pulling_2,golden_apple,wheat,wheat_seeds,carrot,beetroot,beetroot_seeds,copper_*,*_spear}.png`, `textures/block/{torch,farmland,farmland_moist}.png` | `engine/TextureAtlas` (`REAL_TEXTURE_PATHS`) | no | "missing texture" tile |
+| `textures/entity/zombie/zombie_baby.png` | `game/Game` (`EntityTexture.load`) | no | flat placeholder colour on the baby zombie model |
 | `textures/entity/{pig,cow,chicken}/*_temperate_baby.png` | `game/Game` (`EntityTexture.loadFirst`) | no | flat placeholder colour on the baby model |
 | `textures/environment/celestial/moon/<phase>.png` (eight phases) | `game/Game.renderSunAndMoon` | no | no moon |
 | `textures/item/leather_<piece>_overlay.png` | `engine/TextureAtlas.dyeLeather` | no | the leather icon without its overlay |
