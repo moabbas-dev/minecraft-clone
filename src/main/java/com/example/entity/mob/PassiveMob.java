@@ -34,9 +34,15 @@ public abstract class PassiveMob extends Mob {
         getGoals()
                 .add(0, new FloatGoal())
                 .add(1, new PanicGoal(panicMultiplier))
+                .add(4, new com.example.entity.ai.FollowParentGoal())
                 .add(5, new RandomStrollGoal())
                 .add(6, new LookAtPlayerGoal())
                 .add(7, new RandomLookAroundGoal());
+    }
+
+    /** The speed multiplier of a baby following its parent (vanilla: 1.1, the cow 1.25). */
+    public float followParentSpeed() {
+        return 1.1f;
     }
 
     @Override

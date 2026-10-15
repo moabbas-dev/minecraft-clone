@@ -22,6 +22,11 @@ public final class PanicGoal implements Goal {
     }
 
     @Override
+    public boolean usesMovement() {
+        return true;
+    }
+
+    @Override
     public boolean canStart(Mob mob, World world, List<Targetable> candidates) {
         return mob.getRecentHurtTimer() > 0f;
     }

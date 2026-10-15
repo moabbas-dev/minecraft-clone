@@ -48,7 +48,10 @@ public final class CreeperSwellGoal implements Goal {
             if (creeper.getSwell() <= 0f) mob.emitGlobalSound("fuse");
             mob.setMoveDirection(0f, 0f);
             mob.getNavigator().stop();
-            if (mob.hasTarget()) mob.facePoint(mob.getTarget().getPosition());
+            if (mob.hasTarget()) {
+            mob.facePoint(mob.getTarget().getPosition());
+            mob.lookAt(mob.getTarget().getEyePosition());
+        }
             creeper.addSwell(dt * 20f);
         } else {
             creeper.addSwell(-dt * 20f);

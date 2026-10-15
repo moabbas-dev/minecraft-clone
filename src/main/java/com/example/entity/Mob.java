@@ -43,7 +43,21 @@ public abstract class Mob extends LivingEntity {
     private static final float TURN_RATE = 12f; // radians per second
 
     /** One sound a mob wants played (resolved to a registry id like {@code mob.pig.say}); drained by MobManager. */
-    public record SoundEvent(String id, float x, float y, float z) {
+    public record SoundEvent(String id, float x, float y, float z, float pitch) {
+        public SoundEvent(String id, float x, float y, float z) {
+            this(id, x, y, z, 1f);
+        }
+    }
+
+    /** The other mobs of the world, set by the manager each tick so goals (a baby looking for its parent) can look around. */
+    private List<Mob> neighbors = List.of();
+
+    public void setNeighbors(List<Mob> mobs) {
+        neighbors = mobs;
+    }
+
+    public List<Mob> getNeighbors() {
+        return neighbors;
     }
 
     private final List<SoundEvent> pendingSounds = new java.util.ArrayList<>(2);
@@ -56,6 +70,9 @@ public abstract class Mob extends LivingEntity {
     private static final float AMBIENT_INTERVAL_TICKS = 80f;
 
     private float moveDirX, moveDirZ;
+    private final HeadControl head = new HeadControl();
+    private final WalkAnimation limbs = new WalkAnimation();
+    private float ageTicks;
     /** Animation bookkeeping only (renderer reads these): advances while moving. */
     @Getter
     private float walkPhase;
@@ -225,9 +242,56 @@ public abstract class Mob extends LivingEntity {
         if (dx * dx + dz * dz > 1e-6f) desiredYaw = (float) Math.atan2(dx, -dz);
     }
 
+    /** Eye height above the feet (vanilla default: 85% of the hitbox height). */
+    public float getEyeHeight() {
+        return getHeight() * 0.85f;
+    }
+
+    /** Asks the head to look at a world point this tick (the body only follows once the head is turned far enough). */
+    public void lookAt(Vector3f point) {
+        head.lookAt(point.x, point.y, point.z);
+    }
+
+    /** The yaw the body is drawn with: it follows the movement heading, lagging behind a turned head. */
+    public float getBodyYaw() {
+        return head.bodyYaw(yaw);
+    }
+
+    /** The head's turn against the body, radians (positive = clockwise from above). */
+    public float getNetHeadYaw() {
+        return head.netHeadYaw();
+    }
+
+    /** The head's pitch, radians, positive = looking down. */
+    public float getHeadPitch() {
+        return head.headPitch();
+    }
+
+    /** Vanilla's walk animation position and speed: legs swing by cos(pos * 0.6662) * 1.4 * speed. */
+    public float getLimbPos() {
+        return limbs.position();
+    }
+
+    public float getLimbSpeed() {
+        return limbs.speed();
+    }
+
+    /** Time alive in ticks, for the idle arm sway. */
+    public float getAgeTicks() {
+        return ageTicks;
+    }
+
+    /** Hostile and has something to attack (raises zombie arms, draws the skeleton's bow). */
+    public boolean isAggressive() {
+        return target != null && isHostile();
+    }
+
     /** Queues {@code mob.<typeId>.<suffix>} at this mob's position. */
     public void emitSound(String suffix) {
-        pendingSounds.add(new SoundEvent("mob." + typeId() + "." + suffix, position.x, position.y, position.z));
+        // vanilla getVoicePitch: babies speak at 1.5 instead of 1.0 (their voice lines; footsteps keep their pitch)
+        boolean voice = suffix.equals("say") || suffix.equals("hurt") || suffix.equals("death");
+        pendingSounds.add(new SoundEvent("mob." + typeId() + "." + suffix, position.x, position.y, position.z,
+                voice && isBaby() ? 1.5f : 1f));
     }
 
     /** Hands over (and clears) the sounds queued since the last call. */
@@ -284,6 +348,7 @@ public abstract class Mob extends LivingEntity {
             moveDirX = 0f;
             moveDirZ = 0f;
             moveWithGravity(world, 0f, 0f, dt); // dead: no AI/attacks, but still falls and slides from knockback
+            limbs.stop();
             return;
         }
         speedMultiplier = 1f;
@@ -315,6 +380,9 @@ public abstract class Mob extends LivingEntity {
         float movedX = position.x, movedZ = position.z;
         moveWithGravity(world, dx, dz, dt);
         float moved = (float) Math.hypot(position.x - movedX, position.z - movedZ);
+        ageTicks += dt * 20f;
+        head.advance(dt, yaw, moved, dx != 0f || dz != 0f, position.x, position.y + getEyeHeight(), position.z);
+        limbs.advance(dt, moved, isBaby());
         float target = moved > 1e-4f ? 1f : 0f;
         walkAmount += (target - walkAmount) * Math.min(1f, 10f * dt);
         walkPhase += moved * 6f;

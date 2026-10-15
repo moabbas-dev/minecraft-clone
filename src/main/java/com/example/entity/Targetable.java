@@ -16,6 +16,11 @@ public interface Targetable {
      *  same convention as any one implementor's own "position" field. */
     Vector3f getPosition();
 
+    /** Where a mob looking at this target aims its head (the eyes); defaults to the centre. */
+    default Vector3f getEyePosition() {
+        return getPosition();
+    }
+
     boolean isAlive();
 
     /** Routes through whatever centralized damage entry point the implementor already has

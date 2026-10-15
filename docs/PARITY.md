@@ -341,3 +341,16 @@ All numbers below were read from the 26.3 client jar with `javap` (FirstPersonHa
 - Not done: drinking (no potions or milk exist), bow / crossbow / shield use poses (no such items), item-use cooldown overlay.
 - Tests: 751 passing.
 
+## 13. Mob animation, head turning and babies (G13)
+
+Rules read from the 26.3 client with `javap` (LookControl, BodyRotationControl, WalkAnimationState, LivingEntity.updateWalkAnimation, QuadrupedModel / HumanoidModel / ChickenModel / CreeperModel `setupAnim`, AnimationUtils.animateZombieArms, Chicken.aiStep, FollowParentGoal, the animals' `registerGoals`, getVoicePitch).
+
+- [x] Walk animation: vanilla's WalkAnimationState (20 Hz: speed eases to min(4 * distance per tick, 1) by 0.4, position += speed, babies x3) and real limb rotation about the hip: legs swing by cos(pos * 0.6662) * 1.4 * speed (pig, cow, creeper diagonal pairs; chicken; humanoid legs, humanoid arms by cos * speed). Before: legs were slid and lifted. The part pivots come from the models' part offsets (cow front legs z = -5, a 1 px fix).
+- [x] Head and body: `HeadControl` runs LookControl (head turns at most 10 degrees per tick toward the target, pitch up to 40, a look request lasts 2 ticks, head kept within 75 degrees of the body while walking) and BodyRotationControl (the body follows the movement heading while moving; standing still it follows the head only past 75 degrees, and re-aligns after the head held still for 10 ticks). Look-at-player (6 blocks, 2-4 s) and random look-around (2% per tick, 1-2 s) now turn the head, not the whole body; hostile mobs also look at the player's eyes. Rendering interpolates between ticks.
+- [x] Zombie arms: raised 80 degrees (120 while it has a target) with the idle bob, as animateZombieArms; skeleton arms hang with the held-item pose and raise to the bow pose (-90 degrees plus head pitch, yaw -0.1 / 0.5 plus head yaw) while attacking.
+- [x] Chicken wings flap like Chicken.aiStep (flapSpeed +1.2 per tick in the air, -0.3 on the ground, flapping decays by 0.9, wings open by (sin(flap) + 1) * flapSpeed).
+- [x] Baby voice: say / hurt / death at pitch x1.5 (vanilla getVoicePitch 1.5 against 1.0); footsteps keep their pitch.
+- [x] Babies follow their parent (FollowParentGoal: nearest adult of the same kind within 8 blocks and 4 vertically, not closer than 3, kept up to 16 blocks, x1.1, cow x1.25). Goals that steer the mob now share vanilla's MOVE flag, so a higher-priority one (panic, then follow, then stroll) blocks the lower ones; before, the stroll goal could override.
+- Not done: spider leg animation (still the old sway), baby zombie model (still a half-scale adult), breeding, mob attack swing for zombies, the 26.x animation-keyframe walk if any mob uses it.
+- Tests: 770 passing (`HeadAndWalkTest`, `MobModelPoseTest`, `BabyBehaviourTest` are new).
+

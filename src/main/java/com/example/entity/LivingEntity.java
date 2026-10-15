@@ -43,6 +43,11 @@ public abstract class LivingEntity extends Entity implements Targetable {
         return new Vector3f(position.x, position.y + getHeight() * 0.5f, position.z);
     }
 
+    @Override
+    public Vector3f getEyePosition() {
+        return new Vector3f(position.x, position.y + getHeight() * 0.85f, position.z);
+    }
+
     // isAlive() is inherited directly from Entity - tickHealth() below keeps Entity's own
     // "alive" flag in sync with HealthComponent's death state, so Targetable.isAlive() and
     // Entity.isAlive() are never two independent sources of truth.

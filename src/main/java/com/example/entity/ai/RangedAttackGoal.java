@@ -86,6 +86,7 @@ public final class RangedAttackGoal implements Goal {
         }
         if (dist <= SHOOT_RANGE && sight) {
             mob.facePoint(them);
+        mob.lookAt(target.getEyePosition());
             cooldown -= dt;
             if (cooldown <= 0f) {
                 cooldown = intervalFor(difficulty.get());

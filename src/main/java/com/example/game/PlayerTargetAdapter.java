@@ -24,6 +24,11 @@ final class PlayerTargetAdapter implements Targetable {
     }
 
     @Override
+    public Vector3f getEyePosition() {
+        return player.eyePosition();
+    }
+
+    @Override
     public boolean isAlive() {
         return player != null && survival.getHealth().isAlive();
     }

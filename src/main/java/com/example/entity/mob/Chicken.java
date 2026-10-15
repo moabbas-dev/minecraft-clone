@@ -20,6 +20,8 @@ public class Chicken extends PassiveMob {
 
     private float eggTimer;
     private boolean eggReady;
+    // Wing flap (Chicken.aiStep): flapSpeed rises 1.2 per tick in the air and falls 0.3 on the ground, flapping decays by 0.9
+    private float flap, oFlap, flapSpeed, oFlapSpeed, flapping, flapClock;
 
     public Chicken(Vector3f spawnPosition, float yaw) {
         super(spawnPosition, yaw, MAX_HEALTH, 1.4f);
@@ -55,9 +57,34 @@ public class Chicken extends PassiveMob {
         return true;
     }
 
+    /** The wing angle phase between ticks (the model opens the wings by (sin(flap) + 1) * flapSpeed). */
+    public float getFlap() {
+        return oFlap + (flap - oFlap) * (flapClock / 0.05f);
+    }
+
+    public float getFlapSpeed() {
+        return oFlapSpeed + (flapSpeed - oFlapSpeed) * (flapClock / 0.05f);
+    }
+
+    private void tickWings(float dt) {
+        flapClock += dt;
+        int guard = 0;
+        while (flapClock >= 0.05f && guard++ < 5) {
+            flapClock -= 0.05f;
+            oFlap = flap;
+            oFlapSpeed = flapSpeed;
+            flapSpeed = Math.max(0f, Math.min(1f, flapSpeed + (isOnGround() ? -1f : 4f) * 0.3f));
+            if (!isOnGround() && flapping < 1f) flapping = 1f;
+            flapping *= 0.9f;
+            flap += flapping * 2f;
+        }
+        if (flapClock >= 0.05f) flapClock = 0f;
+    }
+
     @Override
     protected void onTick(World world, float dt) {
         super.onTick(world, dt);
+        tickWings(dt);
         if (!isOnGround() && velocity.y < 0f) {
             velocity.y *= (float) Math.pow(FALL_DRAG_PER_TICK, dt * 20f); // wings flap: slow fall
         }

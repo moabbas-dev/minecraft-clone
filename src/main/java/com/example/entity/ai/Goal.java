@@ -24,6 +24,15 @@ public interface Goal {
         return canStart(mob, world, candidates);
     }
 
+    /**
+     * Whether this goal steers the mob (vanilla's MOVE flag). Of the goals that do, only the highest-priority running one is
+     * allowed to run: a lower one is held back (and stopped) while a higher one is active, so panicking beats following a
+     * parent beats strolling.
+     */
+    default boolean usesMovement() {
+        return false;
+    }
+
     /** Called exactly once, the tick this goal transitions from not-running to running. */
     default void start(Mob mob, World world) {
     }

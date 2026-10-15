@@ -6,7 +6,7 @@ import com.example.world.World;
 
 import java.util.List;
 
-/** Vanilla priority 6-7: an idle animal sometimes turns to watch a player within 6 blocks for 2-4 seconds. */
+/** Vanilla priority 6-7: an idle animal sometimes turns its head to watch a player within 6 blocks for 2-4 seconds. */
 public final class LookAtPlayerGoal implements Goal {
     private static final float RANGE = 6f;
     private static final int CHANCE_ONE_IN = 50;
@@ -36,6 +36,6 @@ public final class LookAtPlayerGoal implements Goal {
     @Override
     public void tick(Mob mob, World world, List<Targetable> candidates, float dt) {
         remaining -= dt;
-        mob.facePoint(watched.getPosition());
+        mob.lookAt(watched.getEyePosition());
     }
 }

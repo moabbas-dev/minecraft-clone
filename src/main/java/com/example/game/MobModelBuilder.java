@@ -135,6 +135,17 @@ final class MobModelBuilder {
             }
         }
 
+        /**
+         * The transform of a joint: a rotation about a pivot given in vanilla model pixels (x, y-down, z), with the
+         * ModelPart angles in radians (vanilla applies z, then y, then x; here the model frame is mirrored into ours, so x and y
+         * turn the other way). Assign it to {@link #part} before the boxes that belong to the part.
+         */
+        org.joml.Matrix4f joint(float pmx, float pmy, float pmz, float xRot, float yRot, float zRot) {
+            float sv = scaleY < 0f ? scale : scaleY;
+            float x = -pmx / 16f * scale, y = (24f - pmy) / 16f * sv, z = pmz / 16f * scale;
+            return new org.joml.Matrix4f().translate(x, y, z).rotateZ(zRot).rotateY(-yRot).rotateX(-xRot).translate(-x, -y, -z);
+        }
+
         /** Writes one vertex given a position in the mob's local frame (feet origin, front = -Z). */
         void vertex(float lx, float ly, float lz, float tu, float tv, int face) {
             if (part != null) {
@@ -218,57 +229,130 @@ final class MobModelBuilder {
         };
     }
 
+    /**
+     * What a model needs to pose itself, all as vanilla's render state gives it: the walk animation position and speed
+     * (legs swing by cos(position * 0.6662) * 1.4 * speed), the head's turn against the body and its pitch (radians), the age
+     * in ticks for the idle arm sway, whether the mob is attacking, and the chicken's wing flap.
+     */
+    record Pose(float limbPos, float limbSpeed, float headYaw, float headPitch, float ageTicks, boolean aggressive,
+                float flap, float flapSpeed) {
+        static final Pose REST = new Pose(0f, 0f, 0f, 0f, 0f, false, 0f, 0f);
+    }
+
+    /** QuadrupedModel / CreeperModel leg angles: {rightHind, leftHind, rightFront, leftFront}. */
+    static float[] quadLegAngles(float pos, float speed) {
+        float a = pos * 0.6662f, s = 1.4f * speed, pi = (float) Math.PI;
+        return new float[]{(float) Math.cos(a) * s, (float) Math.cos(a + pi) * s, (float) Math.cos(a + pi) * s, (float) Math.cos(a) * s};
+    }
+
+    /** HumanoidModel walking angles: {rightArm, leftArm, rightLeg, leftLeg}. */
+    static float[] humanoidSwing(float pos, float speed) {
+        float a = pos * 0.6662f, pi = (float) Math.PI;
+        return new float[]{(float) Math.cos(a + pi) * speed, (float) Math.cos(a) * speed,
+                (float) Math.cos(a) * 1.4f * speed, (float) Math.cos(a + pi) * 1.4f * speed};
+    }
+
+    /** AnimationUtils.bobArms: the idle drift of a raised or hanging arm; {@code sign} is +1 for the right arm, -1 for the left. */
+    static float armBobX(float ageTicks, float sign) {
+        return sign * (float) Math.sin(ageTicks * 0.067f) * 0.05f;
+    }
+
+    static float armBobZ(float ageTicks, float sign) {
+        return sign * ((float) Math.cos(ageTicks * 0.09f) * 0.05f + 0.05f);
+    }
+
+    /** The zombie's arms (AnimationUtils.animateZombieArms): raised -80 degrees, or -120 when attacking, turned 0.1 inwards. */
+    static float zombieArmRaise(boolean aggressive) {
+        return -(float) Math.PI / (aggressive ? 1.5f : 2.25f);
+    }
+
     /** Writes one zombie at world feet position (px,py,pz) facing {@code yaw}; returns the new index. */
-    static int emitZombie(float[] out, int n, float px, float py, float pz, float yaw, float tilt, float walkPhase,
-                          float walkAmount, float sky, float blockLight, float[] tint) {
-        return emitZombie(out, n, px, py, pz, yaw, tilt, walkPhase, walkAmount, sky, blockLight, tint, 1f);
+    static int emitZombie(float[] out, int n, float px, float py, float pz, float yaw, float tilt, Pose pose,
+                          float sky, float blockLight, float[] tint) {
+        return emitZombie(out, n, px, py, pz, yaw, tilt, pose, sky, blockLight, tint, 1f);
     }
 
     /** Same with a uniform {@code scale} (0.5 for baby zombies). */
-    static int emitZombie(float[] out, int n, float px, float py, float pz, float yaw, float tilt, float walkPhase,
-                          float walkAmount, float sky, float blockLight, float[] tint, float scale) {
+    static int emitZombie(float[] out, int n, float px, float py, float pz, float yaw, float tilt, Pose pose,
+                          float sky, float blockLight, float[] tint, float scale) {
         Writer w = new Writer(out, n, px, py, pz, yaw, tilt, sky, blockLight, tint, ZOMBIE_TEX_W, ZOMBIE_TEX_H);
         w.scale = scale;
-        float lift = (float) Math.sin(walkPhase) * 2f * walkAmount; // model pixels
-        w.box(0, -4, 0, 8, 8, 8, 0, 0, 0, false);                     // head
-        w.box(0, 6, 0, 8, 12, 4, 16, 16, 0, false);                   // torso
-        // arms held straight forward: shoulder height 1.375 blocks = model y 2
-        w.box(-6, 2, -6, 4, 12, 4, 40, 16, 1, false);                 // right arm
-        w.box(6, 2, -6, 4, 12, 4, 32, 48, 1, true);                   // left arm
-        w.box(-2, 18 - Math.max(0f, lift), 0, 4, 12, 4, 0, 16, 0, false);   // right leg
-        w.box(2, 18 - Math.max(0f, -lift), 0, 4, 12, 4, 16, 48, 0, true);    // left leg
+        float[] swing = humanoidSwing(pose.limbPos(), pose.limbSpeed());
+        w.part = w.joint(0, 0, 0, pose.headPitch(), pose.headYaw(), 0);
+        w.box(0, -4, 0, 8, 8, 8, 0, 0, 0, false);                                    // head
+        w.part = null;
+        w.box(0, 6, 0, 8, 12, 4, 16, 16, 0, false);                                  // torso
+        float raise = zombieArmRaise(pose.aggressive());
+        w.part = w.joint(-5, 2, 0, raise + armBobX(pose.ageTicks(), 1f), -0.1f, armBobZ(pose.ageTicks(), 1f));
+        w.box(-6, 6, 0, 4, 12, 4, 40, 16, 0, false);                                 // right arm
+        w.part = w.joint(5, 2, 0, raise + armBobX(pose.ageTicks(), -1f), 0.1f, armBobZ(pose.ageTicks(), -1f));
+        w.box(6, 6, 0, 4, 12, 4, 32, 48, 0, true);                                   // left arm
+        w.part = w.joint(-1.9f, 12, 0, swing[2], 0, 0);
+        w.box(-1.9f, 18, 0, 4, 12, 4, 0, 16, 0, false);                              // right leg
+        w.part = w.joint(1.9f, 12, 0, swing[3], 0, 0);
+        w.box(1.9f, 18, 0, 4, 12, 4, 16, 48, 0, true);                               // left leg
+        w.part = null;
         return w.n;
     }
 
     /** Creeper with the vanilla swell pulse: horizontal scale (1 + 0.4 q) w, vertical (1 + 0.1 q) / w, q = s^4. */
-    static int emitCreeper(float[] out, int n, float px, float py, float pz, float yaw, float tilt, float walkPhase,
-                           float walkAmount, float swell, float sky, float blockLight, float[] tint) {
+    static int emitCreeper(float[] out, int n, float px, float py, float pz, float yaw, float tilt, Pose pose,
+                           float swell, float sky, float blockLight, float[] tint) {
         Writer w = new Writer(out, n, px, py, pz, yaw, tilt, sky, blockLight, tint, ANIMAL_TEX_W, ANIMAL_TEX_H);
         float wobble = 1f + (float) Math.sin(100f * swell) * swell * 0.01f;
         float q = swell * swell * swell * swell;
         w.scale = (1f + 0.4f * q) * wobble;
         w.scaleY = (1f + 0.1f * q) / wobble;
-        float sw = (float) Math.sin(walkPhase), lift = Math.max(0f, sw) * 1.5f * walkAmount, liftB = Math.max(0f, -sw) * 1.5f * walkAmount;
-        float swing = sw * 3f * walkAmount;
-        w.box(0, 2, 0, 8, 8, 8, 0, 0, 0, false);                       // head
-        w.box(0, 12, 0, 8, 12, 4, 16, 16, 0, false);                   // body
-        w.box(-2, 21 - lift, -4 + swing, 4, 6, 4, 0, 16, 0, false);    // front right
-        w.box(2, 21 - liftB, -4 - swing, 4, 6, 4, 0, 16, 0, true);     // front left
-        w.box(-2, 21 - liftB, 4 - swing, 4, 6, 4, 0, 16, 0, false);    // hind right
-        w.box(2, 21 - lift, 4 + swing, 4, 6, 4, 0, 16, 0, true);       // hind left
+        float[] leg = quadLegAngles(pose.limbPos(), pose.limbSpeed());
+        w.part = w.joint(0, 6, 0, pose.headPitch(), pose.headYaw(), 0);
+        w.box(0, 2, 0, 8, 8, 8, 0, 0, 0, false);                                     // head
+        w.part = null;
+        w.box(0, 12, 0, 8, 12, 4, 16, 16, 0, false);                                 // body
+        w.part = w.joint(-2, 18, -4, leg[2], 0, 0);
+        w.box(-2, 21, -4, 4, 6, 4, 0, 16, 0, false);                                 // front right
+        w.part = w.joint(2, 18, -4, leg[3], 0, 0);
+        w.box(2, 21, -4, 4, 6, 4, 0, 16, 0, true);                                   // front left
+        w.part = w.joint(-2, 18, 4, leg[0], 0, 0);
+        w.box(-2, 21, 4, 4, 6, 4, 0, 16, 0, false);                                  // hind right
+        w.part = w.joint(2, 18, 4, leg[1], 0, 0);
+        w.box(2, 21, 4, 4, 6, 4, 0, 16, 0, true);                                    // hind left
+        w.part = null;
         return w.n;
     }
 
-    static int emitSkeleton(float[] out, int n, float px, float py, float pz, float yaw, float tilt, float walkPhase,
-                            float walkAmount, float sky, float blockLight, float[] tint) {
+    /**
+     * The skeleton: legs and arms swing as a humanoid's; while attacking both arms are raised to hold the bow (right arm
+     * yaw -0.1 + head yaw, left 0.1 + head yaw + 0.4, both -90 degrees + head pitch), otherwise the right arm rests
+     * at half its swing minus 18 degrees (the held-item pose).
+     */
+    static int emitSkeleton(float[] out, int n, float px, float py, float pz, float yaw, float tilt, Pose pose,
+                            float sky, float blockLight, float[] tint) {
         Writer w = new Writer(out, n, px, py, pz, yaw, tilt, sky, blockLight, tint, ANIMAL_TEX_W, ANIMAL_TEX_H);
-        float lift = (float) Math.sin(walkPhase) * 2f * walkAmount;
-        w.box(0, -4, 0, 8, 8, 8, 0, 0, 0, false);                      // head
-        w.box(0, 6, 0, 8, 12, 4, 16, 16, 0, false);                    // ribcage
-        w.box(-5, 2, -6, 2, 12, 2, 40, 16, 1, false);                  // right arm raised to hold the bow
-        w.box(5, 2, -6, 2, 12, 2, 40, 16, 1, true);                    // left arm
-        w.box(-2, 18 - Math.max(0f, lift), 0, 2, 12, 2, 0, 16, 0, false);
-        w.box(2, 18 - Math.max(0f, -lift), 0, 2, 12, 2, 0, 16, 0, true);
+        float[] swing = humanoidSwing(pose.limbPos(), pose.limbSpeed());
+        w.part = w.joint(0, 0, 0, pose.headPitch(), pose.headYaw(), 0);
+        w.box(0, -4, 0, 8, 8, 8, 0, 0, 0, false);                                    // head
+        w.part = null;
+        w.box(0, 6, 0, 8, 12, 4, 16, 16, 0, false);                                  // ribcage
+        float rx, ry, lx, ly;
+        if (pose.aggressive()) {
+            rx = lx = -(float) Math.PI / 2f + pose.headPitch();
+            ry = -0.1f + pose.headYaw();
+            ly = 0.1f + pose.headYaw() + 0.4f;
+        } else {
+            rx = swing[0] * 0.5f - (float) Math.PI / 10f;
+            lx = swing[1];
+            ry = 0f;
+            ly = 0f;
+        }
+        w.part = w.joint(-5, 2, 0, rx + armBobX(pose.ageTicks(), 1f), ry, armBobZ(pose.ageTicks(), 1f));
+        w.box(-5, 6, 0, 2, 12, 2, 40, 16, 0, false);                                 // right arm
+        w.part = w.joint(5, 2, 0, lx + armBobX(pose.ageTicks(), -1f), ly, armBobZ(pose.ageTicks(), -1f));
+        w.box(5, 6, 0, 2, 12, 2, 40, 16, 0, true);                                   // left arm
+        w.part = w.joint(-2, 12, 0, swing[2], 0, 0);
+        w.box(-2, 18, 0, 2, 12, 2, 0, 16, 0, false);
+        w.part = w.joint(2, 12, 0, swing[3], 0, 0);
+        w.box(2, 18, 0, 2, 12, 2, 0, 16, 0, true);
+        w.part = null;
         return w.n;
     }
 
@@ -333,105 +417,150 @@ final class MobModelBuilder {
     /**
      * The baby pig, cow and chicken are dedicated models in 26.x (BabyPigModel, BabyCowModel, BabyChickenModel), not the
      * adult scaled down. Every box below is read from those classes in the client jar: the part's offset plus the box's
-     * corner give the centre, the box size and texture offset are used as they are. Texture sizes: pig 32x32, cow 64x64,
-     * chicken 16x16.
+     * corner give the centre, the box size and texture offset are used as they are, and the part offsets are the joints the
+     * head and legs turn about. Texture sizes: pig 32x32, cow 64x64, chicken 16x16.
      */
-    static int emitBabyPig(float[] out, int n, float px, float py, float pz, float yaw, float tilt, float walkPhase,
-                           float walkAmount, float sky, float blockLight, float[] tint) {
+    static int emitBabyPig(float[] out, int n, float px, float py, float pz, float yaw, float tilt, Pose pose,
+                           float sky, float blockLight, float[] tint) {
         Writer w = new Writer(out, n, px, py, pz, yaw, tilt, sky, blockLight, tint, skinW("pig_baby"), skinH("pig_baby"));
-        float swing = (float) Math.sin(walkPhase) * 1.2f * walkAmount;
-        float lift = Math.max(0f, (float) Math.sin(walkPhase)) * 0.6f * walkAmount, liftB = Math.max(0f, -(float) Math.sin(walkPhase)) * 0.6f * walkAmount;
-        w.box(0, 19, 0.5f, 7, 6, 9, 0, 0, 0, false);                    // body
+        float[] leg = quadLegAngles(pose.limbPos(), pose.limbSpeed());
+        w.box(0, 19, 0.5f, 7, 6, 9, 0, 0, 0, false);                                 // body
+        w.part = w.joint(0, 19, -2, pose.headPitch(), pose.headYaw(), 0);
         w.inflate = 0.025f;
-        w.box(0, 17, -4, 7, 6, 6, 0, 15, 0, false);                     // head
+        w.box(0, 17, -4, 7, 6, 6, 0, 15, 0, false);                                  // head
         w.inflate = 0.015f;
-        w.box(0, 18.025f, -7.5f, 3, 2, 1, 6, 27, 0, false);             // snout
+        w.box(0, 18.025f, -7.5f, 3, 2, 1, 6, 27, 0, false);                          // snout
         w.inflate = 0f;
-        w.box(2.5f, 23 - lift, -3 + swing, 2, 2, 2, 0, 0, 0, false);    // left front leg
-        w.box(-2.5f, 23 - liftB, -3 - swing, 2, 2, 2, 23, 0, 0, false); // right front leg
-        w.box(2.5f, 23 - liftB, 4 - swing, 2, 2, 2, 0, 4, 0, false);    // left hind leg
-        w.box(-2.5f, 23 - lift, 4 + swing, 2, 2, 2, 23, 4, 0, false);   // right hind leg
+        w.part = w.joint(2.5f, 22, -3, leg[3], 0, 0);
+        w.box(2.5f, 23, -3, 2, 2, 2, 0, 0, 0, false);                                // left front leg
+        w.part = w.joint(-2.5f, 22, -3, leg[2], 0, 0);
+        w.box(-2.5f, 23, -3, 2, 2, 2, 23, 0, 0, false);                              // right front leg
+        w.part = w.joint(2.5f, 22, 4, leg[1], 0, 0);
+        w.box(2.5f, 23, 4, 2, 2, 2, 0, 4, 0, false);                                 // left hind leg
+        w.part = w.joint(-2.5f, 22, 4, leg[0], 0, 0);
+        w.box(-2.5f, 23, 4, 2, 2, 2, 23, 4, 0, false);                               // right hind leg
+        w.part = null;
         return w.n;
     }
 
-    static int emitBabyCow(float[] out, int n, float px, float py, float pz, float yaw, float tilt, float walkPhase,
-                           float walkAmount, float sky, float blockLight, float[] tint) {
+    static int emitBabyCow(float[] out, int n, float px, float py, float pz, float yaw, float tilt, Pose pose,
+                           float sky, float blockLight, float[] tint) {
         Writer w = new Writer(out, n, px, py, pz, yaw, tilt, sky, blockLight, tint, skinW("cow_baby"), skinH("cow_baby"));
-        float swing = (float) Math.sin(walkPhase) * 1.5f * walkAmount;
-        float lift = Math.max(0f, (float) Math.sin(walkPhase)) * 0.8f * walkAmount, liftB = Math.max(0f, -(float) Math.sin(walkPhase)) * 0.8f * walkAmount;
-        w.box(0, 12, -7.5f, 6, 6, 5, 0, 18, 0, false);                  // head
-        w.box(3.5f, 9, -8.5f, 1, 2, 1, 8, 29, 0, false);                // horn
-        w.box(-3.5f, 9, -8.5f, 1, 2, 1, 4, 29, 0, true);                // horn (mirrored)
-        w.box(0, 13.5f, -10.5f, 4, 3, 1, 12, 29, 0, false);             // muzzle
-        w.box(0, 15, 0, 8, 6, 12, 0, 0, 0, false);                      // body
-        w.box(-2.5f, 21 - lift, -3.5f + swing, 3, 6, 3, 22, 18, 0, false);  // right front leg
-        w.box(2.5f, 21 - liftB, -3.5f - swing, 3, 6, 3, 34, 18, 0, false);  // left front leg
-        w.box(-2.5f, 21 - liftB, 3.5f - swing, 3, 6, 3, 22, 27, 0, false);  // right hind leg
-        w.box(2.5f, 21 - lift, 3.5f + swing, 3, 6, 3, 34, 27, 0, false);    // left hind leg
+        float[] leg = quadLegAngles(pose.limbPos(), pose.limbSpeed());
+        w.part = w.joint(0, 13.569f, -5.1667f, pose.headPitch(), pose.headYaw(), 0);
+        w.box(0, 12, -7.5f, 6, 6, 5, 0, 18, 0, false);                               // head
+        w.box(3.5f, 9, -8.5f, 1, 2, 1, 8, 29, 0, false);                             // horn
+        w.box(-3.5f, 9, -8.5f, 1, 2, 1, 4, 29, 0, true);                             // horn (mirrored)
+        w.box(0, 13.5f, -10.5f, 4, 3, 1, 12, 29, 0, false);                          // muzzle
+        w.part = null;
+        w.box(0, 15, 0, 8, 6, 12, 0, 0, 0, false);                                   // body
+        w.part = w.joint(-2.5f, 18, -3.5f, leg[2], 0, 0);
+        w.box(-2.5f, 21, -3.5f, 3, 6, 3, 22, 18, 0, false);                          // right front leg
+        w.part = w.joint(2.5f, 18, -3.5f, leg[3], 0, 0);
+        w.box(2.5f, 21, -3.5f, 3, 6, 3, 34, 18, 0, false);                           // left front leg
+        w.part = w.joint(-2.5f, 18, 3.5f, leg[0], 0, 0);
+        w.box(-2.5f, 21, 3.5f, 3, 6, 3, 22, 27, 0, false);                           // right hind leg
+        w.part = w.joint(2.5f, 18, 3.5f, leg[1], 0, 0);
+        w.box(2.5f, 21, 3.5f, 3, 6, 3, 34, 27, 0, false);                            // left hind leg
+        w.part = null;
         return w.n;
     }
 
-    static int emitBabyChicken(float[] out, int n, float px, float py, float pz, float yaw, float tilt, float walkPhase,
-                               float walkAmount, boolean airborne, float sky, float blockLight, float[] tint) {
+    /** The chicken's wings open by (sin(flap) + 1) * flapSpeed; the legs swing as a chicken's (cos, 1.4 * speed). */
+    static float wingAngle(Pose pose) {
+        return ((float) Math.sin(pose.flap()) + 1f) * pose.flapSpeed();
+    }
+
+    static float[] chickenLegAngles(Pose pose) {
+        float a = pose.limbPos() * 0.6662f;
+        return new float[]{(float) Math.cos(a) * 1.4f * pose.limbSpeed(), (float) Math.cos(a + Math.PI) * 1.4f * pose.limbSpeed()};
+    }
+
+    static int emitBabyChicken(float[] out, int n, float px, float py, float pz, float yaw, float tilt, Pose pose,
+                               float sky, float blockLight, float[] tint) {
         Writer w = new Writer(out, n, px, py, pz, yaw, tilt, sky, blockLight, tint, skinW("chicken_baby"), skinH("chicken_baby"));
-        float swing = (float) Math.sin(walkPhase) * 0.8f * walkAmount;
-        w.box(0, 20, 0, 4, 4, 4, 0, 0, 0, false);                       // body (the chick has no separate head)
-        w.box(0, 20.5f, -2.5f, 2, 1, 1, 10, 8, 0, false);               // beak
-        w.box(1, 23 - Math.max(0f, swing), 0.5f + swing, 1, 2, 0, 2, 2, 0, false);   // left leg
-        w.box(1, 24, 0 + swing, 1, 0, 1, 0, 1, 0, false);               // left foot
-        w.box(-1, 23 - Math.max(0f, -swing), 0.5f - swing, 1, 2, 0, 0, 2, 0, false); // right leg
-        w.box(-1, 24, 0 - swing, 1, 0, 1, 0, 0, 0, false);              // right foot
-        float flap = airborne ? -1.5f : 0f;
-        w.box(2.5f, 20 + flap, 0, 1, 0, 2, 6, 8, 0, false);             // right wing
-        w.box(-2.5f, 20 + flap, 0, 1, 0, 2, 4, 8, 0, false);            // left wing
+        float[] leg = chickenLegAngles(pose);
+        float wing = wingAngle(pose);
+        w.box(0, 20, 0, 4, 4, 4, 0, 0, 0, false);                                    // body (the chick has no separate head)
+        w.box(0, 20.5f, -2.5f, 2, 1, 1, 10, 8, 0, false);                            // beak
+        w.part = w.joint(1, 22, 0.5f, leg[1], 0, 0);
+        w.box(1, 23, 0.5f, 1, 2, 0, 2, 2, 0, false);                                 // left leg
+        w.box(1, 24, 0, 1, 0, 1, 0, 1, 0, false);                                    // left foot
+        w.part = w.joint(-1, 22, 0.5f, leg[0], 0, 0);
+        w.box(-1, 23, 0.5f, 1, 2, 0, 0, 2, 0, false);                                // right leg
+        w.box(-1, 24, 0, 1, 0, 1, 0, 0, 0, false);                                   // right foot
+        w.part = w.joint(2, 20, 0, 0, 0, wing);
+        w.box(2.5f, 20, 0, 1, 0, 2, 6, 8, 0, false);                                 // right wing
+        w.part = w.joint(-2, 20, 0, 0, 0, -wing);
+        w.box(-2.5f, 20, 0, 1, 0, 2, 4, 8, 0, false);                                // left wing
+        w.part = null;
         return w.n;
     }
 
-    static int emitPig(float[] out, int n, float px, float py, float pz, float yaw, float tilt, float walkPhase,
-                       float walkAmount, float sky, float blockLight, float[] tint) {
+    static int emitPig(float[] out, int n, float px, float py, float pz, float yaw, float tilt, Pose pose,
+                       float sky, float blockLight, float[] tint) {
         Writer w = new Writer(out, n, px, py, pz, yaw, tilt, sky, blockLight, tint, skinW("pig"), skinH("pig"));
-        float swing = (float) Math.sin(walkPhase) * 3f * walkAmount;
-        float lift = Math.max(0f, (float) Math.sin(walkPhase)) * 1.5f * walkAmount, liftB = Math.max(0f, -(float) Math.sin(walkPhase)) * 1.5f * walkAmount;
-        w.box(0, 12, -10, 8, 8, 8, 0, 0, 0, false);                    // head
-        w.box(0, 13.5f, -14.5f, 4, 3, 1, 16, 16, 0, false);            // snout
-        w.box(0, 14, 0, 10, 16, 8, 28, 8, -1, false);                  // body
-        w.box(-3, 21 - lift, -5 + swing, 4, 6, 4, 0, 16, 0, false);    // front right
-        w.box(3, 21 - liftB, -5 - swing, 4, 6, 4, 0, 16, 0, true);     // front left
-        w.box(-3, 21 - liftB, 7 - swing, 4, 6, 4, 0, 16, 0, false);    // hind right
-        w.box(3, 21 - lift, 7 + swing, 4, 6, 4, 0, 16, 0, true);       // hind left
+        float[] leg = quadLegAngles(pose.limbPos(), pose.limbSpeed());
+        w.part = w.joint(0, 12, -6, pose.headPitch(), pose.headYaw(), 0);
+        w.box(0, 12, -10, 8, 8, 8, 0, 0, 0, false);                                  // head
+        w.box(0, 13.5f, -14.5f, 4, 3, 1, 16, 16, 0, false);                          // snout
+        w.part = null;
+        w.box(0, 14, 0, 10, 16, 8, 28, 8, -1, false);                                // body
+        w.part = w.joint(-3, 18, -5, leg[2], 0, 0);
+        w.box(-3, 21, -5, 4, 6, 4, 0, 16, 0, false);                                 // front right
+        w.part = w.joint(3, 18, -5, leg[3], 0, 0);
+        w.box(3, 21, -5, 4, 6, 4, 0, 16, 0, true);                                   // front left
+        w.part = w.joint(-3, 18, 7, leg[0], 0, 0);
+        w.box(-3, 21, 7, 4, 6, 4, 0, 16, 0, false);                                  // hind right
+        w.part = w.joint(3, 18, 7, leg[1], 0, 0);
+        w.box(3, 21, 7, 4, 6, 4, 0, 16, 0, true);                                    // hind left
+        w.part = null;
         return w.n;
     }
 
-    static int emitCow(float[] out, int n, float px, float py, float pz, float yaw, float tilt, float walkPhase,
-                       float walkAmount, float sky, float blockLight, float[] tint) {
+    static int emitCow(float[] out, int n, float px, float py, float pz, float yaw, float tilt, Pose pose,
+                       float sky, float blockLight, float[] tint) {
         Writer w = new Writer(out, n, px, py, pz, yaw, tilt, sky, blockLight, tint, skinW("cow"), skinH("cow"));
-        float swing = (float) Math.sin(walkPhase) * 3f * walkAmount;
-        float lift = Math.max(0f, (float) Math.sin(walkPhase)) * 1.5f * walkAmount, liftB = Math.max(0f, -(float) Math.sin(walkPhase)) * 1.5f * walkAmount;
-        w.box(0, 4, -11, 8, 8, 6, 0, 0, 0, false);                     // head
-        w.box(-4.5f, 0.5f, -11.5f, 1, 3, 1, 22, 0, 0, false);          // horns
+        float[] leg = quadLegAngles(pose.limbPos(), pose.limbSpeed());
+        w.part = w.joint(0, 4, -8, pose.headPitch(), pose.headYaw(), 0);
+        w.box(0, 4, -11, 8, 8, 6, 0, 0, 0, false);                                   // head
+        w.box(-4.5f, 0.5f, -11.5f, 1, 3, 1, 22, 0, 0, false);                        // horns
         w.box(4.5f, 0.5f, -11.5f, 1, 3, 1, 22, 0, 0, true);
-        w.box(0, 7, 1, 12, 18, 10, 18, 4, -1, false);                  // body
-        w.box(0, 12.5f, 7, 4, 6, 1, 52, 0, -1, false);                 // udder
-        w.box(-4, 18 - lift, -6 + swing, 4, 12, 4, 0, 16, 0, false);   // front right
-        w.box(4, 18 - liftB, -6 - swing, 4, 12, 4, 0, 16, 0, true);    // front left
-        w.box(-4, 18 - liftB, 7 - swing, 4, 12, 4, 0, 16, 0, false);   // hind right
-        w.box(4, 18 - lift, 7 + swing, 4, 12, 4, 0, 16, 0, true);      // hind left
+        w.part = null;
+        w.box(0, 7, 1, 12, 18, 10, 18, 4, -1, false);                                // body
+        w.box(0, 12.5f, 7, 4, 6, 1, 52, 0, -1, false);                               // udder
+        w.part = w.joint(-4, 12, -5, leg[2], 0, 0);
+        w.box(-4, 18, -5, 4, 12, 4, 0, 16, 0, false);                                // front right
+        w.part = w.joint(4, 12, -5, leg[3], 0, 0);
+        w.box(4, 18, -5, 4, 12, 4, 0, 16, 0, true);                                  // front left
+        w.part = w.joint(-4, 12, 7, leg[0], 0, 0);
+        w.box(-4, 18, 7, 4, 12, 4, 0, 16, 0, false);                                 // hind right
+        w.part = w.joint(4, 12, 7, leg[1], 0, 0);
+        w.box(4, 18, 7, 4, 12, 4, 0, 16, 0, true);                                   // hind left
+        w.part = null;
         return w.n;
     }
 
-    static int emitChicken(float[] out, int n, float px, float py, float pz, float yaw, float tilt, float walkPhase,
-                           float walkAmount, boolean airborne, float sky, float blockLight, float[] tint) {
+    static int emitChicken(float[] out, int n, float px, float py, float pz, float yaw, float tilt, Pose pose,
+                           float sky, float blockLight, float[] tint) {
         Writer w = new Writer(out, n, px, py, pz, yaw, tilt, sky, blockLight, tint, skinW("chicken"), skinH("chicken"));
-        float swing = (float) Math.sin(walkPhase) * 2f * walkAmount;
-        w.box(0, 12, -4.5f, 4, 6, 3, 0, 0, 0, false);                  // head
-        w.box(0, 12, -7, 4, 2, 2, 14, 0, 0, false);                    // beak
-        w.box(0, 14, -6, 2, 2, 2, 14, 4, 0, false);                    // wattle
-        w.box(0, 16, 0, 6, 8, 6, 0, 9, -1, false);                     // body
-        float flap = airborne ? -2.5f : 0f;                            // wings lift while falling
-        w.box(-3.5f, 15 + flap, 0, 1, 4, 6, 24, 13, 0, false);         // right wing
-        w.box(3.5f, 15 + flap, 0, 1, 4, 6, 24, 13, 0, true);           // left wing
-        w.box(-1.5f, 21.5f - Math.max(0f, swing), -0.5f + swing, 3, 5, 3, 26, 0, 0, false);   // right leg
-        w.box(1.5f, 21.5f - Math.max(0f, -swing), -0.5f - swing, 3, 5, 3, 26, 0, 0, true);    // left leg
+        float[] leg = chickenLegAngles(pose);
+        float wing = wingAngle(pose);
+        w.part = w.joint(0, 15, -4, pose.headPitch(), pose.headYaw(), 0);
+        w.box(0, 12, -4.5f, 4, 6, 3, 0, 0, 0, false);                                // head
+        w.box(0, 12, -7, 4, 2, 2, 14, 0, 0, false);                                  // beak
+        w.box(0, 14, -6, 2, 2, 2, 14, 4, 0, false);                                  // wattle
+        w.part = null;
+        w.box(0, 16, 0, 6, 8, 6, 0, 9, -1, false);                                   // body
+        w.part = w.joint(-4, 13, 0, 0, 0, wing);
+        w.box(-3.5f, 15, 0, 1, 4, 6, 24, 13, 0, false);                              // right wing
+        w.part = w.joint(4, 13, 0, 0, 0, -wing);
+        w.box(3.5f, 15, 0, 1, 4, 6, 24, 13, 0, true);                                // left wing
+        w.part = w.joint(-2, 19, 1, leg[0], 0, 0);
+        w.box(-1.5f, 21.5f, -0.5f, 3, 5, 3, 26, 0, 0, false);                        // right leg
+        w.part = w.joint(1, 19, 1, leg[1], 0, 0);
+        w.box(1.5f, 21.5f, -0.5f, 3, 5, 3, 26, 0, 0, true);                          // left leg
+        w.part = null;
         return w.n;
     }
 }

@@ -133,6 +133,7 @@ public class MobManager {
             if (m.isAlive() && m.position.distanceSquared(playerPos) > SIMULATION_DISTANCE * SIMULATION_DISTANCE) continue;
             m.setSunlit(m.isAlive() && sunReaches(world, m));
             m.setLightLevel(lightAt(world, m));
+            m.setNeighbors(mobs);
             m.tick(world, candidates, dt);
             com.example.world.BlockType laid = m.isAlive() ? m.takeLaidItem() : null;
             if (laid != null) {

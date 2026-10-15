@@ -7,9 +7,9 @@ import org.joml.Vector3f;
 
 import java.util.List;
 
-/** Vanilla priority 7-8: an idle mob occasionally turns its head to a random direction for 1-2 seconds. */
+/** Vanilla priority 7: an idle mob occasionally (2% per tick) turns its head to a random direction for 1-2 seconds. */
 public final class RandomLookAroundGoal implements Goal {
-    private static final int CHANCE_ONE_IN = 80;
+    private static final int CHANCE_ONE_IN = 50; // vanilla: 2% per tick
 
     private float yaw;
     private float remaining;
@@ -30,6 +30,7 @@ public final class RandomLookAroundGoal implements Goal {
     @Override
     public void tick(Mob mob, World world, List<Targetable> candidates, float dt) {
         remaining -= dt;
-        mob.facePoint(new Vector3f(mob.position.x + (float) Math.sin(yaw) * 3f, mob.position.y, mob.position.z - (float) Math.cos(yaw) * 3f));
+        // vanilla: look at a point 1 block away in a random direction, at the mob's own eye height
+        mob.lookAt(new Vector3f(mob.position.x + (float) Math.cos(yaw), mob.position.y + mob.getEyeHeight(), mob.position.z + (float) Math.sin(yaw)));
     }
 }

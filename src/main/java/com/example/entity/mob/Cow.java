@@ -31,6 +31,11 @@ public class Cow extends PassiveMob {
     }
 
     @Override
+    public float followParentSpeed() {
+        return 1.25f;
+    }
+
+    @Override
     public String typeId() {
         return "cow";
     }

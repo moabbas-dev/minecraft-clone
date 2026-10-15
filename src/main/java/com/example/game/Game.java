@@ -332,7 +332,7 @@ public class Game implements GameAccess {
         mobs.setProjectileSink(r -> arrows.fire(r.origin(), r.velocity(), r.damage()));
         mobs.setSoundSink(e -> {
             if (player != null && player.position.distanceSquared(e.x(), e.y(), e.z()) < 32f * 32f) {
-                gameAudio.play(e.id(), new Vector3f(e.x(), e.y(), e.z()));
+                gameAudio.play(e.id(), new Vector3f(e.x(), e.y(), e.z()), e.pitch());
             }
         });
         gameAudio.init(); // never throws - degrades to silent no-ops if no device/OpenAL fails
@@ -2112,26 +2112,31 @@ public class Game implements GameAccess {
                 float[] tint = m.getHurtTime() > 0f || !m.isAlive() ? new float[]{1.6f, 0.5f, 0.5f}
                         : m.isOnFire() ? new float[]{1.5f, 0.85f, 0.45f} : NEUTRAL_ICON_TINT;
                 float tilt = m.isAlive() ? 0f : (float) (Math.PI / 2) * Math.min(1f, m.getDeathTime());
-                float yaw = m.getYaw();
+                float yaw = m.getBodyYaw();
                 float px = m.position.x, py = m.position.y, pz = m.position.z;
                 float walk = m.getWalkPhase(), amt = m.getWalkAmount();
+                float flap = 0f, flapSpeed = 0f;
+                if (m instanceof com.example.entity.mob.Chicken chicken) {
+                    flap = chicken.getFlap();
+                    flapSpeed = chicken.getFlapSpeed();
+                }
+                MobModelBuilder.Pose pose = new MobModelBuilder.Pose(m.getLimbPos(), m.isAlive() ? m.getLimbSpeed() : 0f,
+                        m.getNetHeadYaw(), m.getHeadPitch(), m.getAgeTicks(), m.isAggressive(), flap, flapSpeed);
                 switch (skin.getKey()) {
-                    case "pig" -> n = MobModelBuilder.emitPig(mobScratch, n, px, py, pz, yaw, tilt, walk, amt, sky, blk, tint);
-                    case "pig_baby" -> n = MobModelBuilder.emitBabyPig(mobScratch, n, px, py, pz, yaw, tilt, walk, amt, sky, blk, tint);
-                    case "cow_baby" -> n = MobModelBuilder.emitBabyCow(mobScratch, n, px, py, pz, yaw, tilt, walk, amt, sky, blk, tint);
-                    case "chicken_baby" -> n = MobModelBuilder.emitBabyChicken(mobScratch, n, px, py, pz, yaw, tilt, walk, amt,
-                            !m.isOnGround(), sky, blk, tint);
+                    case "pig" -> n = MobModelBuilder.emitPig(mobScratch, n, px, py, pz, yaw, tilt, pose, sky, blk, tint);
+                    case "pig_baby" -> n = MobModelBuilder.emitBabyPig(mobScratch, n, px, py, pz, yaw, tilt, pose, sky, blk, tint);
+                    case "cow_baby" -> n = MobModelBuilder.emitBabyCow(mobScratch, n, px, py, pz, yaw, tilt, pose, sky, blk, tint);
+                    case "chicken_baby" -> n = MobModelBuilder.emitBabyChicken(mobScratch, n, px, py, pz, yaw, tilt, pose, sky, blk, tint);
                     case "creeper" -> {
                         float swell = ((com.example.entity.mob.Creeper) m).getSwellFraction();
                         float[] t2 = ((int) Math.floor(swell * 10f) & 1) == 1 && m.isAlive() ? new float[]{2.4f, 2.4f, 2.4f} : tint;
-                        n = MobModelBuilder.emitCreeper(mobScratch, n, px, py, pz, yaw, tilt, walk, amt, swell, sky, blk, t2);
+                        n = MobModelBuilder.emitCreeper(mobScratch, n, px, py, pz, yaw, tilt, pose, swell, sky, blk, t2);
                     }
-                    case "skeleton" -> n = MobModelBuilder.emitSkeleton(mobScratch, n, px, py, pz, yaw, tilt, walk, amt, sky, blk, tint);
+                    case "skeleton" -> n = MobModelBuilder.emitSkeleton(mobScratch, n, px, py, pz, yaw, tilt, pose, sky, blk, tint);
                     case "spider" -> n = MobModelBuilder.emitSpider(mobScratch, n, px, py, pz, yaw, tilt, walk, amt, sky, blk, tint);
-                    case "cow" -> n = MobModelBuilder.emitCow(mobScratch, n, px, py, pz, yaw, tilt, walk, amt, sky, blk, tint);
-                    case "chicken" -> n = MobModelBuilder.emitChicken(mobScratch, n, px, py, pz, yaw, tilt, walk, amt,
-                            !m.isOnGround(), sky, blk, tint);
-                    default -> n = MobModelBuilder.emitZombie(mobScratch, n, px, py, pz, yaw, tilt, walk, amt, sky, blk, tint, m.isBaby() ? 0.5f : 1f);
+                    case "cow" -> n = MobModelBuilder.emitCow(mobScratch, n, px, py, pz, yaw, tilt, pose, sky, blk, tint);
+                    case "chicken" -> n = MobModelBuilder.emitChicken(mobScratch, n, px, py, pz, yaw, tilt, pose, sky, blk, tint);
+                    default -> n = MobModelBuilder.emitZombie(mobScratch, n, px, py, pz, yaw, tilt, pose, sky, blk, tint, m.isBaby() ? 0.5f : 1f);
                 }
             }
             if (n == 0) continue;

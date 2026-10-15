@@ -182,6 +182,11 @@ public class GameAudio {
         engine.playOneShot(registry.definitionOf(id), registry.buffersFor(id), worldPos);
     }
 
+    /** Same, with the sound's pitch multiplied (a baby animal's voice is 1.5 times as high). */
+    public void play(String id, Vector3f worldPos, float pitchMultiplier) {
+        engine.playOneShot(registry.definitionOf(id), registry.buffersFor(id), worldPos, pitchMultiplier, 1f);
+    }
+
     /** Item collected into the inventory. Non-positional (it happens at the player). The caller
      *  invokes this at most once per update no matter how many stacks transferred, so a pile
      *  being collected in one frame is one sound, not a burst. */

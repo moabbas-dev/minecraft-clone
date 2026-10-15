@@ -14,7 +14,7 @@ import java.util.Set;
  * Runs a priority-ordered list of independent {@link Goal}s against one {@link Mob} each tick.
  * Lower {@code priority} runs first and is checked first, matching real vanilla's own
  * convention, but this selector deliberately has no "conflicting goal" flag system (unlike
- * vanilla's real one) - with today's 3 zombie goals their start/continue conditions are already
+ * vanilla's real one, apart from the single MOVE flag, see {@link Goal#usesMovement}) - with today's 3 zombie goals their start/continue conditions are already
  * mutually exclusive by construction (movement stops being eligible exactly when attack range is
  * reached, and vice versa), so multiple goals simply run concurrently without stepping on each
  * other. A future mob whose goals genuinely conflict (e.g. two different movement goals) would
@@ -34,17 +34,20 @@ public final class GoalSelector {
     }
 
     public void tick(Mob mob, World world, List<Targetable> candidates, float dt) {
+        boolean movementTaken = false;
         for (Entry e : entries) {
             Goal goal = e.goal();
+            boolean blocked = goal.usesMovement() && movementTaken;
             if (running.contains(goal)) {
-                if (!goal.canContinue(mob, world, candidates)) {
+                if (blocked || !goal.canContinue(mob, world, candidates)) {
                     goal.stop(mob, world);
                     running.remove(goal);
                 }
-            } else if (goal.canStart(mob, world, candidates)) {
+            } else if (!blocked && goal.canStart(mob, world, candidates)) {
                 goal.start(mob, world);
                 running.add(goal);
             }
+            if (goal.usesMovement() && running.contains(goal)) movementTaken = true;
         }
         for (Entry e : entries) {
             if (running.contains(e.goal())) e.goal().tick(mob, world, candidates, dt);

@@ -46,6 +46,7 @@ public final class MeleeAttackGoal implements Goal {
         Targetable target = mob.getTarget();
         if (target == null) return;
         mob.facePoint(target.getPosition());
+            mob.lookAt(target.getEyePosition());
         if (cooldown > 0f) {
             cooldown = Math.max(0f, cooldown - dt);
             return;

@@ -20,6 +20,11 @@ public final class RandomStrollGoal implements Goal {
     private float walked;
 
     @Override
+    public boolean usesMovement() {
+        return true;
+    }
+
+    @Override
     public boolean canStart(Mob mob, World world, List<Targetable> candidates) {
         if (mob.getRecentHurtTimer() > 0f) return false; // panicking takes over
         if (!AiRolls.oneIn(mob, ONE_IN)) return false;
