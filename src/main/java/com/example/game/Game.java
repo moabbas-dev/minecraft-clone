@@ -1722,6 +1722,8 @@ public class Game implements GameAccess {
 
     private void updateItemsAndEffects(float dt) {
         playerTarget.bind(player, survival);
+        float stormLevel = weather.getStormIntensity();
+        world.setSkyDarken(SkyDetails.skyDarken(SkyDetails.dayTick(dayTime), stormLevel, weather.isThundering() ? stormLevel : 0f));
         mobs.setEnvironment(computeDaylightFactor(sunDirection(dayTime)), weather.isRaining());
         if (survival.getDifficulty() == Difficulty.PEACEFUL) mobs.removeHostile();
         fallingBlocks.update(world, dt, itemEntities, gameplayRandom);
@@ -1736,9 +1738,9 @@ public class Game implements GameAccess {
         float cooldown = survival.getHealth().hurtCooldownRemaining();
         if (cooldown > lastHurtCooldown + 1e-4f && survival.getHealth().isAlive()) gameAudio.play("player.hurt", null);
         lastHurtCooldown = cooldown;
-        mobSpawner.tick(world, mobs, player.position, computeDaylightFactor(sunDirection(dayTime)),
+        mobSpawner.tick(world, mobs, player.position, weather.isThundering(),
                 () -> survival.getDifficulty(), gameplayRandom, dt);
-        passiveSpawner.tick(world, mobs, player.position, computeDaylightFactor(sunDirection(dayTime)), gameplayRandom, dt);
+        passiveSpawner.tick(world, mobs, player.position, gameplayRandom, dt);
         mobs.tick(world, mobTargets, player.position, itemEntities, gameplayRandom, dt);
         survival.addExperience(mobs.drainExperience());
         itemEntities.update(world, dt);
@@ -2157,8 +2159,9 @@ public class Game implements GameAccess {
             for (Mob m : list) {
                 if (!skin.getKey().equals(skinKeyOf(m))) continue;
                 if (n + MobModelBuilder.FLOATS_PER_MOB > mobScratch.length) break;
-                int bx = (int) Math.floor(m.position.x), by = (int) Math.floor(m.position.y + 1f), bz = (int) Math.floor(m.position.z);
-                float sky = world.getSkyLight(bx, by, bz) / 15f, blk = world.getBlockLight(bx, by, bz) / 15f;
+                // vanilla lights an entity with the cell of its eye position, and a burning one is lit at block light 15
+                int bx = (int) Math.floor(m.position.x), by = (int) Math.floor(m.position.y + m.getEyeHeight()), bz = (int) Math.floor(m.position.z);
+                float sky = world.getSkyLight(bx, by, bz) / 15f, blk = m.isOnFire() ? 1f : world.getBlockLight(bx, by, bz) / 15f;
                 float[] tint = m.getHurtTime() > 0f || !m.isAlive() ? new float[]{1.6f, 0.5f, 0.5f}
                         : m.isOnFire() ? new float[]{1.5f, 0.85f, 0.45f} : NEUTRAL_ICON_TINT;
                 float tilt = m.isAlive() ? 0f : (float) (Math.PI / 2) * Math.min(1f, m.getDeathTime());

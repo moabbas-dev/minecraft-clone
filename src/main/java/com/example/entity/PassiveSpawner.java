@@ -45,7 +45,7 @@ public class PassiveSpawner {
     }
 
     /** The occasional natural pack near the player. */
-    public void tick(World world, MobManager mobs, Vector3f playerPos, float daylightFactor, Random random, float dt) {
+    public void tick(World world, MobManager mobs, Vector3f playerPos, Random random, float dt) {
         if (!enabled) return;
         timer -= dt;
         if (timer > 0f) return;
@@ -56,7 +56,7 @@ public class PassiveSpawner {
         float dist = MIN_DISTANCE + random.nextFloat() * (MAX_DISTANCE - MIN_DISTANCE);
         int bx = (int) Math.floor(playerPos.x + Math.cos(angle) * dist);
         int bz = (int) Math.floor(playerPos.z + Math.sin(angle) * dist);
-        spawnPack(world, mobs, bx, bz, 1 + random.nextInt(PACK_SIZE), random, true, daylightFactor);
+        spawnPack(world, mobs, bx, bz, 1 + random.nextInt(PACK_SIZE), random, true);
     }
 
     /** Called once for a freshly generated (never saved) chunk: about 1 in 10 get a pack of 1-4. */
@@ -64,12 +64,12 @@ public class PassiveSpawner {
         if (random.nextInt(10) != 0) return 0;
         int bx = chunk.worldOriginX() + random.nextInt(Chunk.SIZE_X);
         int bz = chunk.worldOriginZ() + random.nextInt(Chunk.SIZE_Z);
-        return spawnPack(world, mobs, bx, bz, 1 + random.nextInt(PACK_SIZE), random, false, 1f);
+        return spawnPack(world, mobs, bx, bz, 1 + random.nextInt(PACK_SIZE), random, false);
     }
 
     /** Places up to {@code size} animals of one weighted-random species around (bx, bz); returns how many. */
     public static int spawnPack(World world, MobManager mobs, int bx, int bz, int size, Random random,
-                                boolean requireGrassAndLight, float daylightFactor) {
+                                boolean requireGrassAndLight) {
         int species = pickSpecies(random);
         int placed = 0;
         for (int i = 0; i < size; i++) {
@@ -83,8 +83,8 @@ public class PassiveSpawner {
             if (ground == BlockType.WATER || ground.name().endsWith("LEAVES")) continue;
             if (requireGrassAndLight) {
                 if (ground != BlockType.GRASS_BLOCK) continue;
-                int light = Math.max(Math.round(world.getSkyLight(x, y, z) * daylightFactor), world.getBlockLight(x, y, z));
-                if (light < MIN_LIGHT) continue;
+                // Animal.isBrightEnoughToSpawn: getRawBrightness(pos, 0) > 8 - the sky light is not dimmed for it
+                if (world.getRawBrightness(x, y, z, 0) < MIN_LIGHT) continue;
             }
             Vector3f at = new Vector3f(x + 0.5f, y, z + 0.5f);
             float yaw = random.nextFloat() * (float) (Math.PI * 2);

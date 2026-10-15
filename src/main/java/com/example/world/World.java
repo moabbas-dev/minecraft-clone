@@ -122,6 +122,33 @@ public class World {
         return c.getBlockLight(worldToLocal(x), y, worldToLocal(z));
     }
 
+    /** How much the sky light is dimmed for gameplay (vanilla's {@code Level.getSkyDarken}: 0 at noon, 11 on a clear night). */
+    private int skyDarken;
+
+    public int getSkyDarken() {
+        return skyDarken;
+    }
+
+    public void setSkyDarken(int skyDarken) {
+        this.skyDarken = Math.max(0, Math.min(15, skyDarken));
+    }
+
+    /** {@code Level.isBrightOutside}: the sky is dimmed by less than 4. */
+    public boolean isBrightOutside() {
+        return skyDarken < 4;
+    }
+
+    /** {@code getRawBrightness(pos, amount)}: the larger of the block light and the sky light dimmed by {@code amount}. */
+    public int getRawBrightness(int x, int y, int z, int amount) {
+        if (y < 0 || y >= Chunk.SIZE_Y) return 15;
+        return Math.max(getBlockLight(x, y, z), getSkyLight(x, y, z) - amount);
+    }
+
+    /** {@code getRawBrightness(pos)} with the current sky darkness: the light a mob at this cell is in. */
+    public int getRawBrightness(int x, int y, int z) {
+        return getRawBrightness(x, y, z, skyDarken);
+    }
+
     /** Extra block light a position gives off on top of its block's own (a burning furnace), keyed by packed position. */
     private final Map<Long, Integer> emissionOverrides = new HashMap<>();
 

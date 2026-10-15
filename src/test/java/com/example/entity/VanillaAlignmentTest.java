@@ -144,7 +144,7 @@ class VanillaAlignmentTest {
         MobManager mobs = new MobManager();
         MobSpawner spawner = new MobSpawner();
         for (int i = 0; i < 200; i++) {
-            spawner.tick(world, mobs, new Vector3f(5, ground, 5), 0f, () -> Difficulty.PEACEFUL, new Random(i), 2f);
+            spawner.tick(world, mobs, new Vector3f(5, ground, 5), false, () -> Difficulty.PEACEFUL, new Random(i), 2f);
         }
         assertEquals(0, mobs.size());
         mobs.spawn(new Zombie(new Vector3f(5.5f, ground, 5.5f), 0f, () -> Difficulty.NORMAL));
@@ -156,8 +156,13 @@ class VanillaAlignmentTest {
     void hostileSpawnsNeedBlockLightZeroAndLowSkyLight() {
         Vector3f far = new Vector3f(-30, ground, -30);
         // flat floor in daylight: sky light is bright, so no spawn
-        assertFalse(MobSpawner.isValidSpawn(world, 5, ground, 5, far, 1f));
-        // at night (daylight 0) the sky contributes nothing and block light is 0
-        assertTrue(MobSpawner.isValidSpawn(world, 5, ground, 5, far, 0f));
+        world.setSkyDarken(0);
+        Random random = new Random(5);
+        for (int i = 0; i < 300; i++) assertFalse(MobSpawner.isValidSpawn(world, 5, ground, 5, far, false, random));
+        // at night the sky is dimmed by 11 and block light is 0, so some attempts pass
+        world.setSkyDarken(11);
+        boolean any = false;
+        for (int i = 0; i < 300; i++) any |= MobSpawner.isValidSpawn(world, 5, ground, 5, far, false, random);
+        assertTrue(any);
     }
 }

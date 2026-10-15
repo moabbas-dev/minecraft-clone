@@ -14,9 +14,10 @@ import java.util.function.Supplier;
  * {@link #ATTEMPT_INTERVAL_SECONDS} it makes one bounded attempt at a random column in an
  * annulus around the player, and spawns only if the spot passes the rules in
  * {@link #isValidSpawn} (the hook point where future rules - biome, mob category, spawn
- * weights - get added). Light is the darkness gate: combined sky+block light at the spot must be
- * at or below {@link #MAX_SPAWN_LIGHT}, which is vanilla's own hostile-spawn rule and naturally
- * means "night outdoors or inside caves/dark rooms" without hard-coding time of day.
+ * weights - get added). Light is the darkness gate, vanilla's {@code Monster.isDarkEnoughToSpawn} with the overworld
+ * numbers: the raw sky light must not beat a random 0-31, the block light must be 0, and the brightness (block light or
+ * the sky light dimmed by the sky darkness, 10 in a thunderstorm) must not exceed a random 0-7. That naturally means
+ * "night outdoors, storms, or inside caves/dark rooms" without hard-coding the time of day.
  */
 public class MobSpawner {
     public static final float ATTEMPT_INTERVAL_SECONDS = 2f;
@@ -36,9 +37,7 @@ public class MobSpawner {
         return enabled;
     }
 
-    /** @param daylightFactor 0 (night) .. 1 (day) from the game's day/night cycle; skylight is
-     *                        scaled by it so "dark" means the right thing at night outdoors. */
-    public void tick(World world, MobManager mobs, Vector3f playerPos, float daylightFactor,
+    public void tick(World world, MobManager mobs, Vector3f playerPos, boolean thundering,
                      Supplier<Difficulty> difficulty, Random random, float dt) {
         if (!enabled || difficulty.get() == Difficulty.PEACEFUL) return;
         timer -= dt;
@@ -52,7 +51,7 @@ public class MobSpawner {
         int z = (int) Math.floor(playerPos.z + Math.sin(angle) * dist);
         Integer y = findSpawnY(world, x, z, (int) Math.floor(playerPos.y));
         if (y == null) return;
-        if (!isValidSpawn(world, x, y, z, playerPos, daylightFactor)) return;
+        if (!isValidSpawn(world, x, y, z, playerPos, thundering, random)) return;
 
         Vector3f at = new Vector3f(x + 0.5f, y, z + 0.5f);
         float yaw = random.nextFloat() * (float) (Math.PI * 2);
@@ -81,7 +80,7 @@ public class MobSpawner {
         return null;
     }
 
-    public static boolean isValidSpawn(World world, int x, int y, int z, Vector3f playerPos, float daylightFactor) {
+    public static boolean isValidSpawn(World world, int x, int y, int z, Vector3f playerPos, boolean thundering, Random random) {
         Chunk c = world.getChunk(World.worldToChunk(x), World.worldToChunk(z));
         if (c == null || !c.isGenerated()) return false;
         // Not inside solid blocks / enough room for the 1.95-tall box.
@@ -91,8 +90,14 @@ public class MobSpawner {
         if (world.getBlock(x, y, z) == com.example.world.BlockType.WATER) return false;
         float dx = x + 0.5f - playerPos.x, dz = z + 0.5f - playerPos.z;
         if (dx * dx + dz * dz < MIN_DISTANCE * MIN_DISTANCE) return false; // never on top of the player
-        int sky = Math.round(world.getSkyLight(x, y, z) * daylightFactor);
-        // Vanilla 1.18+: block light must be 0 and sky light at most 7.
-        return world.getBlockLight(x, y, z) == 0 && sky <= MAX_SPAWN_LIGHT;
+        return isDarkEnoughToSpawn(world, x, y, z, thundering, random);
+    }
+
+    /** Monster.isDarkEnoughToSpawn with the overworld's monster_spawn_light_level (uniform 0-7) and block light limit 0. */
+    public static boolean isDarkEnoughToSpawn(World world, int x, int y, int z, boolean thundering, Random random) {
+        if (world.getSkyLight(x, y, z) > random.nextInt(32)) return false;
+        if (world.getBlockLight(x, y, z) > 0) return false;
+        int brightness = thundering ? world.getRawBrightness(x, y, z, 10) : world.getRawBrightness(x, y, z);
+        return brightness <= random.nextInt(MAX_SPAWN_LIGHT + 1);
     }
 }

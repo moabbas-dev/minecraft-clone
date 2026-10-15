@@ -51,12 +51,12 @@ public class MobManager {
     }
 
     private int lightAt(World world, Mob m) {
-        int x = (int) Math.floor(m.position.x), y = (int) Math.floor(m.position.y + 0.5f), z = (int) Math.floor(m.position.z);
-        return Math.max(Math.round(world.getSkyLight(x, y, z) * daylightFactor), world.getBlockLight(x, y, z));
+        int x = (int) Math.floor(m.position.x), y = (int) Math.floor(m.position.y + m.getEyeHeight()), z = (int) Math.floor(m.position.z);
+        return world.getRawBrightness(x, y, z);
     }
 
     private boolean sunReaches(World world, Mob m) {
-        if (daylightFactor < 0.6f || raining || m.isInWater(world)) return false;
+        if (!world.isBrightOutside() || raining || m.isInWater(world)) return false;
         int x = (int) Math.floor(m.position.x), z = (int) Math.floor(m.position.z);
         int headY = (int) Math.floor(m.position.y + m.getHeight() - 0.1f);
         return world.getSkyLight(x, headY, z) >= 15;

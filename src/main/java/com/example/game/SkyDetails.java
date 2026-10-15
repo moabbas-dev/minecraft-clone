@@ -43,6 +43,26 @@ final class SkyDetails {
         return new float[]{cyclic(r, tick), cyclic(g, tick), cyclic(b, tick)};
     }
 
+    private static final float[][] SKY_LIGHT_LEVEL_FACTOR = {{133, 1f}, {11867, 1f}, {13670, 0.26666668f}, {22330, 0.26666668f}};
+    /** The level rain and thunder pull the gameplay sky light toward (WeatherAttributes: alpha 0.3125 rain, 0.527 thunder). */
+    static final float STORM_SKY_LIGHT_LEVEL = 4f;
+
+    /**
+     * The overworld's {@code gameplay/sky_light_level}: 15 times the day timeline factor, pulled toward 4 by rain (alpha 0.3125)
+     * and thunder (alpha 0.52734375), each scaled by how strong the weather is. Mob spawning and burning read it.
+     */
+    static float skyLightLevel(float tick, float rainLevel, float thunderLevel) {
+        float level = 15f * cyclic(SKY_LIGHT_LEVEL_FACTOR, tick);
+        level += (STORM_SKY_LIGHT_LEVEL - level) * 0.3125f * Math.max(0f, Math.min(1f, rainLevel));
+        level += (STORM_SKY_LIGHT_LEVEL - level) * 0.52734375f * Math.max(0f, Math.min(1f, thunderLevel));
+        return level;
+    }
+
+    /** {@code Level.updateSkyBrightness}: {@code (int) (15 - sky_light_level)}, how much the sky light is dimmed for gameplay. */
+    static int skyDarken(float tick, float rainLevel, float thunderLevel) {
+        return (int) (15f - skyLightLevel(tick, rainLevel, thunderLevel));
+    }
+
     static float cyclic(float[][] keys, float tick) {
         float t = ((tick % 24000f) + 24000f) % 24000f;
         int n = keys.length;

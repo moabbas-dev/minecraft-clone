@@ -205,20 +205,55 @@ class MobSystemTest {
     @Test
     void spawnerRejectsBrightSolidAndTooCloseSpots() {
         Vector3f player = new Vector3f(8, GROUND, 8);
-        assertFalse(MobSpawner.isValidSpawn(world, 30, GROUND, 8, player, 1f), "bright daylight");
-        assertTrue(MobSpawner.isValidSpawn(world, 30, GROUND, 8, player, 0f), "night is dark enough");
-        assertFalse(MobSpawner.isValidSpawn(world, 10, GROUND, 8, player, 0f), "too close to player");
+        world.setSkyDarken(0); // noon
+        assertFalse(spawnsSometimes(30, GROUND, 8, player, false), "bright daylight");
+        world.setSkyDarken(11); // a clear night
+        assertTrue(spawnsSometimes(30, GROUND, 8, player, false), "night is dark enough");
+        assertFalse(spawnsSometimes(10, GROUND, 8, player, false), "too close to player");
         world.setBlock(30, GROUND, 8, BlockType.STONE);
-        assertFalse(MobSpawner.isValidSpawn(world, 30, GROUND, 8, player, 0f), "inside a block");
+        assertFalse(spawnsSometimes(30, GROUND, 8, player, false), "inside a block");
+    }
+
+    /** True when at least one of many random draws passes the (probabilistic) spawn test. */
+    private boolean spawnsSometimes(int x, int y, int z, Vector3f player, boolean thundering) {
+        Random random = new Random(11);
+        for (int i = 0; i < 400; i++) {
+            if (MobSpawner.isValidSpawn(world, x, y, z, player, thundering, random)) return true;
+        }
+        return false;
+    }
+
+    @Test
+    void spawnLightRuleIsVanillasMonsterTest() {
+        Vector3f player = new Vector3f(8, GROUND, 8);
+        world.setSkyDarken(11);
+        int pass = 0;
+        Random random = new Random(3);
+        for (int i = 0; i < 20000; i++) if (MobSpawner.isDarkEnoughToSpawn(world, 30, GROUND, 8, false, random)) pass++;
+        // open sky (15) must not beat a random 0-31 (17/32 of the time), then brightness 15 - 11 = 4 must not exceed a random 0-7 (4 of 8)
+        assertEquals(17.0 / 32.0 * 0.5, pass / 20000.0, 0.02);
+        world.setSkyDarken(0);
+        for (int i = 0; i < 500; i++) assertFalse(MobSpawner.isDarkEnoughToSpawn(world, 30, GROUND, 8, false, random), "noon: brightness 15 never passes");
+        int storm = 0; // a thunderstorm counts the sky as dimmed by 10 whatever the time is
+        for (int i = 0; i < 2000; i++) if (MobSpawner.isDarkEnoughToSpawn(world, 30, GROUND, 8, true, random)) storm++;
+        assertTrue(storm > 0, "thunderstorms let monsters spawn by day");
+    }
+
+    @Test
+    void skyDarkenFollowsTheGameplaySkyLightLevel() {
+        assertEquals(0, com.example.game.SkyDetailsAccess.skyDarken(6000f, 0f, 0f));
+        assertEquals(11, com.example.game.SkyDetailsAccess.skyDarken(18000f, 0f, 0f), "15 * 0.2667 = 4.0, so 15 - 4 = 11");
+        assertEquals(7, com.example.game.SkyDetailsAccess.skyDarken(6000f, 1f, 1f), "noon 15 -> 11.56 (rain) -> 7.58 (thunder): 15 - 7.58 truncated");
     }
 
     @Test
     void spawnerSpawnsAtNightRespectingTheCap() {
+        world.setSkyDarken(11);
         MobManager mm = new MobManager();
         MobSpawner sp = new MobSpawner();
         Vector3f player = new Vector3f(8, GROUND, 8);
         Random rnd = new Random(7);
-        for (int i = 0; i < 2000; i++) sp.tick(world, mm, player, 0f, () -> difficulty, rnd, 0.5f);
+        for (int i = 0; i < 2000; i++) sp.tick(world, mm, player, false, () -> difficulty, rnd, 0.5f);
         assertTrue(mm.size() > 0);
         assertTrue(mm.size() <= MobSpawner.MAX_ZOMBIES);
         for (Mob m : mm.mobs()) assertTrue(m.position.distance(player) >= MobSpawner.MIN_DISTANCE - 1f);
