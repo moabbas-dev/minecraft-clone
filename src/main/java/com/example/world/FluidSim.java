@@ -58,7 +58,7 @@ public final class FluidSim {
     // ---- positions ----
 
     private static long key(int x, int y, int z) {
-        return ((long) x & 0x3FFFFFFL) | (((long) z & 0x3FFFFFFL) << 26) | (((long) y & 0xFFL) << 52);
+        return ((long) x & 0x3FFFFFFL) | (((long) z & 0x3FFFFFFL) << 26) | (((long) (y - Chunk.MIN_Y) & 0x1FFL) << 52);
     }
 
     private static int keyX(long k) {
@@ -70,7 +70,7 @@ public final class FluidSim {
     }
 
     private static int keyY(long k) {
-        return (int) ((k >> 52) & 0xFF);
+        return (int) ((k >> 52) & 0x1FF) + Chunk.MIN_Y;
     }
 
     public static int delayOf(BlockType fluid) {
@@ -135,8 +135,8 @@ public final class FluidSim {
         int ox = chunk.worldOriginX(), oz = chunk.worldOriginZ();
         for (int lx = 0; lx < Chunk.SIZE_X; lx++) {
             for (int lz = 0; lz < Chunk.SIZE_Z; lz++) {
-                int top = Math.min(Chunk.SIZE_Y - 1, chunk.getColumnHeight(lx, lz));
-                for (int y = 0; y <= top; y++) {
+                int top = Math.min(Chunk.MAX_Y, chunk.getColumnHeight(lx, lz));
+                for (int y = Chunk.MIN_Y; y <= top; y++) {
                     BlockType b = chunk.getLocal(lx, y, lz);
                     if (!b.isFluid()) continue;
                     if (b.isFluidSource() && !hasRoomToSpread(chunk, lx, y, lz, b.isLava())) continue;
@@ -150,7 +150,7 @@ public final class FluidSim {
 
     /** A source can still spread when the cell below or one of the four beside it (inside the chunk) can hold fluid without being the same source. */
     private static boolean hasRoomToSpread(Chunk chunk, int lx, int y, int lz, boolean lava) {
-        if (y > 0 && canPassThrough(chunk.getLocal(lx, y - 1, lz), lava)) return true;
+        if (y > Chunk.MIN_Y && canPassThrough(chunk.getLocal(lx, y - 1, lz), lava)) return true;
         for (int[] d : HORIZONTAL) {
             int nx = lx + d[0], nz = lz + d[1];
             if (nx < 0 || nx >= Chunk.SIZE_X || nz < 0 || nz >= Chunk.SIZE_Z) continue; // across the border: left to the neighbour's own scan
@@ -191,8 +191,8 @@ public final class FluidSim {
 
     /** The block at a cell, with unloaded terrain standing in as solid bedrock. */
     private static BlockType at(World world, int x, int y, int z) {
-        if (y < 0) return BlockType.BEDROCK;
-        if (y >= Chunk.SIZE_Y) return BlockType.AIR;
+        if (y < Chunk.MIN_Y) return BlockType.BEDROCK;
+        if (y > Chunk.MAX_Y) return BlockType.AIR;
         return loaded(world, x, z) ? world.getBlock(x, y, z) : BlockType.BEDROCK;
     }
 

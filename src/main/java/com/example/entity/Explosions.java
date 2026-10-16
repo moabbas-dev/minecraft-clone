@@ -89,7 +89,7 @@ public final class Explosions {
     }
 
     private static long pack(int x, int y, int z) {
-        return ((long) (x & 0x3FFFFFF) << 38) | ((long) (z & 0x3FFFFFF) << 12) | (y & 0xFFF);
+        return ((long) (x & 0x3FFFFFF) << 38) | ((long) (z & 0x3FFFFFF) << 12) | ((y - com.example.world.Chunk.MIN_Y) & 0xFFF);
     }
 
     private static int unpackX(long p) {
@@ -101,7 +101,7 @@ public final class Explosions {
     }
 
     private static int unpackY(long p) {
-        return (int) (p & 0xFFF);
+        return (int) (p & 0xFFF) + com.example.world.Chunk.MIN_Y;
     }
 
     /** Runs the whole explosion: damages and pushes {@code victims}, destroys blocks and drops 1 in {@code power} of them. */

@@ -18,6 +18,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /** Breeding as the 26.3 client does it: the foods, 30 s of love, the 60-tick walk to a partner, the baby and the 5 minute wait. */
 class BreedingTest {
+    /** The flat world starts at the bottom of the world: {@code BOTTOM + n} is the n-th layer above its bedrock (grass at 3, air from 4). */
+    private static final int BOTTOM = com.example.world.Chunk.MIN_Y;
+
     private static World flatWorld() {
         World world = new World(1L, new FlatWorldGenerator());
         for (int cx = -2; cx <= 2; cx++) for (int cz = -2; cz <= 2; cz++) world.generateChunk(world.getOrCreateChunk(cx, cz));
@@ -61,15 +64,15 @@ class BreedingTest {
     void twoPigsInLoveWalkTogetherAndHaveABabyThenWaitFiveMinutes() {
         World world = flatWorld();
         MobManager mobs = new MobManager();
-        Pig a = new Pig(new Vector3f(0.5f, 5f, 0.5f), 0f);
-        Pig b = new Pig(new Vector3f(5.5f, 5f, 0.5f), 0f);
+        Pig a = new Pig(new Vector3f(0.5f, BOTTOM + 5f, 0.5f), 0f);
+        Pig b = new Pig(new Vector3f(5.5f, BOTTOM + 5f, 0.5f), 0f);
         mobs.spawn(a);
         mobs.spawn(b);
         a.feed(BlockType.CARROT);
         b.feed(BlockType.POTATO);
         ItemEntityManager items = new ItemEntityManager(64);
         for (int i = 0; i < 600 && mobs.size() < 3; i++) {
-            mobs.tick(world, List.of(), new Vector3f(2f, 5f, 0.5f), items, new Random(3), 0.05f);
+            mobs.tick(world, List.of(), new Vector3f(2f, BOTTOM + 5f, 0.5f), items, new Random(3), 0.05f);
         }
         assertEquals(3, mobs.size(), "a baby was born");
         PassiveMob baby = (PassiveMob) mobs.mobs().get(2);
@@ -84,7 +87,7 @@ class BreedingTest {
     @Test
     void loveGoesOutIfNoPartnerComes() {
         World world = flatWorld();
-        Pig lonely = new Pig(new Vector3f(0.5f, 5f, 0.5f), 0f);
+        Pig lonely = new Pig(new Vector3f(0.5f, BOTTOM + 5f, 0.5f), 0f);
         lonely.feed(BlockType.CARROT);
         lonely.setNeighbors(List.of(lonely));
         for (int i = 0; i < 700; i++) lonely.tick(world, List.of(), 0.05f);
@@ -94,17 +97,17 @@ class BreedingTest {
     @Test
     void theGoalIgnoresBabiesAnotherKindAndPartnersOutOfRange() {
         World world = flatWorld();
-        Pig a = new Pig(new Vector3f(0.5f, 5f, 0.5f), 0f);
+        Pig a = new Pig(new Vector3f(0.5f, BOTTOM + 5f, 0.5f), 0f);
         a.feed(BlockType.CARROT);
-        Pig babyInLove = new Pig(new Vector3f(2.5f, 5f, 0.5f), 0f);
+        Pig babyInLove = new Pig(new Vector3f(2.5f, BOTTOM + 5f, 0.5f), 0f);
         babyInLove.makeBaby();
-        Cow cow = new Cow(new Vector3f(3.5f, 5f, 0.5f), 0f);
+        Cow cow = new Cow(new Vector3f(3.5f, BOTTOM + 5f, 0.5f), 0f);
         cow.feed(BlockType.WHEAT);
-        Pig far = new Pig(new Vector3f(12.5f, 5f, 0.5f), 0f);
+        Pig far = new Pig(new Vector3f(12.5f, BOTTOM + 5f, 0.5f), 0f);
         far.feed(BlockType.CARROT);
         a.setNeighbors(List.of(a, babyInLove, cow, far));
         assertFalse(new BreedGoal().canStart(a, world, List.of()));
-        Pig near = new Pig(new Vector3f(6.5f, 5f, 0.5f), 0f);
+        Pig near = new Pig(new Vector3f(6.5f, BOTTOM + 5f, 0.5f), 0f);
         near.feed(BlockType.CARROT);
         a.setNeighbors(List.of(a, near));
         assertTrue(new BreedGoal().canStart(a, world, List.of()));

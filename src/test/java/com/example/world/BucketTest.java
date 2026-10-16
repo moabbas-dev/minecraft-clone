@@ -9,6 +9,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /** The bucket: its recipe, stack sizes, and the ray an empty bucket aims with. */
 class BucketTest {
+    /** The flat world starts at the bottom of the world: {@code BOTTOM + n} is the n-th layer above its bedrock (grass at 3, air from 4). */
+    private static final int BOTTOM = com.example.world.Chunk.MIN_Y;
+
     private static World flat() {
         World world = new World(1L, new FlatWorldGenerator());
         world.generateChunk(world.getOrCreateChunk(0, 0));
@@ -41,26 +44,26 @@ class BucketTest {
     @Test
     void theNormalRaySeesThroughFluidsButTheBucketRayStopsAtASource() {
         World w = flat();
-        w.setBlock(5, 4, 5, BlockType.WATER);
-        w.setBlock(5, 5, 5, BlockType.WATER_FLOW_3);
-        Vector3f from = new Vector3f(5.5f, 8.5f, 5.5f), down = new Vector3f(0f, -1f, 0f);
+        w.setBlock(5, BOTTOM + 4, 5, BlockType.WATER);
+        w.setBlock(5, BOTTOM + 5, 5, BlockType.WATER_FLOW_3);
+        Vector3f from = new Vector3f(5.5f, BOTTOM + 8.5f, 5.5f), down = new Vector3f(0f, -1f, 0f);
         Raycast.Hit normal = Raycast.cast(w, from, down, 10f);
-        assertEquals(3, normal.y(), "the ground below the water");
+        assertEquals(BOTTOM + 3, normal.y(), "the ground below the water");
         Raycast.Hit bucket = Raycast.cast(w, from, down, 10f, true);
-        assertEquals(4, bucket.y(), "the source, past the flowing water above it which does not stop the ray");
+        assertEquals(BOTTOM + 4, bucket.y(), "the source, past the flowing water above it which does not stop the ray");
         assertSame(BlockType.WATER, bucket.type());
-        w.setBlock(5, 4, 5, BlockType.WATER_FLOW_2);
-        assertEquals(3, Raycast.cast(w, from, down, 10f, true).y(), "a flowing block cannot be scooped");
+        w.setBlock(5, BOTTOM + 4, 5, BlockType.WATER_FLOW_2);
+        assertEquals(BOTTOM + 3, Raycast.cast(w, from, down, 10f, true).y(), "a flowing block cannot be scooped");
     }
 
     @Test
     void pouringAndScoopingMovesWaterAroundLikeTheBucketDoes() {
         World w = flat();
-        w.setBlock(8, 4, 8, BlockType.WATER);
+        w.setBlock(8, BOTTOM + 4, 8, BlockType.WATER);
         w.fluids().settle(w, 400);
-        assertTrue(w.getBlock(10, 4, 8).isWater());
-        w.setBlock(8, 4, 8, BlockType.AIR); // scooped
+        assertTrue(w.getBlock(10, BOTTOM + 4, 8).isWater());
+        w.setBlock(8, BOTTOM + 4, 8, BlockType.AIR); // scooped
         w.fluids().settle(w, 600);
-        assertTrue(w.getBlock(10, 4, 8).isAir(), "the flow dries up once its source is taken");
+        assertTrue(w.getBlock(10, BOTTOM + 4, 8).isAir(), "the flow dries up once its source is taken");
     }
 }

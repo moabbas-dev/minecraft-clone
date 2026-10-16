@@ -42,7 +42,7 @@ public class PlayerSurvival {
     /** Real vanilla's own fall-damage rule: 1 HP per block fallen beyond this. */
     private static final float FALL_DAMAGE_SAFE_DISTANCE = 3f;
     /** Vanilla Entity.checkBelowWorld: below (world minimum height - 64) every hurt cooldown deals 4 damage (LivingEntity.onBelowWorld). */
-    public static final float VOID_Y = -64f;
+    public static final float VOID_Y = com.example.world.Chunk.MIN_Y - 64f;
     private static final float VOID_DAMAGE = 4f;
 
     @Getter

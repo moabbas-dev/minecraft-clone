@@ -3,6 +3,7 @@ package com.example.game;
 import com.example.inventory.Inventory;
 import com.example.inventory.ItemStack;
 import com.example.world.BlockType;
+import com.example.world.Chunk;
 import com.example.world.FlatWorldGenerator;
 import com.example.world.Raycast;
 import com.example.world.SaplingGrowth;
@@ -73,7 +74,7 @@ class BlockPlacerTest {
     @Test
     void placingAboveTheWorldHeightFailsInsteadOfSilentlyEatingTheItem() {
         inventory.add(BlockType.DIRT, 5);
-        Raycast.Hit tooHigh = new Raycast.Hit(5, 255, 5, 5, 256, 5, BlockType.STONE);
+        Raycast.Hit tooHigh = new Raycast.Hit(5, Chunk.MAX_Y, 5, 5, Chunk.MAX_Y + 1, 5, BlockType.STONE);
         assertEquals(BlockPlacer.Outcome.INVALID_TARGET, place(tooHigh, (x, y, z) -> false).outcome());
         assertEquals(5, inventory.count(BlockType.DIRT));
     }

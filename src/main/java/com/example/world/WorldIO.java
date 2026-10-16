@@ -196,8 +196,15 @@ public class WorldIO {
         File chunksDir = new File(dir, "chunks");
         chunksDir.mkdirs();
         File file = new File(chunksDir, chunk.chunkX + "_" + chunk.chunkZ + ".chunk");
-        try (OutputStream out = new BufferedOutputStream(new FileOutputStream(file))) {
-            out.write(chunk.exportBlocks());
+        try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(file)))) {
+            short[] blocks = chunk.exportBlocks();
+            out.writeInt(CHUNK_MAGIC);
+            out.writeInt(CHUNK_FORMAT_VERSION);
+            out.writeInt(Chunk.MIN_Y);
+            out.writeInt(Chunk.SIZE_Y);
+            java.nio.ByteBuffer buffer = java.nio.ByteBuffer.allocate(blocks.length * 2);
+            buffer.asShortBuffer().put(blocks);
+            out.write(buffer.array());
         } catch (IOException e) {
             System.err.println("Failed to save chunk " + chunk.chunkX + "," + chunk.chunkZ + ": " + e.getMessage());
         }
@@ -213,9 +220,9 @@ public class WorldIO {
         file.getParentFile().mkdirs();
         try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(file, true)))) {
             out.writeByte(lx);
-            out.writeShort(y);
+            out.writeInt(y);
             out.writeByte(lz);
-            out.writeByte(type.id);
+            out.writeShort(type.id);
         } catch (IOException e) {
             System.err.println("Failed to save tree spill for chunk " + cx + "," + cz + ": " + e.getMessage());
         }
@@ -228,7 +235,7 @@ public class WorldIO {
         if (!file.isFile()) return out;
         try (DataInputStream in = new DataInputStream(new BufferedInputStream(new FileInputStream(file)))) {
             while (true) {
-                int lx = in.readUnsignedByte(), y = in.readUnsignedShort(), lz = in.readUnsignedByte(), id = in.readUnsignedByte();
+                int lx = in.readUnsignedByte(), y = in.readInt(), lz = in.readUnsignedByte(), id = in.readUnsignedShort();
                 out.add(new int[]{lx, y, lz, id});
             }
         } catch (java.io.EOFException done) {
@@ -244,12 +251,43 @@ public class WorldIO {
         return chunkFile(dir, cx, cz).isFile();
     }
 
-    public static byte[] loadChunk(File dir, int cx, int cz) {
-        try {
-            return Files.readAllBytes(chunkFile(dir, cx, cz).toPath());
+    /** Magic number and format version at the start of every chunk file: min_y, height and 16-bit block ids follow. */
+    private static final int CHUNK_MAGIC = 0x4D434B32; // "MCK2"
+    private static final int CHUNK_FORMAT_VERSION = 2;
+    private static boolean legacyWarned;
+
+    /**
+     * The blocks of a saved chunk, or null if there is none. A file without the header (the 256-high, 8-bit format written before the
+     * vanilla world height) or with another range is a legacy chunk: it cannot be converted - it holds terrain of the old invented
+     * generator at heights that do not exist any more - so it is reported once and the chunk is generated afresh instead of being
+     * misread as the new format.
+     */
+    public static short[] loadChunk(File dir, int cx, int cz) {
+        File file = chunkFile(dir, cx, cz);
+        if (!file.isFile()) return null;
+        try (DataInputStream in = new DataInputStream(new BufferedInputStream(new FileInputStream(file)))) {
+            if (in.readInt() != CHUNK_MAGIC || in.readInt() != CHUNK_FORMAT_VERSION || in.readInt() != Chunk.MIN_Y || in.readInt() != Chunk.SIZE_Y) {
+                warnLegacy(dir);
+                return null;
+            }
+            byte[] raw = in.readAllBytes();
+            short[] blocks = new short[Chunk.SIZE_X * Chunk.SIZE_Y * Chunk.SIZE_Z];
+            if (raw.length != blocks.length * 2) {
+                warnLegacy(dir);
+                return null;
+            }
+            java.nio.ByteBuffer.wrap(raw).asShortBuffer().get(blocks);
+            return blocks;
         } catch (IOException e) {
+            warnLegacy(dir);
             return null;
         }
+    }
+
+    private static void warnLegacy(File dir) {
+        if (legacyWarned) return;
+        legacyWarned = true;
+        System.err.println("World " + dir + " holds chunks in the legacy format (256 high, 8-bit ids, invented terrain); they cannot be read and are generated again.");
     }
 
     private static File chunkFile(File dir, int cx, int cz) {

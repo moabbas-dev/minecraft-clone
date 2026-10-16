@@ -1,6 +1,7 @@
 package com.example.entity;
 
 import com.example.world.BlockType;
+import com.example.world.Chunk;
 import com.example.world.World;
 import org.joml.Vector3f;
 
@@ -47,7 +48,7 @@ public class FallingBlockManager {
     }
 
     private static boolean canFallThrough(World world, int x, int y, int z) {
-        return y > 0 && !world.isSolidCollision(x, y, z);
+        return y > Chunk.MIN_Y && !world.isSolidCollision(x, y, z);
     }
 
     /** Starts every gravity block in the column from (x, y) upward that has lost its support. */

@@ -22,8 +22,8 @@ class CaveCarverTest {
 
     @Test
     void sameSeedAndChunkProducesIdenticalBlocks() {
-        byte[] a = freshChunk(777L, 3, -2).exportBlocks();
-        byte[] b = freshChunk(777L, 3, -2).exportBlocks();
+        short[] a = freshChunk(777L, 3, -2).exportBlocks();
+        short[] b = freshChunk(777L, 3, -2).exportBlocks();
         assertArrayEquals(a, b, "identical seed+chunk must produce identical terrain including caves");
     }
 
@@ -31,8 +31,8 @@ class CaveCarverTest {
     void differentSeedsProduceDifferentCarvingSomewhereAcrossManyChunks() {
         boolean anyDifference = false;
         for (int i = 0; i < 20; i++) {
-            byte[] a = freshChunk(100L, i, 0).exportBlocks();
-            byte[] b = freshChunk(999L, i, 0).exportBlocks();
+            short[] a = freshChunk(100L, i, 0).exportBlocks();
+            short[] b = freshChunk(999L, i, 0).exportBlocks();
             if (!java.util.Arrays.equals(a, b)) {
                 anyDifference = true;
                 break;

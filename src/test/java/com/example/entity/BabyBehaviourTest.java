@@ -12,6 +12,9 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 class BabyBehaviourTest {
+    /** The flat world starts at the bottom of the world: {@code BOTTOM + n} is the n-th layer above its bedrock (grass at 3, air from 4). */
+    private static final int BOTTOM = com.example.world.Chunk.MIN_Y;
+
     private static World flatWorld() {
         World world = new World(1L, new FlatWorldGenerator());
         for (int cx = -2; cx <= 2; cx++) for (int cz = -2; cz <= 2; cz++) world.generateChunk(world.getOrCreateChunk(cx, cz));
@@ -21,8 +24,8 @@ class BabyBehaviourTest {
     @Test
     void aBabyWalksTowardsItsParentBeyondThreeBlocks() {
         World world = flatWorld();
-        Pig adult = new Pig(new Vector3f(6.5f, 5f, 0.5f), 0f);
-        Pig baby = new Pig(new Vector3f(0.5f, 5f, 0.5f), 0f);
+        Pig adult = new Pig(new Vector3f(6.5f, BOTTOM + 5f, 0.5f), 0f);
+        Pig baby = new Pig(new Vector3f(0.5f, BOTTOM + 5f, 0.5f), 0f);
         baby.makeBaby();
         List<Mob> all = List.of(adult, baby);
         baby.setNeighbors(all);
@@ -35,8 +38,8 @@ class BabyBehaviourTest {
     @Test
     void anAdultDoesNotFollowAnotherAdult() {
         World world = flatWorld();
-        Pig a = new Pig(new Vector3f(0.5f, 5f, 0.5f), 0f);
-        Pig b = new Pig(new Vector3f(6.5f, 5f, 0.5f), 0f);
+        Pig a = new Pig(new Vector3f(0.5f, BOTTOM + 5f, 0.5f), 0f);
+        Pig b = new Pig(new Vector3f(6.5f, BOTTOM + 5f, 0.5f), 0f);
         a.setNeighbors(List.of(a, b));
         assertFalse(new com.example.entity.ai.FollowParentGoal().canStart(a, world, List.of()));
     }
@@ -44,10 +47,10 @@ class BabyBehaviourTest {
     @Test
     void aBabyIgnoresAParentOfAnotherKindOrOutOfRange() {
         World world = flatWorld();
-        Pig baby = new Pig(new Vector3f(0.5f, 5f, 0.5f), 0f);
+        Pig baby = new Pig(new Vector3f(0.5f, BOTTOM + 5f, 0.5f), 0f);
         baby.makeBaby();
-        Cow cow = new Cow(new Vector3f(5.5f, 5f, 0.5f), 0f);
-        Pig far = new Pig(new Vector3f(12.5f, 5f, 0.5f), 0f);
+        Cow cow = new Cow(new Vector3f(5.5f, BOTTOM + 5f, 0.5f), 0f);
+        Pig far = new Pig(new Vector3f(12.5f, BOTTOM + 5f, 0.5f), 0f);
         baby.setNeighbors(List.of(baby, cow, far));
         assertFalse(new com.example.entity.ai.FollowParentGoal().canStart(baby, world, List.of()));
     }
@@ -55,9 +58,9 @@ class BabyBehaviourTest {
     @Test
     void aBabyAlreadyWithinThreeBlocksStaysPut() {
         World world = flatWorld();
-        Pig baby = new Pig(new Vector3f(0.5f, 5f, 0.5f), 0f);
+        Pig baby = new Pig(new Vector3f(0.5f, BOTTOM + 5f, 0.5f), 0f);
         baby.makeBaby();
-        Pig adult = new Pig(new Vector3f(2.5f, 5f, 0.5f), 0f);
+        Pig adult = new Pig(new Vector3f(2.5f, BOTTOM + 5f, 0.5f), 0f);
         baby.setNeighbors(List.of(baby, adult));
         assertFalse(new com.example.entity.ai.FollowParentGoal().canStart(baby, world, List.of()));
     }

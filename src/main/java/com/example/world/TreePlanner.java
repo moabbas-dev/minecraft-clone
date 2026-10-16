@@ -59,7 +59,7 @@ public final class TreePlanner {
             maxZ = z1;
             minY = y0;
             maxY = y1;
-            fits = blocks.isEmpty() || (x0 >= 0 && x1 < Chunk.SIZE_X && z0 >= 0 && z1 < Chunk.SIZE_Z && y0 >= 1 && y1 < Chunk.SIZE_Y);
+            fits = blocks.isEmpty() || (x0 >= 0 && x1 < Chunk.SIZE_X && z0 >= 0 && z1 < Chunk.SIZE_Z && y0 > Chunk.MIN_Y && y1 <= Chunk.MAX_Y);
         }
 
         public boolean isEmpty() {
@@ -89,7 +89,7 @@ public final class TreePlanner {
         public void commit(Chunk chunk, World world) {
             for (Map.Entry<Long, BlockType> e : blocks.entrySet()) {
                 int x = keyX(e.getKey()), y = keyY(e.getKey()), z = keyZ(e.getKey());
-                if (y < 0 || y >= Chunk.SIZE_Y) continue;
+                if (!Chunk.inWorld(y)) continue;
                 if (x < 0 || x >= Chunk.SIZE_X || z < 0 || z >= Chunk.SIZE_Z) {
                     if (world != null) world.spill(chunk.chunkX + Math.floorDiv(x, Chunk.SIZE_X), chunk.chunkZ + Math.floorDiv(z, Chunk.SIZE_Z),
                             Math.floorMod(x, Chunk.SIZE_X), y, Math.floorMod(z, Chunk.SIZE_Z), e.getValue());
@@ -145,7 +145,7 @@ public final class TreePlanner {
         BlockType get(int x, int y, int z) {
             BlockType s = staged.get(key(x, y, z));
             if (s != null) return s;
-            if (y < 0 || y >= Chunk.SIZE_Y) return BlockType.AIR;
+            if (!Chunk.inWorld(y)) return BlockType.AIR;
             if (x >= 0 && x < Chunk.SIZE_X && z >= 0 && z < Chunk.SIZE_Z) return chunk.getLocal(x, y, z);
             if (world != null) {
                 Chunk other = world.getChunk(chunk.chunkX + Math.floorDiv(x, Chunk.SIZE_X), chunk.chunkZ + Math.floorDiv(z, Chunk.SIZE_Z));
@@ -228,7 +228,7 @@ public final class TreePlanner {
 
     /** The block the trunk stands on becomes dirt (the soil_beneath_tree provider), when it is grass. */
     private static void placeBelowTrunk(Stage s, int x, int y, int z) {
-        if (y < 0) return;
+        if (y < Chunk.MIN_Y) return;
         BlockType below = s.get(x, y, z);
         if (below == BlockType.GRASS_BLOCK || below.isAir() || below.isWater()) s.staged.put(key(x, y, z), BlockType.DIRT);
     }

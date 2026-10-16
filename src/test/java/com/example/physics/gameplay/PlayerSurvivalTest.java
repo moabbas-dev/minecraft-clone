@@ -54,10 +54,10 @@ class PlayerSurvivalTest {
         Player player = new Player(new Vector3f(0.5f, 1f, 0.5f));
         PlayerSurvival s = survival(Difficulty.NORMAL);
         s.update(0f, player);
-        player.position.y = -60f; // below the world but not yet 64 blocks under it
+        player.position.y = -100f; // below the world (min_y -64) but not yet 64 blocks under it
         s.update(DT, player);
-        assertEquals(20f, s.getHealth().getCurrentHealth(), "no void damage above y = -64");
-        player.position.y = -70f;
+        assertEquals(20f, s.getHealth().getCurrentHealth(), "no void damage above y = -128 (min_y - 64)");
+        player.position.y = -130f;
         s.update(DT, player);
         assertEquals(16f, s.getHealth().getCurrentHealth(), 1e-4f, "4 damage");
         s.update(DT, player);

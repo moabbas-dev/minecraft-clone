@@ -22,7 +22,7 @@ public abstract class Entity {
     private static final float GRAVITY = 28f; // matches Player's own value
     private static final float TERMINAL_VELOCITY = -60f;
     private static final float MAX_SUBSTEP = 0.2f;
-    private static final float VOID_Y = -16f;
+    private static final float VOID_Y = com.example.world.Chunk.MIN_Y - 64f;
 
     public final Vector3f position = new Vector3f();
     public final Vector3f velocity = new Vector3f();
@@ -172,7 +172,6 @@ public abstract class Entity {
     /** Unloaded space counts as solid (same safety rule as {@code ItemEntityManager}) so an
      *  entity standing at the edge of loaded terrain never walks/falls into the void beyond it. */
     private static boolean blocked(World world, int bx, int by, int bz) {
-        if (by < 0) return true;
         int cx = World.worldToChunk(bx), cz = World.worldToChunk(bz);
         var chunk = world.getChunk(cx, cz);
         if (chunk == null || !chunk.isGenerated()) return true;

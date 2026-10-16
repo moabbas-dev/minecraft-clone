@@ -57,7 +57,7 @@ class HostileMobTest {
         world = new World(1L, new FlatWorldGenerator());
         for (int cx = -2; cx <= 2; cx++)
             for (int cz = -2; cz <= 2; cz++) world.generateChunk(world.getOrCreateChunk(cx, cz));
-        ground = 1;
+        ground = com.example.world.Chunk.MIN_Y;
         while (world.isSolidCollision(5, ground, 5)) ground++;
     }
 
@@ -84,7 +84,7 @@ class HostileMobTest {
         Explosions.detonate(world, center, 3f, List.of(), new ItemEntityManager(64), new Random(4), Difficulty.NORMAL);
         assertEquals(BlockType.AIR, world.getBlock(5, ground - 1, 5), "the dirt under the blast is destroyed");
         assertEquals(BlockType.OBSIDIAN, world.getBlock(5, ground + 1, 5), "blast resistance 1200 survives");
-        assertEquals(BlockType.BEDROCK, world.getBlock(5, 0, 5), "bedrock never breaks");
+        assertEquals(BlockType.BEDROCK, world.getBlock(5, com.example.world.Chunk.MIN_Y, 5), "bedrock never breaks");
     }
 
     @Test

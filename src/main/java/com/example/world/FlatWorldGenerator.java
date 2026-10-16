@@ -1,16 +1,20 @@
 package com.example.world;
 
-/** Vanilla's default superflat preset: bedrock, then 2 layers of dirt, then grass on top. */
+/**
+ * Vanilla's classic flat preset (worldgen/flat_level_generator_preset/classic_flat.json): layers bedrock x1, dirt x2, grass_block x1,
+ * stacked from the bottom of the world ({@link Chunk#MIN_Y}) upward - so bedrock is at y -64 and the grass at y -61.
+ */
 public class FlatWorldGenerator implements WorldGenerator {
     private static final int DIRT_LAYERS = 2;
-    public static final int GRASS_HEIGHT = DIRT_LAYERS + 1;
+    /** World Y of the grass layer, the top block of the ground. */
+    public static final int GRASS_HEIGHT = Chunk.MIN_Y + 1 + DIRT_LAYERS;
 
     @Override
     public void generate(Chunk chunk, World world) {
         for (int x = 0; x < Chunk.SIZE_X; x++) {
             for (int z = 0; z < Chunk.SIZE_Z; z++) {
-                chunk.setLocal(x, 0, z, BlockType.BEDROCK);
-                for (int y = 1; y <= DIRT_LAYERS; y++) {
+                chunk.setLocal(x, Chunk.MIN_Y, z, BlockType.BEDROCK);
+                for (int y = Chunk.MIN_Y + 1; y < GRASS_HEIGHT; y++) {
                     chunk.setLocal(x, y, z, BlockType.DIRT);
                 }
                 chunk.setLocal(x, GRASS_HEIGHT, z, BlockType.GRASS_BLOCK);

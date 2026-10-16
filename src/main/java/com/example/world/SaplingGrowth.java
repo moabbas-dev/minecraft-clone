@@ -61,7 +61,7 @@ public class SaplingGrowth {
     }
 
     private static long packKey(int x, int y, int z) {
-        return ((long) x & 0x3FFFFFFL) | (((long) z & 0x3FFFFFFL) << 26) | (((long) y & 0xFFFL) << 52);
+        return ((long) x & 0x3FFFFFFL) | (((long) z & 0x3FFFFFFL) << 26) | (((long) (y - Chunk.MIN_Y) & 0xFFFL) << 52);
     }
 
     private float randomDelayFor(int stageIndex) {
@@ -83,7 +83,7 @@ public class SaplingGrowth {
     public void registerChunk(Chunk chunk) {
         int originX = chunk.worldOriginX(), originZ = chunk.worldOriginZ();
         for (int x = 0; x < Chunk.SIZE_X; x++) {
-            for (int y = 0; y < Chunk.SIZE_Y; y++) {
+            for (int y = Chunk.MIN_Y; y <= Chunk.MAX_Y; y++) {
                 for (int z = 0; z < Chunk.SIZE_Z; z++) {
                     BlockType t = chunk.getLocal(x, y, z);
                     SaplingSpecies species = SaplingSpecies.bySaplingBlock(t);
@@ -165,7 +165,7 @@ public class SaplingGrowth {
         // guarantee from placement time, unlike a worldgen candidate.
         if (lx - r < 0 || lx + r >= Chunk.SIZE_X || lz - r < 0 || lz + r >= Chunk.SIZE_Z) return false;
         int maxHeight = tree.maxTotalHeight();
-        if (y + maxHeight >= Chunk.SIZE_Y) return false;
+        if (y + maxHeight > Chunk.MAX_Y) return false;
 
         for (int dx = -r; dx <= r; dx++) {
             for (int dz = -r; dz <= r; dz++) {

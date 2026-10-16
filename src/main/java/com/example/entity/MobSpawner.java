@@ -71,7 +71,7 @@ public class MobSpawner {
 
     /** Same, scanning {@code range} blocks above and below {@code nearY}. */
     public static Integer findSpawnY(World world, int x, int z, int nearY, int range) {
-        int lo = Math.max(1, nearY - range), hi = Math.min(Chunk.SIZE_Y - 3, nearY + range);
+        int lo = Math.max(Chunk.MIN_Y + 1, nearY - range), hi = Math.min(Chunk.MAX_Y - 2, nearY + range);
         for (int y = hi; y >= lo; y--) {
             if (world.isSolidCollision(x, y - 1, z) && !world.isSolidCollision(x, y, z) && !world.isSolidCollision(x, y + 1, z)) {
                 return y;

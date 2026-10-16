@@ -72,7 +72,7 @@ public final class BlockPlacer {
         }
         // World.setBlock silently ignores out-of-range Y - without this check the item would be
         // consumed for a block that was never written.
-        if (y < 0 || y >= Chunk.SIZE_Y) return Result.failed(Outcome.INVALID_TARGET);
+        if (!Chunk.inWorld(y)) return Result.failed(Outcome.INVALID_TARGET);
 
         SaplingSpecies sapling = SaplingSpecies.bySaplingBlock(block);
         if (sapling != null) {

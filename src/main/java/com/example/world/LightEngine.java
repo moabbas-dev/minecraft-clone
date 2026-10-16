@@ -25,7 +25,7 @@ public final class LightEngine {
     }
 
     private static final int MAX = 15;
-    private static final int SIZE_Y = Chunk.SIZE_Y;
+    private static final int MIN_Y = Chunk.MIN_Y, MAX_Y = Chunk.MAX_Y;
 
     private static World world;
     private static Chunk cachedChunk;
@@ -56,15 +56,15 @@ public final class LightEngine {
         // sky: the highest light-dampening block of each column; everything above it is a source
         for (int x = 0; x < Chunk.SIZE_X; x++) {
             for (int z = 0; z < Chunk.SIZE_Z; z++) {
-                int by = -1;
-                for (int y = SIZE_Y - 1; y >= 0; y--) {
+                int by = MIN_Y - 1;
+                for (int y = MAX_Y; y >= MIN_Y; y--) {
                     if (LightProperties.dampening(chunk.getLocal(x, y, z)) > 0) {
                         by = y;
                         break;
                     }
                 }
                 chunk.setSkyBlocker(x, z, by);
-                for (int y = by + 1; y < SIZE_Y; y++) chunk.skyLight[Chunk.index(x, y, z)] = MAX;
+                for (int y = by + 1; y <= MAX_Y; y++) chunk.skyLight[Chunk.index(x, y, z)] = MAX;
             }
         }
         increase.clear();
@@ -72,12 +72,12 @@ public final class LightEngine {
         for (int x = 0; x < Chunk.SIZE_X; x++) {
             for (int z = 0; z < Chunk.SIZE_Z; z++) {
                 int by = chunk.skyBlocker(x, z);
-                if (by + 1 < SIZE_Y) enqueue(ox + x, by + 1, oz + z, MAX);
+                if (by + 1 <= MAX_Y) enqueue(ox + x, by + 1, oz + z, MAX);
                 for (int d = 0; d < 4; d++) {
                     int nx = ox + x + DX[d], nz = oz + z + DZ[d];
                     int nb = skyBlockerAt(nx, nz);
                     if (nb == Integer.MIN_VALUE) continue;
-                    for (int y = by + 1; y <= Math.min(SIZE_Y - 1, nb); y++) enqueue(ox + x, y, oz + z, MAX);
+                    for (int y = by + 1; y <= Math.min(MAX_Y, nb); y++) enqueue(ox + x, y, oz + z, MAX);
                 }
             }
         }
@@ -87,7 +87,7 @@ public final class LightEngine {
 
         // block light: emitters, then the neighbours' borders
         increase.clear();
-        for (int y = 0; y < SIZE_Y; y++) {
+        for (int y = MIN_Y; y <= MAX_Y; y++) {
             for (int z = 0; z < Chunk.SIZE_Z; z++) {
                 for (int x = 0; x < Chunk.SIZE_X; x++) {
                     int e = emissionAt(ox + x, y, oz + z, chunk.getLocal(x, y, z));
@@ -113,7 +113,7 @@ public final class LightEngine {
     /** Same, for a position whose old block was giving off {@code oldOverride} extra light (a burning furnace). */
     public static void onBlockChanged(World w, int x, int y, int z, BlockType oldType, BlockType newType, int oldOverride) {
         Chunk c = w.getChunk(World.worldToChunk(x), World.worldToChunk(z));
-        if (c == null || !c.isGenerated() || !c.isLightComputed() || y < 0 || y >= SIZE_Y) return;
+        if (c == null || !c.isGenerated() || !c.isLightComputed() || !Chunk.inWorld(y)) return;
         begin(w);
         if (LightProperties.dampening(oldType) == LightProperties.dampening(newType)
                 && Math.max(LightProperties.emission(oldType), oldOverride) == emissionAt(x, y, z, newType)) {
@@ -132,8 +132,8 @@ public final class LightEngine {
         if (dampNew > 0 && y > oldB) {
             newB = y;
         } else if (dampNew == 0 && y == oldB) {
-            newB = -1;
-            for (int yy = y - 1; yy >= 0; yy--) {
+            newB = MIN_Y - 1;
+            for (int yy = y - 1; yy >= MIN_Y; yy--) {
                 if (LightProperties.dampening(c.getLocal(lx, yy, lz)) > 0) {
                     newB = yy;
                     break;
@@ -173,7 +173,7 @@ public final class LightEngine {
     /** A cell's emission changed without its block changing (a furnace lighting or going out): relight around it. */
     public static void onEmissionChanged(World w, int x, int y, int z) {
         Chunk c = w.getChunk(World.worldToChunk(x), World.worldToChunk(z));
-        if (c == null || !c.isGenerated() || !c.isLightComputed() || y < 0 || y >= SIZE_Y) return;
+        if (c == null || !c.isGenerated() || !c.isLightComputed() || !Chunk.inWorld(y)) return;
         begin(w);
         decrease.clear();
         increase.clear();
@@ -211,7 +211,7 @@ public final class LightEngine {
 
     /** The stored level (0-15) or -1 when the cell is outside the world or in a chunk that is not lit. */
     private static int level(boolean sky, int x, int y, int z) {
-        if (y < 0 || y >= SIZE_Y) return -1;
+        if (!Chunk.inWorld(y)) return -1;
         Chunk c = chunkAt(x, z);
         if (c == null) return -1;
         int i = Chunk.index(World.worldToLocal(x), y, World.worldToLocal(z));
@@ -261,7 +261,7 @@ public final class LightEngine {
     /** Enqueues every lit border cell of the neighbouring chunks that touches {@code chunk}, so their light flows in. */
     private static void importBorders(Chunk chunk, boolean sky) {
         int ox = chunk.worldOriginX(), oz = chunk.worldOriginZ();
-        for (int y = 0; y < SIZE_Y; y++) {
+        for (int y = MIN_Y; y <= MAX_Y; y++) {
             for (int i = 0; i < Chunk.SIZE_X; i++) {
                 importCell(sky, ox - 1, y, oz + i);
                 importCell(sky, ox + Chunk.SIZE_X, y, oz + i);
@@ -381,27 +381,27 @@ public final class LightEngine {
         touched.clear();
     }
 
-    // ---- packing: x (26 bits), z (26 bits), y (8 bits), level (4 bits) in one long ----
+    // ---- packing: x (25 bits), z (25 bits), y - MIN_Y (9 bits), level (4 bits) in one long ----
 
     private static long pack(int x, int y, int z, int level) {
-        return ((long) (x + (1 << 25)) & 0x3FFFFFFL) | (((long) (z + (1 << 25)) & 0x3FFFFFFL) << 26)
-                | (((long) y & 0xFFL) << 52) | (((long) level & 0xFL) << 60);
+        return ((long) (x + (1 << 24)) & 0x1FFFFFFL) | (((long) (z + (1 << 24)) & 0x1FFFFFFL) << 25)
+                | (((long) (y - MIN_Y) & 0x1FFL) << 50) | (((long) level & 0xFL) << 59);
     }
 
     private static int ux(long e) {
-        return (int) (e & 0x3FFFFFFL) - (1 << 25);
+        return (int) (e & 0x1FFFFFFL) - (1 << 24);
     }
 
     private static int uz(long e) {
-        return (int) ((e >> 26) & 0x3FFFFFFL) - (1 << 25);
+        return (int) ((e >> 25) & 0x1FFFFFFL) - (1 << 24);
     }
 
     private static int uy(long e) {
-        return (int) ((e >> 52) & 0xFFL);
+        return (int) ((e >> 50) & 0x1FFL) + MIN_Y;
     }
 
     private static int ul(long e) {
-        return (int) ((e >>> 60) & 0xFL);
+        return (int) ((e >>> 59) & 0xFL);
     }
 
     /** A growable circular queue of longs. */

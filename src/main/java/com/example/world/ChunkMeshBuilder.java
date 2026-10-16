@@ -111,8 +111,8 @@ public class ChunkMeshBuilder {
 
         for (int lx = 0; lx < Chunk.SIZE_X; lx++) {
             for (int lz = 0; lz < Chunk.SIZE_Z; lz++) {
-                int maxY = Math.min(Chunk.SIZE_Y - 1, chunk.getColumnHeight(lx, lz) + 12);
-                for (int ly = 0; ly <= maxY; ly++) {
+                int maxY = Math.min(Chunk.MAX_Y, chunk.getColumnHeight(lx, lz) + 12);
+                for (int ly = Chunk.MIN_Y; ly <= maxY; ly++) {
                     BlockType type = chunk.getLocal(lx, ly, lz);
                     if (type.isAir()) continue;
 

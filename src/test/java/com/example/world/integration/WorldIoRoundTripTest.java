@@ -147,16 +147,16 @@ class WorldIoRoundTripTest {
     @Test
     void chunkRoundTripsExactBytes(@TempDir File tempDir) {
         Chunk chunk = new Chunk(2, -3);
-        chunk.setLocal(0, 0, 0, BlockType.BEDROCK);
+        chunk.setLocal(0, Chunk.MIN_Y, 0, BlockType.BEDROCK);
         chunk.setLocal(5, 10, 7, BlockType.DIAMOND_ORE);
-        chunk.setLocal(15, 255, 15, BlockType.GLOWSTONE);
-        byte[] original = chunk.exportBlocks();
+        chunk.setLocal(15, Chunk.MAX_Y, 15, BlockType.GLOWSTONE);
+        short[] original = chunk.exportBlocks();
 
         WorldIO.saveChunk(tempDir, chunk);
         assertTrue(WorldIO.chunkExists(tempDir, 2, -3));
         assertFalse(WorldIO.chunkExists(tempDir, 2, -4));
 
-        byte[] loaded = WorldIO.loadChunk(tempDir, 2, -3);
+        short[] loaded = WorldIO.loadChunk(tempDir, 2, -3);
         assertArrayEquals(original, loaded);
     }
 

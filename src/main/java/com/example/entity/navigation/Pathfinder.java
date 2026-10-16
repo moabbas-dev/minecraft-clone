@@ -170,7 +170,7 @@ final class Pathfinder {
      *  exists within the bounded vertical scan - solid ground directly beneath, and clear
      *  headroom for the mob's own height above it. */
     private static Integer findGroundY(World world, int x, int z, int referenceY, int mobHeightBlocks) {
-        int minY = Math.max(0, referenceY - GROUND_SEARCH_DOWN);
+        int minY = Math.max(com.example.world.Chunk.MIN_Y, referenceY - GROUND_SEARCH_DOWN);
         int maxY = referenceY + GROUND_SEARCH_UP;
         Integer best = null;
         int bestDist = Integer.MAX_VALUE;

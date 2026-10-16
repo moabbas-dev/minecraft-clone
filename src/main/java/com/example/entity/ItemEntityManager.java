@@ -40,7 +40,7 @@ public class ItemEntityManager {
     /** Items nearer than this (and same type) merge into one entity on spawn. */
     static final float MERGE_RADIUS = 0.75f;
     static final float MAX_SUBSTEP = 0.2f;
-    static final float VOID_Y = -16f;
+    static final float VOID_Y = com.example.world.Chunk.MIN_Y - 64f;
 
     private final List<ItemEntity> entities = new ArrayList<>();
     private final List<ItemEntity> view = Collections.unmodifiableList(entities);
@@ -184,7 +184,6 @@ public class ItemEntityManager {
     }
 
     private static boolean blocked(World world, int bx, int by, int bz) {
-        if (by < 0) return true;
         if (!chunkLoaded(world, bx, bz)) return true; // unloaded space acts as a wall/floor
         return world.isSolidCollision(bx, by, bz);
     }

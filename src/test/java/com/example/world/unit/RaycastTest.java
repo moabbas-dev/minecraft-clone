@@ -14,6 +14,9 @@ import static org.junit.jupiter.api.Assertions.*;
  * biome/height noise.
  */
 class RaycastTest {
+    /** The flat world starts at the bottom of the world: {@code BOTTOM + n} is the n-th layer above its bedrock (grass at 3, air from 4). */
+    private static final int BOTTOM = com.example.world.Chunk.MIN_Y;
+
 
     private World world;
 
@@ -30,7 +33,7 @@ class RaycastTest {
 
     @Test
     void straightDownHitsGroundAtExpectedCoordinateAndFace() {
-        Raycast.Hit hit = Raycast.cast(world, new Vector3f(8.5f, 10f, 8.5f), new Vector3f(0, -1, 0), 20f);
+        Raycast.Hit hit = Raycast.cast(world, new Vector3f(8.5f, BOTTOM + 10f, 8.5f), new Vector3f(0, -1, 0), 20f);
         assertNotNull(hit);
         assertEquals(8, hit.x());
         assertEquals(FlatWorldGenerator.GRASS_HEIGHT, hit.y());
@@ -44,21 +47,21 @@ class RaycastTest {
 
     @Test
     void straightUpFromOpenAirMisses() {
-        Raycast.Hit hit = Raycast.cast(world, new Vector3f(8.5f, 10f, 8.5f), new Vector3f(0, 1, 0), 50f);
+        Raycast.Hit hit = Raycast.cast(world, new Vector3f(8.5f, BOTTOM + 10f, 8.5f), new Vector3f(0, 1, 0), 50f);
         assertNull(hit, "casting up through open sky should never hit anything");
     }
 
     @Test
     void hitBeyondMaxDistanceReturnsNull() {
         // Ground is ~6 blocks below y=10 (surface at y=3+1=4 top face); cap the ray well short of it.
-        Raycast.Hit hit = Raycast.cast(world, new Vector3f(8.5f, 10f, 8.5f), new Vector3f(0, -1, 0), 2f);
+        Raycast.Hit hit = Raycast.cast(world, new Vector3f(8.5f, BOTTOM + 10f, 8.5f), new Vector3f(0, -1, 0), 2f);
         assertNull(hit, "a ray capped shorter than the distance to the block must not report a hit");
     }
 
     @Test
     void diagonalRayHitsExpectedBlock() {
         // From well above and to the side, aimed down-and-across at 45 degrees in the XZ plane too.
-        Vector3f origin = new Vector3f(0.5f, 10f, 0.5f);
+        Vector3f origin = new Vector3f(0.5f, BOTTOM + 10f, 0.5f);
         Vector3f dir = new Vector3f(1f, -1f, 1f);
         Raycast.Hit hit = Raycast.cast(world, origin, dir, 30f);
         assertNotNull(hit);
@@ -68,7 +71,7 @@ class RaycastTest {
 
     @Test
     void negativeCoordinatesResolveCorrectly() {
-        Raycast.Hit hit = Raycast.cast(world, new Vector3f(-8.5f, 10f, -8.5f), new Vector3f(0, -1, 0), 20f);
+        Raycast.Hit hit = Raycast.cast(world, new Vector3f(-8.5f, BOTTOM + 10f, -8.5f), new Vector3f(0, -1, 0), 20f);
         assertNotNull(hit);
         assertEquals(-9, hit.x());
         assertEquals(FlatWorldGenerator.GRASS_HEIGHT, hit.y());
@@ -77,11 +80,11 @@ class RaycastTest {
 
     @Test
     void raycastFindsAManuallyPlacedBlockAboveTheSurface() {
-        world.setBlock(5, 10, 5, BlockType.STONE);
-        Raycast.Hit hit = Raycast.cast(world, new Vector3f(5.5f, 20f, 5.5f), new Vector3f(0, -1, 0), 30f);
+        world.setBlock(5, BOTTOM + 10, 5, BlockType.STONE);
+        Raycast.Hit hit = Raycast.cast(world, new Vector3f(5.5f, BOTTOM + 20f, 5.5f), new Vector3f(0, -1, 0), 30f);
         assertNotNull(hit);
         assertEquals(5, hit.x());
-        assertEquals(10, hit.y());
+        assertEquals(BOTTOM + 10, hit.y());
         assertEquals(5, hit.z());
         assertEquals(BlockType.STONE, hit.type());
     }
@@ -89,7 +92,7 @@ class RaycastTest {
     @Test
     void rayPassesThroughWaterWithoutStopping() {
         world.setBlock(3, FlatWorldGenerator.GRASS_HEIGHT + 1, 3, BlockType.WATER);
-        Raycast.Hit hit = Raycast.cast(world, new Vector3f(3.5f, 10f, 3.5f), new Vector3f(0, -1, 0), 20f);
+        Raycast.Hit hit = Raycast.cast(world, new Vector3f(3.5f, BOTTOM + 10f, 3.5f), new Vector3f(0, -1, 0), 20f);
         assertNotNull(hit);
         assertEquals(BlockType.GRASS_BLOCK, hit.type(), "water must not itself count as a hit - raycast should pass through to the solid ground beneath it");
     }

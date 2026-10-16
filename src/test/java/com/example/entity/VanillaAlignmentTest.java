@@ -24,7 +24,7 @@ class VanillaAlignmentTest {
         world = new World(1L, new FlatWorldGenerator());
         for (int cx = -1; cx <= 1; cx++)
             for (int cz = -1; cz <= 1; cz++) world.generateChunk(world.getOrCreateChunk(cx, cz));
-        ground = 1;
+        ground = com.example.world.Chunk.MIN_Y;
         while (world.isSolidCollision(5, ground, 5)) ground++;
     }
 

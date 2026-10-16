@@ -346,8 +346,11 @@ public enum BlockType {
         return hardness * 1.5f;
     }
 
-    private static final BlockType[] BY_ID = new BlockType[256];
+    private static final BlockType[] BY_ID;
     static {
+        int highest = 0;
+        for (BlockType b : values()) highest = Math.max(highest, b.id);
+        BY_ID = new BlockType[highest + 1];
         for (BlockType b : values()) {
             BY_ID[b.id] = b;
         }

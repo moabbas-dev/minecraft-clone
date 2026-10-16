@@ -13,6 +13,9 @@ import java.util.Random;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ItemEntityManagerTest {
+    /** The flat world starts at the bottom of the world: {@code BOTTOM + n} is the n-th layer above its bedrock (grass at 3, air from 4). */
+    private static final int BOTTOM = com.example.world.Chunk.MIN_Y;
+
     private static final float DT = 1f / 60f;
     /** Feet rest on top of FlatWorldGenerator's grass layer. */
     private static final float FLOOR_Y = FlatWorldGenerator.GRASS_HEIGHT + 1;
@@ -39,7 +42,7 @@ class ItemEntityManagerTest {
 
     @Test
     void aDroppedItemFallsAndSettlesOnTheGroundWithoutSinking() {
-        manager.spawn(BlockType.DIRT, 1, new Vector3f(5.5f, 10.5f, 5.5f), new Random(1));
+        manager.spawn(BlockType.DIRT, 1, new Vector3f(5.5f, BOTTOM + 10.5f, 5.5f), new Random(1));
         ItemEntity e = manager.entities().get(0);
         for (int i = 0; i < 240; i++) {
             manager.update(world, DT);
@@ -52,7 +55,7 @@ class ItemEntityManagerTest {
 
     @Test
     void aVeryFastFallStillNeverTunnelsThroughTheFloor() {
-        manager.spawn(BlockType.DIRT, 1, new Vector3f(5.5f, 200f, 5.5f), new Random(1));
+        manager.spawn(BlockType.DIRT, 1, new Vector3f(5.5f, BOTTOM + 200f, 5.5f), new Random(1));
         ItemEntity e = manager.entities().get(0);
         for (int i = 0; i < 600; i++) {
             manager.update(world, 0.05f); // the game's maximum dt
@@ -63,14 +66,14 @@ class ItemEntityManagerTest {
 
     @Test
     void itemsSpawnedInsideTerrainArePushedOutInsteadOfStayingEmbedded() {
-        manager.spawn(BlockType.DIRT, 1, new Vector3f(5.5f, 2.5f, 5.5f), new Random(1)); // inside the grass layer
+        manager.spawn(BlockType.DIRT, 1, new Vector3f(5.5f, BOTTOM + 2.5f, 5.5f), new Random(1)); // inside the grass layer
         run(2f);
         assertEquals(FLOOR_Y, manager.entities().get(0).position.y, 0.05f);
     }
 
     @Test
     void pickupIsBlockedDuringTheDelayAndWorksAfterIt() {
-        manager.spawn(BlockType.DIRT, 1, new Vector3f(5.5f, 4.3f, 5.5f), new Random(1));
+        manager.spawn(BlockType.DIRT, 1, new Vector3f(5.5f, BOTTOM + 4.3f, 5.5f), new Random(1));
         Inventory inv = new Inventory();
         ItemEntity e = manager.entities().get(0);
         run(0.2f);
@@ -83,7 +86,7 @@ class ItemEntityManagerTest {
 
     @Test
     void fullPickupAddsToInventoryAndRemovesTheEntityAtZero() {
-        manager.spawn(BlockType.DIRT, 5, new Vector3f(5.5f, 4.3f, 5.5f), new Random(1));
+        manager.spawn(BlockType.DIRT, 5, new Vector3f(5.5f, BOTTOM + 4.3f, 5.5f), new Random(1));
         run(1f);
         Inventory inv = new Inventory();
         assertEquals(1, manager.collect(above(manager.entities().get(0)), inv));
@@ -93,7 +96,7 @@ class ItemEntityManagerTest {
 
     @Test
     void whatWasCollectedIsReportedOnceWithWhereItLayForThePickupAnimation() {
-        manager.spawn(BlockType.DIRT, 5, new Vector3f(5.5f, 4.3f, 5.5f), new Random(1));
+        manager.spawn(BlockType.DIRT, 5, new Vector3f(5.5f, BOTTOM + 4.3f, 5.5f), new Random(1));
         run(1f);
         ItemEntity e = manager.entities().get(0);
         float x = e.position.x, z = e.position.z;
@@ -111,7 +114,7 @@ class ItemEntityManagerTest {
 
     @Test
     void aPartlyCollectedStackReportsOnlyTheTakenPart() {
-        manager.spawn(BlockType.DIRT, 6, new Vector3f(5.5f, 4.3f, 5.5f), new Random(1));
+        manager.spawn(BlockType.DIRT, 6, new Vector3f(5.5f, BOTTOM + 4.3f, 5.5f), new Random(1));
         run(1f);
         Inventory inv = new Inventory(1, 1, 4);
         manager.collect(above(manager.entities().get(0)), inv);
@@ -121,7 +124,7 @@ class ItemEntityManagerTest {
 
     @Test
     void aFullInventoryLeavesTheItemInTheWorldUntouched() {
-        manager.spawn(BlockType.DIRT, 3, new Vector3f(5.5f, 4.3f, 5.5f), new Random(1));
+        manager.spawn(BlockType.DIRT, 3, new Vector3f(5.5f, BOTTOM + 4.3f, 5.5f), new Random(1));
         run(1f);
         Inventory inv = new Inventory(1, 1, 4);
         inv.add(BlockType.STONE, 4);
@@ -133,7 +136,7 @@ class ItemEntityManagerTest {
 
     @Test
     void partialPickupTakesOnlyWhatFitsAndLeavesTheRestInTheWorld() {
-        manager.spawn(BlockType.DIRT, 10, new Vector3f(5.5f, 4.3f, 5.5f), new Random(1));
+        manager.spawn(BlockType.DIRT, 10, new Vector3f(5.5f, BOTTOM + 4.3f, 5.5f), new Random(1));
         run(1f);
         Inventory inv = new Inventory(2, 2, 4);
         inv.add(BlockType.DIRT, 3); // room: 1 in the stack + 4 in the empty slot = 5
@@ -145,7 +148,7 @@ class ItemEntityManagerTest {
 
     @Test
     void anItemCanNeverBePickedUpTwice() {
-        manager.spawn(BlockType.DIRT, 2, new Vector3f(5.5f, 4.3f, 5.5f), new Random(1));
+        manager.spawn(BlockType.DIRT, 2, new Vector3f(5.5f, BOTTOM + 4.3f, 5.5f), new Random(1));
         run(1f);
         Inventory inv = new Inventory();
         Vector3f feet = above(manager.entities().get(0));
@@ -156,7 +159,7 @@ class ItemEntityManagerTest {
 
     @Test
     void severalNearbyDifferentItemsAreAllCollected() {
-        Vector3f spot = new Vector3f(5.5f, 4.3f, 5.5f);
+        Vector3f spot = new Vector3f(5.5f, BOTTOM + 4.3f, 5.5f);
         manager.spawn(BlockType.DIRT, 1, spot, new Random(1));
         manager.spawn(BlockType.STONE, 1, spot, new Random(2));
         manager.spawn(BlockType.SAND, 1, spot, new Random(3));
@@ -171,7 +174,7 @@ class ItemEntityManagerTest {
 
     @Test
     void farAwayItemsAreNotCollected() {
-        manager.spawn(BlockType.DIRT, 1, new Vector3f(5.5f, 4.3f, 5.5f), new Random(1));
+        manager.spawn(BlockType.DIRT, 1, new Vector3f(5.5f, BOTTOM + 4.3f, 5.5f), new Random(1));
         run(1f);
         Inventory inv = new Inventory();
         assertEquals(0, manager.collect(new Vector3f(40f, FLOOR_Y, 40f), inv));
@@ -180,7 +183,7 @@ class ItemEntityManagerTest {
 
     @Test
     void sameTypeDropsAtTheSameSpotMergeIntoOneEntity() {
-        Vector3f spot = new Vector3f(5.5f, 6.5f, 5.5f);
+        Vector3f spot = new Vector3f(5.5f, BOTTOM + 6.5f, 5.5f);
         manager.spawn(BlockType.DIRT, 1, spot, new Random(1));
         manager.spawn(BlockType.DIRT, 1, spot, new Random(2));
         assertEquals(1, manager.size());
@@ -189,7 +192,7 @@ class ItemEntityManagerTest {
 
     @Test
     void mergingNeverExceedsTheStackLimit() {
-        Vector3f spot = new Vector3f(5.5f, 6.5f, 5.5f);
+        Vector3f spot = new Vector3f(5.5f, BOTTOM + 6.5f, 5.5f);
         manager.spawn(BlockType.DIRT, 60, spot, new Random(1));
         manager.spawn(BlockType.DIRT, 10, spot, new Random(2));
         int total = 0;
@@ -202,7 +205,7 @@ class ItemEntityManagerTest {
 
     @Test
     void itemsInAnUnloadedChunkAreFrozenNotDeletedOrDropped() {
-        manager.spawn(BlockType.DIRT, 1, new Vector3f(5.5f, 4.3f, 5.5f), new Random(1));
+        manager.spawn(BlockType.DIRT, 1, new Vector3f(5.5f, BOTTOM + 4.3f, 5.5f), new Random(1));
         run(1f);
         ItemEntity e = manager.entities().get(0);
         Vector3f frozenAt = new Vector3f(e.position);
@@ -221,7 +224,7 @@ class ItemEntityManagerTest {
 
     @Test
     void itemsDespawnAfterTheirLifetime() {
-        manager.spawn(BlockType.DIRT, 1, new Vector3f(5.5f, 4.3f, 5.5f), new Random(1));
+        manager.spawn(BlockType.DIRT, 1, new Vector3f(5.5f, BOTTOM + 4.3f, 5.5f), new Random(1));
         for (int i = 0; i < 305; i++) manager.update(world, 1f);
         assertEquals(0, manager.size());
     }
@@ -229,23 +232,23 @@ class ItemEntityManagerTest {
     @Test
     void theEntityCountIsCappedAndEvictsTheOldest() {
         for (int i = 0; i < ItemEntityManager.MAX_ENTITIES + 40; i++) {
-            manager.spawn(BlockType.DIRT, 1, new Vector3f(i * 3f, 6.5f, 0.5f), new Random(i)); // far apart: no merging
+            manager.spawn(BlockType.DIRT, 1, new Vector3f(i * 3f, BOTTOM + 6.5f, 0.5f), new Random(i)); // far apart: no merging
         }
         assertEquals(ItemEntityManager.MAX_ENTITIES, manager.size());
     }
 
     @Test
     void invalidSpawnsAreIgnored() {
-        manager.spawn(BlockType.AIR, 1, new Vector3f(5.5f, 6.5f, 5.5f), new Random(1));
-        manager.spawn(null, 1, new Vector3f(5.5f, 6.5f, 5.5f), new Random(1));
-        manager.spawn(BlockType.DIRT, 0, new Vector3f(5.5f, 6.5f, 5.5f), new Random(1));
-        manager.spawn(BlockType.DIRT, -3, new Vector3f(5.5f, 6.5f, 5.5f), new Random(1));
+        manager.spawn(BlockType.AIR, 1, new Vector3f(5.5f, BOTTOM + 6.5f, 5.5f), new Random(1));
+        manager.spawn(null, 1, new Vector3f(5.5f, BOTTOM + 6.5f, 5.5f), new Random(1));
+        manager.spawn(BlockType.DIRT, 0, new Vector3f(5.5f, BOTTOM + 6.5f, 5.5f), new Random(1));
+        manager.spawn(BlockType.DIRT, -3, new Vector3f(5.5f, BOTTOM + 6.5f, 5.5f), new Random(1));
         assertEquals(0, manager.size());
     }
 
     @Test
     void clearRemovesEverything() {
-        manager.spawn(BlockType.DIRT, 1, new Vector3f(5.5f, 6.5f, 5.5f), new Random(1));
+        manager.spawn(BlockType.DIRT, 1, new Vector3f(5.5f, BOTTOM + 6.5f, 5.5f), new Random(1));
         manager.clear();
         assertEquals(0, manager.size());
     }

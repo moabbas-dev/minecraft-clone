@@ -70,14 +70,14 @@ class WorldGenerationTest {
         World world = new World(9L, new TerrainGenerator(9L));
         Chunk chunk = world.getOrCreateChunk(0, 0);
         world.generateChunk(chunk);
-        byte[] first = chunk.exportBlocks();
+        short[] first = chunk.exportBlocks();
 
         // generateChunk is only ever called once per chunk in real play (guarded by
         // world.hasChunk in Game's streaming loop), but the generator itself should still be a
         // pure function of the chunk's own coordinates - calling it again must not corrupt data.
         // (saveDir is null here, so this always regenerates fresh rather than loading from disk.)
         world.generateChunk(chunk);
-        byte[] second = chunk.exportBlocks();
+        short[] second = chunk.exportBlocks();
         assertArrayEquals(first, second, "regenerating the same chunk coordinates must be deterministic");
     }
 

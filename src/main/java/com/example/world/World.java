@@ -67,7 +67,7 @@ public class World {
     private final Map<Long, Map<Long, BlockType>> pendingSpill = new HashMap<>();
 
     private static long localKey(int lx, int y, int lz) {
-        return ((long) y << 8) | ((long) lz << 4) | lx;
+        return ((long) (y - Chunk.MIN_Y) << 8) | ((long) lz << 4) | lx;
     }
 
     /**
@@ -77,7 +77,7 @@ public class World {
      * generated first.
      */
     public void spill(int cx, int cz, int lx, int y, int lz, BlockType type) {
-        if (y < 0 || y >= Chunk.SIZE_Y) return;
+        if (!Chunk.inWorld(y)) return;
         Chunk c = getChunk(cx, cz);
         if (c != null && c.isGenerated()) {
             if (!TreePlanner.replaceableByTree(c.getLocal(lx, y, lz))) return;
@@ -99,7 +99,7 @@ public class World {
         if (memory != null) blocks.putAll(memory);
         for (Map.Entry<Long, BlockType> e : blocks.entrySet()) {
             long k = e.getKey();
-            int lx = (int) (k & 15), lz = (int) ((k >> 4) & 15), y = (int) (k >> 8);
+            int lx = (int) (k & 15), lz = (int) ((k >> 4) & 15), y = (int) (k >> 8) + Chunk.MIN_Y;
             BlockType current = chunk.getLocal(lx, y, lz);
             if (!TreePlanner.replaceableByTree(current)) continue;
             if (ChunkMeshBuilder.isAnyLeaves(e.getValue()) && ChunkMeshBuilder.isAnyLeaves(current)) continue;
@@ -109,7 +109,7 @@ public class World {
 
     /** Generates a fresh chunk, or restores it from disk if it was previously saved. */
     public void generateChunk(Chunk chunk) {
-        byte[] saved = saveDir != null ? WorldIO.loadChunk(saveDir, chunk.chunkX, chunk.chunkZ) : null;
+        short[] saved = saveDir != null ? WorldIO.loadChunk(saveDir, chunk.chunkX, chunk.chunkZ) : null;
         if (saved != null) {
             chunk.importBlocks(saved);
             fluids.chunkRestored(this, chunk);
@@ -137,7 +137,7 @@ public class World {
 
     /** Returns AIR for unloaded chunks so chunk-edge faces still render while neighbors stream in. */
     public BlockType getBlock(int x, int y, int z) {
-        if (y < 0 || y >= Chunk.SIZE_Y) return BlockType.AIR;
+        if (!Chunk.inWorld(y)) return BlockType.AIR;
         int cx = worldToChunk(x);
         int cz = worldToChunk(z);
         Chunk c = getChunk(cx, cz);
@@ -145,10 +145,10 @@ public class World {
         return c.getLocal(worldToLocal(x), y, worldToLocal(z));
     }
 
-    /** Highest solid block's Y at this column, or 0 if the chunk isn't loaded (used by rain particles). */
+    /** Highest solid block's Y at this column, or {@code Chunk.MIN_Y - 1} if the chunk isn't loaded or the column is empty (used by rain particles). */
     public int getColumnHeightAt(int worldX, int worldZ) {
         Chunk c = getChunk(worldToChunk(worldX), worldToChunk(worldZ));
-        if (c == null || !c.isGenerated()) return 0;
+        if (c == null || !c.isGenerated()) return Chunk.MIN_Y - 1;
         return c.getColumnHeight(worldToLocal(worldX), worldToLocal(worldZ));
     }
 
@@ -162,14 +162,14 @@ public class World {
      * since nothing revisits that neighbor once the border chunk's real light is later computed.
      */
     public int getSkyLight(int x, int y, int z) {
-        if (y < 0 || y >= Chunk.SIZE_Y) return 15;
+        if (!Chunk.inWorld(y)) return 15;
         Chunk c = getChunk(worldToChunk(x), worldToChunk(z));
         if (c == null || !c.isGenerated() || !c.isLightComputed()) return 15;
         return c.getSkyLight(worldToLocal(x), y, worldToLocal(z));
     }
 
     public int getBlockLight(int x, int y, int z) {
-        if (y < 0 || y >= Chunk.SIZE_Y) return 0;
+        if (!Chunk.inWorld(y)) return 0;
         Chunk c = getChunk(worldToChunk(x), worldToChunk(z));
         if (c == null || !c.isGenerated() || !c.isLightComputed()) return 0;
         return c.getBlockLight(worldToLocal(x), y, worldToLocal(z));
@@ -204,7 +204,7 @@ public class World {
 
     /** {@code getRawBrightness(pos, amount)}: the larger of the block light and the sky light dimmed by {@code amount}. */
     public int getRawBrightness(int x, int y, int z, int amount) {
-        if (y < 0 || y >= Chunk.SIZE_Y) return 15;
+        if (!Chunk.inWorld(y)) return 15;
         return Math.max(getBlockLight(x, y, z), getSkyLight(x, y, z) - amount);
     }
 
@@ -217,7 +217,7 @@ public class World {
     private final Map<Long, Integer> emissionOverrides = new HashMap<>();
 
     private static long posKey(int x, int y, int z) {
-        return ((long) x & 0x3FFFFFFL) | (((long) z & 0x3FFFFFFL) << 26) | (((long) y & 0xFFL) << 52);
+        return ((long) x & 0x3FFFFFFL) | (((long) z & 0x3FFFFFFL) << 26) | (((long) (y - Chunk.MIN_Y) & 0x1FFL) << 52);
     }
 
     public int lightEmissionOverride(int x, int y, int z) {
@@ -252,7 +252,7 @@ public class World {
     }
 
     public void setBlock(int x, int y, int z, BlockType type) {
-        if (y < 0 || y >= Chunk.SIZE_Y) return;
+        if (!Chunk.inWorld(y)) return;
         int cx = worldToChunk(x);
         int cz = worldToChunk(z);
         Chunk c = getOrCreateChunk(cx, cz);

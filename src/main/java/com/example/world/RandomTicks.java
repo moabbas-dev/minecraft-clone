@@ -34,7 +34,7 @@ public final class RandomTicks {
                 if (chunk == null || !chunk.isGenerated()) continue;
                 for (int section = 0; section < Chunk.SIZE_Y / SECTION; section++) {
                     for (int i = 0; i < PER_SECTION; i++) {
-                        int lx = random.nextInt(SECTION), lz = random.nextInt(SECTION), y = section * SECTION + random.nextInt(SECTION);
+                        int lx = random.nextInt(SECTION), lz = random.nextInt(SECTION), y = Chunk.MIN_Y + section * SECTION + random.nextInt(SECTION);
                         BlockType t = chunk.getLocal(lx, y, lz);
                         if (BlockSupport.isFarmland(t)) {
                             farmlandTick(world, random, (cx + dx) * Chunk.SIZE_X + lx, y, (cz + dz) * Chunk.SIZE_Z + lz, t, rainingAt);

@@ -208,15 +208,15 @@ class SaplingGrowthTest {
         Chunk chunk = world.getOrCreateChunk(0, 0);
         for (int x = 0; x < Chunk.SIZE_X; x++) {
             for (int z = 0; z < Chunk.SIZE_Z; z++) {
-                chunk.setLocal(x, Chunk.SIZE_Y - 3, z, BlockType.GRASS_BLOCK);
+                chunk.setLocal(x, Chunk.MAX_Y - 2, z, BlockType.GRASS_BLOCK);
             }
         }
         chunk.markGenerated();
-        world.setBlock(8, Chunk.SIZE_Y - 2, 8, BlockType.OAK_SAPLING_STAGE_0);
+        world.setBlock(8, Chunk.MAX_Y - 1, 8, BlockType.OAK_SAPLING_STAGE_0);
         SaplingGrowth growth = new SaplingGrowth(8L);
-        growth.registerPlanted(8, Chunk.SIZE_Y - 2, 8, SaplingSpecies.OAK);
+        growth.registerPlanted(8, Chunk.MAX_Y - 1, 8, SaplingSpecies.OAK);
         for (int i = 0; i < 4; i++) growth.update(world, FAR_PAST_ANY_DELAY);
-        assertEquals(BlockType.OAK_SAPLING_STAGE_3, world.getBlock(8, Chunk.SIZE_Y - 2, 8), "must defer, not overflow world height");
+        assertEquals(BlockType.OAK_SAPLING_STAGE_3, world.getBlock(8, Chunk.MAX_Y - 1, 8), "must defer, not overflow world height");
     }
 
     // --- Chunk load/unload (persistence-adjacent) ---

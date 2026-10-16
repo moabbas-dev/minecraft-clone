@@ -247,7 +247,7 @@ class NewBiomesTest {
         World world = new World(seed, new TerrainGenerator(seed));
         Chunk chunk = world.getOrCreateChunk(cx, cz);
         world.generateChunk(chunk);
-        byte[] firstGeneration = chunk.exportBlocks();
+        short[] firstGeneration = chunk.exportBlocks();
 
         // Simulates "chunk unload, then reload" without going through WorldIO's disk round-trip -
         // regenerating the same coordinates from a fresh generator instance must be byte-identical,
@@ -255,7 +255,7 @@ class NewBiomesTest {
         World reloadedWorld = new World(seed, new TerrainGenerator(seed));
         Chunk reloadedChunk = reloadedWorld.getOrCreateChunk(cx, cz);
         reloadedWorld.generateChunk(reloadedChunk);
-        byte[] secondGeneration = reloadedChunk.exportBlocks();
+        short[] secondGeneration = reloadedChunk.exportBlocks();
 
         assertArrayEquals(firstGeneration, secondGeneration,
                 "reloading the same Birch Forest chunk coordinates must reproduce identical blocks, not duplicate or drop trees");
@@ -300,13 +300,13 @@ class NewBiomesTest {
         World world = new World(seed, new TerrainGenerator(seed));
         Chunk chunk = world.getOrCreateChunk(cx, cz);
         world.generateChunk(chunk);
-        byte[] firstGeneration = chunk.exportBlocks();
+        short[] firstGeneration = chunk.exportBlocks();
         assertTrue(countBlock(chunk, BlockType.DARK_OAK_LOG) > 0, "expected at least one Dark Oak tree (with branches) in this chunk");
 
         World reloadedWorld = new World(seed, new TerrainGenerator(seed));
         Chunk reloadedChunk = reloadedWorld.getOrCreateChunk(cx, cz);
         reloadedWorld.generateChunk(reloadedChunk);
-        byte[] secondGeneration = reloadedChunk.exportBlocks();
+        short[] secondGeneration = reloadedChunk.exportBlocks();
 
         assertArrayEquals(firstGeneration, secondGeneration,
                 "reloading the same Dark Forest chunk coordinates must reproduce identical branches, not duplicate or drop them");

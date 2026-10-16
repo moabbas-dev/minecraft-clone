@@ -18,6 +18,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /** The bow of the 26.3 client: draw power, arrow speed and damage, the pull animation, the FOV squeeze, recipes and pickup. */
 class BowTest {
+    /** The flat world starts at the bottom of the world: {@code BOTTOM + n} is the n-th layer above its bedrock (grass at 3, air from 4). */
+    private static final int BOTTOM = com.example.world.Chunk.MIN_Y;
+
     @Test
     void powerRisesFasterThanLinearlyAndCapsAtOneAfterTwentyTicks() {
         assertEquals(0f, BowMath.power(0f));
@@ -86,8 +89,8 @@ class BowTest {
         World world = new World(1L, new FlatWorldGenerator());
         world.generateChunk(world.getOrCreateChunk(0, 0));
         ArrowManager arrows = new ArrowManager();
-        Dummy mob = new Dummy(8.5f, 5f, 8.5f), player = new Dummy(2.5f, 5f, 8.5f);
-        arrows.firePlayer(new Vector3f(2f, 5f, 8.5f), new Vector3f(60f, 0f, 0f), false);
+        Dummy mob = new Dummy(8.5f, BOTTOM + 5f, 8.5f), player = new Dummy(2.5f, BOTTOM + 5f, 8.5f);
+        arrows.firePlayer(new Vector3f(2f, BOTTOM + 5f, 8.5f), new Vector3f(60f, 0f, 0f), false);
         for (int i = 0; i < 40 && arrows.arrows().size() == 1; i++) {
             arrows.update(world, List.of(player), List.of(mob), 0.05f, p -> {
             }, new Random(1));
@@ -103,15 +106,15 @@ class BowTest {
         World world = new World(1L, new FlatWorldGenerator());
         world.generateChunk(world.getOrCreateChunk(0, 0));
         ArrowManager arrows = new ArrowManager();
-        arrows.firePlayer(new Vector3f(5.5f, 3.9f, 5.5f), new Vector3f(0f, -20f, 0f), false); // into the ground
-        arrows.fire(new Vector3f(5.7f, 3.9f, 5.7f), new Vector3f(0f, -20f, 0f), 2f);
+        arrows.firePlayer(new Vector3f(5.5f, BOTTOM + 3.9f, 5.5f), new Vector3f(0f, -20f, 0f), false); // into the ground
+        arrows.fire(new Vector3f(5.7f, BOTTOM + 3.9f, 5.7f), new Vector3f(0f, -20f, 0f), 2f);
         List<Targetable> none = new ArrayList<>();
         for (int i = 0; i < 40; i++) arrows.update(world, none, List.of(), 0.05f, p -> {
         }, new Random(1));
         assertEquals(2, arrows.arrows().size());
-        assertEquals(1, arrows.pickUp(new Vector3f(5.5f, 4.5f, 5.5f)), "only the player's arrow");
+        assertEquals(1, arrows.pickUp(new Vector3f(5.5f, BOTTOM + 4.5f, 5.5f)), "only the player's arrow");
         assertEquals(1, arrows.arrows().size());
-        assertEquals(0, arrows.pickUp(new Vector3f(50f, 4.5f, 5.5f)), "and only when close");
+        assertEquals(0, arrows.pickUp(new Vector3f(50f, BOTTOM + 4.5f, 5.5f)), "and only when close");
     }
 
     @Test
