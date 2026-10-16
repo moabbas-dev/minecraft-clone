@@ -49,5 +49,7 @@ public enum Tile {
     // Copper tools and the spears.
     TORCH, FARMLAND, FARMLAND_MOIST, GOLDEN_APPLE, BOW, BOW_PULLING_0, BOW_PULLING_1, BOW_PULLING_2, WHEAT, WHEAT_SEEDS, CARROT, BEETROOT, BEETROOT_SEEDS, COPPER_SWORD, COPPER_AXE, COPPER_PICKAXE, COPPER_SHOVEL, COPPER_HOE, WOODEN_SPEAR, STONE_SPEAR, COPPER_SPEAR, IRON_SPEAR, GOLD_SPEAR, DIAMOND_SPEAR,
     // Fluids: the still surface and the flowing side (first frames only), and the buckets.
-    WATER_FLOW, LAVA, LAVA_FLOW, BUCKET, WATER_BUCKET, LAVA_BUCKET
+    WATER_FLOW, LAVA, LAVA_FLOW, BUCKET, WATER_BUCKET, LAVA_BUCKET,
+    // The middle of a 32 x 32 flowing frame (the surface of moving fluid) and the burning overlay.
+    WATER_FLOW_TOP, LAVA_FLOW_TOP, FIRE_1
 }

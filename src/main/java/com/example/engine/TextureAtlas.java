@@ -39,6 +39,25 @@ public class TextureAtlas {
 
     private static final Map<Tile, String> REAL_TEXTURE_PATHS = new EnumMap<>(Tile.class);
 
+    /**
+     * The animated tiles and which 16 x 16 part of a frame each shows: the still sprites and the burning overlay one whole frame; the
+     * flowing sprites are 32 x 32 frames, whose top-left quarter is what the sides of a fluid use (u 0 to 0.5, v 0 to 0.5 of the sprite) and
+     * whose middle (8, 8) is what a moving surface uses (FluidRenderer samples 0.25 to 0.75 around the centre, turned to the flow).
+     */
+    private static final Map<Tile, int[]> ANIMATED = new EnumMap<>(Tile.class);
+
+    static {
+        ANIMATED.put(Tile.WATER, new int[]{0, 0});
+        ANIMATED.put(Tile.WATER_FLOW, new int[]{0, 0});
+        ANIMATED.put(Tile.WATER_FLOW_TOP, new int[]{8, 8});
+        ANIMATED.put(Tile.LAVA, new int[]{0, 0});
+        ANIMATED.put(Tile.LAVA_FLOW, new int[]{0, 0});
+        ANIMATED.put(Tile.LAVA_FLOW_TOP, new int[]{8, 8});
+        ANIMATED.put(Tile.FIRE_1, new int[]{0, 0});
+    }
+
+    private final Map<Tile, TextureAnimation> animations = new EnumMap<>(Tile.class);
+
     /** Cutout tiles (binary alpha - fully opaque leaf/sprout pixels, fully transparent holes)
      *  whose transparent pixels get {@link LeafEdgeDilate} applied before upload, so mipmapping
      *  never blends the black behind a hole into a leaf edge (the "pale blue line" glitch). Every
@@ -216,6 +235,9 @@ public class TextureAtlas {
         REAL_TEXTURE_PATHS.put(Tile.BUCKET, "textures/item/bucket.png");
         REAL_TEXTURE_PATHS.put(Tile.WATER_BUCKET, "textures/item/water_bucket.png");
         REAL_TEXTURE_PATHS.put(Tile.LAVA_BUCKET, "textures/item/lava_bucket.png");
+        REAL_TEXTURE_PATHS.put(Tile.WATER_FLOW_TOP, "textures/block/water_flow.png");
+        REAL_TEXTURE_PATHS.put(Tile.LAVA_FLOW_TOP, "textures/block/lava_flow.png");
+        REAL_TEXTURE_PATHS.put(Tile.FIRE_1, "textures/block/fire_1.png");
         REAL_TEXTURE_PATHS.put(Tile.BOW, "textures/item/bow.png");
         REAL_TEXTURE_PATHS.put(Tile.BOW_PULLING_0, "textures/item/bow_pulling_0.png");
         REAL_TEXTURE_PATHS.put(Tile.BOW_PULLING_1, "textures/item/bow_pulling_1.png");
@@ -305,6 +327,70 @@ public class TextureAtlas {
         }
 
         textureId = upload(atlas);
+        loadAnimations();
+    }
+
+    private void loadAnimations() {
+        for (Map.Entry<Tile, int[]> e : ANIMATED.entrySet()) {
+            String path = REAL_TEXTURE_PATHS.get(e.getKey());
+            if (path == null) continue;
+            try {
+                BufferedImage strip = TextureIo.read(new File(path));
+                File meta = new File(path + ".mcmeta");
+                if (strip == null || !meta.isFile()) continue;
+                TextureAnimation anim = TextureAnimation.parse(strip, java.nio.file.Files.readString(meta.toPath()));
+                if (anim != null && anim.frameCount() > 1) animations.put(e.getKey(), anim);
+            } catch (IOException | RuntimeException ex) {
+                log.warn("Couldn't load the animation of {} ({}) - it stays on its first frame", e.getKey(), ex.getMessage());
+            }
+        }
+    }
+
+    /** How many tiles are animated (for tests and the debug overlay). */
+    public int animatedTileCount() {
+        return animations.size();
+    }
+
+    /**
+     * One game tick of every animated tile (water, lava, the burning overlay): the frame moves on when its time is up and the changed tiles
+     * are written into the atlas again, border and mip levels included, with glTexSubImage2D - nothing is re-meshed.
+     */
+    public void tickAnimations() {
+        if (animations.isEmpty()) return;
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, textureId);
+        for (Map.Entry<Tile, TextureAnimation> e : animations.entrySet()) {
+            TextureAnimation anim = e.getValue();
+            anim.tick();
+            if (!anim.takeChanged()) continue;
+            int[] r = ANIMATED.get(e.getKey());
+            uploadCell(e.getKey(), anim.region(r[0], r[1], TILE_PX));
+        }
+    }
+
+    /** Writes a tile's 16 x 16 picture (and its wrapped border, and every mip level) into its atlas cell. */
+    private void uploadCell(Tile tile, int[] pixels) {
+        int[] cell = new int[CELL_PX * CELL_PX];
+        for (int y = 0; y < CELL_PX; y++) {
+            for (int x = 0; x < CELL_PX; x++) {
+                cell[y * CELL_PX + x] = pixels[Math.floorMod(y - BORDER_PX, TILE_PX) * TILE_PX + Math.floorMod(x - BORDER_PX, TILE_PX)];
+            }
+        }
+        int col = tile.ordinal() % COLS, row = tile.ordinal() / COLS;
+        int[][] chain = MipmapChain.generate(cell, CELL_PX, MAX_MIP_LEVEL, MipmapChain.strategyFor(cell, false, false));
+        for (int l = 0; l <= MAX_MIP_LEVEL; l++) {
+            int size = CELL_PX >> l;
+            ByteBuffer b = memAlloc(size * size * 4);
+            for (int argb : chain[l]) {
+                b.put((byte) ((argb >> 16) & 0xFF));
+                b.put((byte) ((argb >> 8) & 0xFF));
+                b.put((byte) (argb & 0xFF));
+                b.put((byte) ((argb >> 24) & 0xFF));
+            }
+            b.flip();
+            glTexSubImage2D(GL_TEXTURE_2D, l, col * size, row * size, size, size, GL_RGBA, GL_UNSIGNED_BYTE, b);
+            memFree(b);
+        }
     }
 
     private static int[] toArgb(BufferedImage img) {
@@ -327,12 +413,12 @@ public class TextureAtlas {
                 BufferedImage real = TextureIo.read(file);
                 if (real == null) {
                     log.warn("Texture file {} isn't a decodable image - using the missing-texture placeholder for {}", path, tile);
-                } else if (tile == Tile.WATER || tile == Tile.WATER_FLOW || tile == Tile.LAVA || tile == Tile.LAVA_FLOW) {
-                    // the fluid textures are vertical strips of animation frames (the flowing ones 32 wide); this engine has
-                    // no texture animation, so just take the first 16x16 of the first frame as a static look.
-                    int w = Math.min(TILE_PX, real.getWidth());
-                    int h = Math.min(TILE_PX, real.getHeight());
-                    return real.getSubimage(0, 0, w, h);
+                } else if (ANIMATED.containsKey(tile)) {
+                    // an animation strip: the first frame's part of it (the animation then replaces it, see tickAnimations)
+                    int[] r = ANIMATED.get(tile);
+                    int w = Math.min(TILE_PX, real.getWidth() - r[0]);
+                    int h = Math.min(TILE_PX, real.getHeight() - r[1]);
+                    return real.getSubimage(r[0], r[1], w, h);
                 } else if (real.getWidth() == TILE_PX && real.getHeight() == TILE_PX) {
                     return DYEABLE.contains(tile) ? dyeLeather(real, path) : real;
                 } else {

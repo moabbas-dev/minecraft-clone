@@ -28,8 +28,8 @@ None of these files are committed: `textures/`, `texts/`, `sounds/`, `minecraft-
 | `textures/entity/equipment/{humanoid,humanoid_leggings}/<material>.png` (+ `leather_overlay.png`) | `game/Game.renderPlayerPreview` | no | that armor layer is not drawn in the inventory preview |
 | `textures/gui/sprites/hud/hotbar_offhand_left.png` | `game/Game.renderRealHud` | no | the offhand item is drawn without its slot frame |
 | `textures/gui/sprites/hud/heart/{poisoned,absorbing}_{full,half}.png`, `textures/gui/sprites/hud/effect_background.png`, `textures/mob_effect/*.png` | `game/Game` (`drawHealthAndFood`, `drawEffectIcons`) | no | that heart variant / the effect icon or its background is not drawn (`mob_effect/` is a bulk folder of `restore-assets.py`) |
-| `textures/block/fire_1.png` | `game/Game.drawFireOverlay` | no | no burning overlay |
-| `textures/block/{water_still,water_flow,lava_still,lava_flow}.png` | `engine/TextureAtlas` (first 16x16 of the first frame; no animation) | no | "missing texture" tile |
+| `textures/block/fire_1.png` | `game/Game.renderFireOverlay` (a tile of the atlas) | no | no burning overlay |
+| `textures/block/{water_still,water_flow,lava_still,lava_flow,fire_1}.png` and their `.png.mcmeta` | `engine/TextureAtlas` + `engine/TextureAnimation` (animated) | no | "missing texture" tile; without the `.mcmeta` the first frame stays |
 | `textures/item/{bucket,water_bucket,lava_bucket,bow,bow_pulling_0,bow_pulling_1,bow_pulling_2,golden_apple,wheat,wheat_seeds,carrot,beetroot,beetroot_seeds,copper_*,*_spear}.png`, `textures/block/{torch,farmland,farmland_moist}.png` | `engine/TextureAtlas` (`REAL_TEXTURE_PATHS`) | no | "missing texture" tile |
 | `textures/entity/zombie/zombie_baby.png` | `game/Game` (`EntityTexture.load`) | no | flat placeholder colour on the baby zombie model |
 | `textures/entity/{pig,cow,chicken}/*_temperate_baby.png` | `game/Game` (`EntityTexture.loadFirst`) | no | flat placeholder colour on the baby model |

@@ -226,7 +226,7 @@ public class Game implements GameAccess {
     private float waterVisionSeconds, rainFogMultiplier;
     /** Ticks the bow has been drawn (0 = not drawing). */
     private float bowDrawTicks;
-    private Mesh skyDiscMesh, sunriseMesh, lightningMesh;
+    private Mesh skyDiscMesh, sunriseMesh, lightningMesh, fireMesh;
     private final com.example.entity.LightningBolts lightning = new com.example.entity.LightningBolts();
     private final float[] lightningScratch = new float[LightningGeometry.capacityFloats()];
     private Mesh sunMoonMesh;
@@ -344,6 +344,7 @@ public class Game implements GameAccess {
         sunMoonMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
         skyDiscMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
         sunriseMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
+        fireMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
         lightningMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
         rainMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
         starMesh = new Mesh(CHUNK_VERTEX_LAYOUT);
@@ -814,7 +815,16 @@ public class Game implements GameAccess {
         }
     }
 
+    /** Animated textures (water, lava, the burning overlay) run at 20 ticks a second in every screen, the pause menu included. */
+    private float animationClock;
+
     private void update(float dt, double now) {
+        animationClock += dt;
+        for (int guard = 0; animationClock >= TICK_SECONDS && guard < 4; guard++) {
+            animationClock -= TICK_SECONDS;
+            if (atlas != null) atlas.tickAnimations();
+        }
+        if (animationClock > TICK_SECONDS) animationClock = 0f;
         switch (state) {
             case TITLE -> titleScreen.update(dt, input, window.getWidth(), window.getHeight());
             case SELECT_WORLD -> selectWorldScreen.update(dt, input, window.getWidth(), window.getHeight());
@@ -2218,6 +2228,9 @@ public class Game implements GameAccess {
         renderClouds(tick, rain, thunder);
         chunkShader.setUniform("uLitMode", LIT_TERRAIN);
         renderRain();
+        renderFireOverlay(projection);
+        chunkShader.setUniform("uFogStart", fogStart);
+        chunkShader.setUniform("uFogEnd", fogEnd);
         chunkShader.setUniform("uLitMode", LIT_HELD);
         renderHeldItem();
 
@@ -3315,7 +3328,6 @@ public class Game implements GameAccess {
 
         if (hudTextures != null && inventory.getHotbarSize() == 9) {
             renderRealHud();
-            drawFireOverlay(window.getWidth(), window.getHeight());
             renderDebugOverlay();
             return;
         }
@@ -3476,19 +3488,52 @@ public class Game implements GameAccess {
         }
     }
 
-    /** ScreenEffectRenderer.renderFire, flattened: two sheets of the real fire texture over the lower screen while the player burns. */
-    private void drawFireOverlay(int w, int h) {
-        if (!survival.isBurning()) return;
-        HudTextures.Sprite fire = guiSprite("textures/block/fire_1.png");
-        if (fire == null) return;
-        int frames = Math.max(1, fire.h() / Math.max(1, fire.w()));
-        int frame = (int) ((System.nanoTime() / 100_000_000L) % frames);
-        float size = h * 0.55f;
-        float v0 = frame / (float) frames, v1 = (frame + 1) / (float) frames;
+    /**
+     * ScreenEffectRenderer.renderFire: while the player burns, two 1 x 1 quads of the animated {@code fire_1} sprite, 0.5 in front of the
+     * camera, one moved 0.24 to the right and 0.3 down and turned 10 degrees, the other the mirror image, drawn 90 % opaque with the
+     * world's projection - so they cover the lower part of the view and tilt away from each other. Drawn before the hand, with the HUD
+     * hidden too (wiki, Screen effects: visible with the HUD disabled).
+     */
+    private void renderFireOverlay(Matrix4f projection) {
+        if (!survival.isBurning() || world == null) return;
+        float[] uv = atlas.getUv(com.example.engine.Tile.FIRE_1);
+        float[] v = new float[12 * 11];
+        int n = 0;
         for (int i = 0; i < 2; i++) {
-            float x = i == 0 ? w / 2f - size * 1.05f : w / 2f + size * 0.05f;
-            uiRenderer.drawTexturedQuad(x, h - size, size, size, new float[]{0f, v0, 1f, v1}, fire.id(), 1f, 1f, 1f, 0.9f);
+            float side = i == 0 ? 1f : -1f; // the first quad is moved to +x and turned by -10 degrees, the second the other way
+            Matrix4f m = new Matrix4f().translate(side * 0.24f, -0.3f, 0f).rotateY(-side * 0.17453292f);
+            float[][] corners = {{-0.5f, -0.5f, uv[0], uv[3]}, {0.5f, -0.5f, uv[2], uv[3]}, {0.5f, 0.5f, uv[2], uv[1]}, {-0.5f, 0.5f, uv[0], uv[1]}};
+            int[] order = {0, 1, 2, 0, 2, 3};
+            for (int k : order) {
+                org.joml.Vector3f p = m.transformPosition(new org.joml.Vector3f(corners[k][0], corners[k][1], -0.5f));
+                v[n++] = p.x;
+                v[n++] = p.y;
+                v[n++] = p.z;
+                v[n++] = corners[k][2];
+                v[n++] = corners[k][3];
+                v[n++] = 1f; // sky and block light: unlit mode ignores them
+                v[n++] = 1f;
+                v[n++] = 1f;
+                v[n++] = 1f;
+                v[n++] = 1f;
+                v[n++] = 0f;
+            }
         }
+        atlas.bind(0);
+        chunkShader.setUniform("uProjection", projection);
+        chunkShader.setUniform("uView", new Matrix4f());
+        chunkShader.setUniform("uModel", IDENTITY);
+        chunkShader.setUniform("uLitMode", LIT_UNLIT);
+        chunkShader.setUniform("uAlpha", 229f / 255f); // the colour #e5ffffff of buildFireQuad
+        chunkShader.setUniform("uFogStart", 1_000_000f);
+        chunkShader.setUniform("uFogEnd", 2_000_000f);
+        setEnvFog(false);
+        boolean depth = glIsEnabled(GL_DEPTH_TEST);
+        glDisable(GL_DEPTH_TEST);
+        fireMesh.upload(v, n);
+        fireMesh.draw();
+        if (depth) glEnable(GL_DEPTH_TEST);
+        chunkShader.setUniform("uAlpha", 1f);
     }
 
     /** Vanilla durability bar: 13x2 of a 16-unit icon, green to red, only once the item has been used. */
@@ -4001,12 +4046,7 @@ public class Game implements GameAccess {
     @Override
     public void respawn() {
         if (world == null) throw new IllegalStateException("no active world");
-        survival.getHealth().reset();
-        if (state == GameState.DEATH) {
-            window.captureMouse();
-            input.resyncMousePosition();
-            state = GameState.IN_GAME;
-        }
+        respawnPlayer(); // the same as the Respawn button: back at the spawn point with full health and hunger, no effects, no fire
     }
 
     @Override
@@ -4203,6 +4243,7 @@ public class Game implements GameAccess {
         sunMoonMesh.destroy();
         skyDiscMesh.destroy();
         sunriseMesh.destroy();
+        fireMesh.destroy();
         lightningMesh.destroy();
         rainMesh.destroy();
         heldItemMesh.destroy();

@@ -272,6 +272,8 @@ public class ChunkMeshBuilder {
         FloatBuffer buf = lava ? opaque : transparent;
         BlockTextureMap.Faces faces = textureMap.facesFor(type);
         float[] stillUv = atlas.getUv(faces.top()), flowUv = atlas.getUv(faces.side());
+        // a moving surface shows the middle of the flowing sprite
+        float[] flowTopUv = atlas.getUv(lava ? com.example.engine.Tile.LAVA_FLOW_TOP : com.example.engine.Tile.WATER_FLOW_TOP);
         float[] tint = lava ? NEUTRAL_TINT : chunk.getWaterTint(lx, lz);
         BlockType up = sampleBlock(chunk, world, lx, ly + 1, lz), down = sampleBlock(chunk, world, lx, ly - 1, lz);
         BlockType north = sampleBlock(chunk, world, lx, ly, lz - 1), south = sampleBlock(chunk, world, lx, ly, lz + 1);
@@ -282,7 +284,7 @@ public class ChunkMeshBuilder {
         if (!sameFluid(up, lava) && !up.isOpaqueCube()) {
             float[] flow = fluidFlow(chunk, world, lx, ly, lz, type);
             boolean still = flow[0] == 0f && flow[1] == 0f;
-            float[] uv = still ? stillUv : flowUv;
+            float[] uv = still ? stillUv : flowTopUv;
             // the flow's angle snapped to quarter turns (the atlas tile cannot be sampled at other angles without bleeding)
             int turns = still ? 0 : Math.floorMod(Math.round((float) ((Math.atan2(flow[1], flow[0]) - Math.PI / 2) / (Math.PI / 2))), 4);
             float[][] corner = {{0, 0, hNW}, {0, 1, hSW}, {1, 1, hSE}, {1, 0, hNE}};
