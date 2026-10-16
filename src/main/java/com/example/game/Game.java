@@ -2183,11 +2183,13 @@ public class Game implements GameAccess {
         chunkShader.setUniform("uLitMode", LIT_TERRAIN);
         setEnvFog(true);
         chunkShader.setUniform("uAlpha", 1f);
+        chunkShader.setUniform("uCutoff", com.example.engine.MipmapChain.CUTOFF); // terrain cutout: leaves, plants, torches, glass
         for (ChunkRenderData rd : renderData.values()) {
             Matrix4f model = new Matrix4f().translation(rd.chunkX * (float) Chunk.SIZE_X, 0, rd.chunkZ * (float) Chunk.SIZE_Z);
             chunkShader.setUniform("uModel", model);
             rd.opaqueMesh.draw();
         }
+        chunkShader.setUniform("uCutoff", 0f);
         chunkShader.setUniform("uAlpha", 1f); // water and ice carry their own alpha (180 and 190 of 255) in their textures
         for (ChunkRenderData rd : renderData.values()) {
             Matrix4f model = new Matrix4f().translation(rd.chunkX * (float) Chunk.SIZE_X, 0, rd.chunkZ * (float) Chunk.SIZE_Z);
@@ -3756,7 +3758,7 @@ public class Game implements GameAccess {
         int cx = World.worldToChunk(x), cz = World.worldToChunk(z);
         Chunk chunk = world.getChunk(cx, cz);
         if (chunk == null || !chunk.isGenerated()) throw new IllegalStateException("chunk not loaded yet");
-        species.place(chunk, World.worldToLocal(x), y, World.worldToLocal(z), new Random(seed));
+        TreePlanner.plan(species, chunk, world, World.worldToLocal(x), y, World.worldToLocal(z), new Random(seed)).commit(chunk, world);
         chunk.markMeshDirty();
         world.markNeighborChunksDirty(cx, cz);
     }

@@ -63,6 +63,50 @@ public class World {
         chunks.remove(Chunk.key(cx, cz));
     }
 
+    /** Blocks of trees that grew in a neighbouring chunk and fall into a chunk that is not generated yet, keyed by that chunk. */
+    private final Map<Long, Map<Long, BlockType>> pendingSpill = new HashMap<>();
+
+    private static long localKey(int lx, int y, int lz) {
+        return ((long) y << 8) | ((long) lz << 4) | lx;
+    }
+
+    /**
+     * One block of a tree rooted in another chunk that lands in chunk (cx, cz) at local (lx, y, lz). A generated chunk takes it at once
+     * (where the cell is free for a tree: air, leaves or water); one that is not generated yet keeps it - on disk too, so a world closed
+     * in between does not lose it - until it is generated or loaded. So a tree is never cut off at a chunk border, whichever side is
+     * generated first.
+     */
+    public void spill(int cx, int cz, int lx, int y, int lz, BlockType type) {
+        if (y < 0 || y >= Chunk.SIZE_Y) return;
+        Chunk c = getChunk(cx, cz);
+        if (c != null && c.isGenerated()) {
+            if (!TreePlanner.replaceableByTree(c.getLocal(lx, y, lz))) return;
+            if (ChunkMeshBuilder.isAnyLeaves(type) && ChunkMeshBuilder.isAnyLeaves(c.getLocal(lx, y, lz))) return;
+            setBlock(c.worldOriginX() + lx, y, c.worldOriginZ() + lz, type);
+            return;
+        }
+        pendingSpill.computeIfAbsent(Chunk.key(cx, cz), k -> new java.util.LinkedHashMap<>()).put(localKey(lx, y, lz), type);
+        if (saveDir != null) WorldIO.appendSpill(saveDir, cx, cz, lx, y, lz, type);
+    }
+
+    /** Writes the tree blocks that other chunks' trees left for this one (in memory and from disk) into a chunk that is being generated or loaded. */
+    private void applyPendingSpill(Chunk chunk) {
+        Map<Long, BlockType> blocks = new java.util.LinkedHashMap<>();
+        if (saveDir != null) {
+            for (int[] r : WorldIO.takeSpill(saveDir, chunk.chunkX, chunk.chunkZ)) blocks.put(localKey(r[0], r[1], r[2]), BlockType.byId(r[3]));
+        }
+        Map<Long, BlockType> memory = pendingSpill.remove(Chunk.key(chunk.chunkX, chunk.chunkZ));
+        if (memory != null) blocks.putAll(memory);
+        for (Map.Entry<Long, BlockType> e : blocks.entrySet()) {
+            long k = e.getKey();
+            int lx = (int) (k & 15), lz = (int) ((k >> 4) & 15), y = (int) (k >> 8);
+            BlockType current = chunk.getLocal(lx, y, lz);
+            if (!TreePlanner.replaceableByTree(current)) continue;
+            if (ChunkMeshBuilder.isAnyLeaves(e.getValue()) && ChunkMeshBuilder.isAnyLeaves(current)) continue;
+            chunk.setLocal(lx, y, lz, e.getValue());
+        }
+    }
+
     /** Generates a fresh chunk, or restores it from disk if it was previously saved. */
     public void generateChunk(Chunk chunk) {
         byte[] saved = saveDir != null ? WorldIO.loadChunk(saveDir, chunk.chunkX, chunk.chunkZ) : null;
@@ -73,6 +117,7 @@ public class World {
             generator.generate(chunk, this);
             chunk.setFreshlyGenerated(true);
         }
+        applyPendingSpill(chunk);
         generator.computeTint(chunk); // not persisted, so this runs on both the load and generate paths
         chunk.markGenerated();
         chunk.markMeshDirty();

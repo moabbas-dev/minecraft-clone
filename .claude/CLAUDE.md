@@ -16,13 +16,13 @@ Never use:
 
 # 1. Minecraft Source of Truth
 
-Treat **minecraft.wiki** as the primary source of truth for Minecraft-related information.
+Treat **minecraft.wiki and minecraftdocs.dev** as the primary source of truth for Minecraft-related information.
 
 Before implementing or modifying anything related to Minecraft:
 
 1. **Research first.**
 2. Use the configured **Perplexity MCP/search tools** as the primary search method.
-3. Search `minecraft.wiki` for the relevant mechanic, block, entity, item, structure, particle, visual, formula, behavior, or other information.
+3. Search `minecraft.wiki and minecraftdocs.dev` for the relevant mechanic, block, entity, item, structure, particle, visual, formula, behavior, or other information.
 4. Read the relevant documentation before writing code.
 5. Base the implementation on documented Minecraft behavior rather than assumptions, memory, or general knowledge.
 6. If the information is unclear, perform additional searches and inspect related wiki pages before implementing.
@@ -224,7 +224,7 @@ Depending on the task, useful subagent roles may include:
 
 ### Mechanics Research Agent
 
-Research the exact Minecraft behavior on `minecraft.wiki` using Perplexity.
+Research the exact Minecraft behavior on `minecraft.wiki or minecraftdocs.dev` using Perplexity.
 
 Determine:
 
@@ -331,7 +331,7 @@ Subagents must not invent:
 - behavior
 - visual details
 
-Minecraft-related research must prioritize `minecraft.wiki` through the configured Perplexity tools.
+Minecraft-related research must prioritize `minecraft.wiki and minecraftdocs.dev` through the configured Perplexity tools.
 
 Visual research agents must inspect available reference images when visual accuracy matters.
 
@@ -424,6 +424,47 @@ Before considering the task complete, confirm:
 - The implementation satisfies the original request.
 
 ---
+
+
+---
+
+# 14. Minecraft 26.3 Zero-Invention & Existing-Code Cleanup
+
+Target **Minecraft Java Edition 26.3**. Reproduce verified vanilla behavior; never create merely Minecraft-like behavior.
+
+## Research Priority
+Use **Perplexity MCP** and research in this order: (1) actual Minecraft Java 26.3 source/implementation, (2) actual vanilla 26.3 worldgen/configuration data, (3) `minecraftdocs.dev` for architecture, and (4) `minecraft.wiki` for mechanics, version differences and visuals. Search repeatedly and cross-check; a Wiki summary is not enough when the internal algorithm is required. For worldgen, trace relevant vanilla systems such as `TreeFeature`, trunk/foliage/root placers, configured/placed features, `TreePlacements`, `VegetationPlacements`, `Climate`, `Climate.Sampler`, `MultiNoiseBiomeSource`, `OverworldBiomeBuilder`, `NoiseRouter`, `NoiseChunk`, density functions, surface rules, aquifers, noise settings, RNG and seed derivation.
+
+## Delete Invented/Guessed Minecraft Logic
+Existing project code is not automatically trusted. Audit affected systems for AI guesses, approximations, placeholders, arbitrary constants, simplified algorithms and trial-and-error tuning. When Minecraft-specific code is verified to be invented, guessed, approximate or incorrect, **remove it and replace it with researched vanilla 26.3 behavior**. Also remove obsolete helpers, constants, dead branches, stale comments and tests that only support the fake implementation. Do not keep the old approximation as a fallback, comment it out “just in case”, or layer correct logic over fake logic.
+
+Do not delete legitimate project infrastructure blindly. Rendering, caching, networking, UI, abstractions and optimizations may differ from Mojang. Delete code because its Minecraft behavior is verified wrong/invented, not merely because its architecture differs.
+
+## No Arbitrary Substitutions
+Minecraft constants must have a verified source. Never tune values until the result looks right. Do not substitute generic Perlin/Simplex noise, Voronoi regions, random blobs, spherical foliage, custom climate thresholds or generic tree generators unless research confirms vanilla 26.3 uses that behavior. Complexity is not permission to simplify or invent.
+
+## Trees
+Never manually design trees from guessed heights, spherical/circular foliage, random leaf deletion or arbitrary branches. Verify each tree's configured/placed feature, trunk placer, foliage placer, parameters, feature size, roots, decorators, block providers, placement conditions, biome placement and RNG behavior. Audit and remove fake tree generation after the vanilla replacement is verified.
+
+## Biomes & Terrain
+Never use simplified rules such as `high temperature -> desert`, generic noise maps, fake climate systems or manually tuned terrain curves merely because they resemble Minecraft. Research the actual 26.3 climate, biome-selection, terrain, density/noise, surface, cave, aquifer and RNG pipelines. Audit arbitrary thresholds, guessed cave/river logic, custom noise settings and unexplained constants and replace verified approximations.
+
+## Randomness
+RNG is part of the algorithm. Research world/chunk/feature seed derivation, salts, positional randomness, random factories and random-consumption order where relevant. Never substitute `Math.random()` or another convenient RNG without verified justification.
+
+## Mandatory Stop Condition
+If exact 26.3 behavior cannot be verified after thorough research, **STOP that part of implementation**. Do not fill gaps with intuition, plausible algorithms, standard game-development behavior or visual approximations. Report what remains unverified. An incomplete verified implementation is preferable to a completed fake implementation.
+
+## Worldgen Workflow
+**Research vanilla 26.3 → inspect vanilla data → inspect existing code → identify unsupported approximations → plan safe replacement → implement verified behavior → delete obsolete fake code → test → compare against vanilla references.**
+
+For large work, use parallel subagents for source research, worldgen data, trees, biome/climate, terrain/density, RNG/seeding, visual references, existing-code audit and verification. The main agent must reconcile their findings.
+
+## Completion Gate
+Do not mark work complete until no affected mechanics/algorithms/constants are guessed, fake tree/biome/terrain logic has been replaced, relevant 26.3 source/data was inspected, RNG was verified where relevant, obsolete fake code was cleaned up, and important Minecraft-specific decisions can be traced to researched vanilla behavior.
+
+**Golden rule: Do not build Minecraft-like behavior. Reproduce researched Minecraft Java Edition 26.3 behavior. If you cannot verify it, do not invent it.**
+
 
 # Final Rule
 

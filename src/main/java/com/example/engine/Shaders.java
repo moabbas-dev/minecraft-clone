@@ -94,6 +94,9 @@ public final class Shaders {
 
             uniform sampler2D uTexture;
             uniform float uAlpha;
+            // The alpha test of a cutout pass (0.5 for terrain, as RenderPipelines' ALPHA_CUTOUT_THRESHOLD_CUTOUT_TERRAIN); 0 = none.
+            // A cutout fragment is written opaque, so the mip-scaled alpha at a distance never blends the leaves into the sky.
+            uniform float uCutoff;
             uniform vec3 uFogColor;
             uniform float uFogStart;
             uniform float uFogEnd;
@@ -113,7 +116,7 @@ public final class Shaders {
 
             void main() {
                 vec4 texColor = texture(uTexture, vUv);
-                if (texColor.a < 0.05) discard;
+                if (texColor.a < max(uCutoff, 0.05)) discard;
                 float directional = 1.0;
                 if (uLitMode >= 2) {
                     // The face normal from the screen-space derivatives of the position (flat faces only, which is all
@@ -140,7 +143,7 @@ public final class Shaders {
                     fogFactor = max(fogFactor, envFog);
                 }
                 vec3 finalColor = mix(shaded, uFogColor, fogFactor);
-                FragColor = vec4(finalColor, texColor.a * uAlpha * vFan);
+                FragColor = vec4(finalColor, (uCutoff > 0.0 ? 1.0 : texColor.a) * uAlpha * vFan);
             }
             """;
 

@@ -161,16 +161,21 @@ class TerrainGeneratorTreeTest {
     }
 
     @Test
-    void canopyMustFitInsideTheChunkToBeAccepted() {
+    void aTreeThatWouldCrossTheChunkBorderIsPlannedAsNotFittingAndNeverWritten() {
+        Chunk chunk = new Chunk(0, 0);
+        chunk.markGenerated();
+        for (int x = 0; x < Chunk.SIZE_X; x++) for (int z = 0; z < Chunk.SIZE_Z; z++) chunk.setLocal(x, 3, z, BlockType.GRASS_BLOCK);
+        TreePlanner.Plan edge = TreePlanner.plan(TreeSpecies.JUNGLE, chunk, 1, 4, 8, new Random(1));
+        assertFalse(edge.fits, "the blob foliage of radius 2 reaches x = -1");
+        TreePlanner.Plan middle = TreePlanner.plan(TreeSpecies.JUNGLE, chunk, 8, 4, 8, new Random(1));
+        assertTrue(middle.fits);
+        assertTrue(TerrainGenerator.fitsAndIsSuitable(chunk, 8, 8, flatHeights(), TreeSpecies.JUNGLE, new ArrayList<>()));
+    }
+
+    private static int[][] flatHeights() {
         int[][] heights = new int[Chunk.SIZE_X][Chunk.SIZE_Z];
         for (int[] row : heights) java.util.Arrays.fill(row, 70);
-        Chunk chunk = new Chunk(0, 0);
-        List<int[]> placed = new ArrayList<>();
-
-        // JUNGLE has canopyRadius=3; at x=1 the canopy would need x=-2, out of bounds.
-        assertFalse(TerrainGenerator.fitsAndIsSuitable(chunk, 1, 8, heights, TreeSpecies.JUNGLE, placed));
-        // Comfortably inside with nothing else placed yet.
-        assertTrue(TerrainGenerator.fitsAndIsSuitable(chunk, 8, 8, heights, TreeSpecies.JUNGLE, placed));
+        return heights;
     }
 
     @Test

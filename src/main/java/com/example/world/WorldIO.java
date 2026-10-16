@@ -203,6 +203,43 @@ public class WorldIO {
         }
     }
 
+    private static File spillFile(File dir, int cx, int cz) {
+        return new File(new File(dir, "spill"), cx + "_" + cz + ".spill");
+    }
+
+    /** Appends one block of a tree that grew in a neighbouring chunk and falls into (cx, cz), which has not been generated yet. */
+    public static void appendSpill(File dir, int cx, int cz, int lx, int y, int lz, BlockType type) {
+        File file = spillFile(dir, cx, cz);
+        file.getParentFile().mkdirs();
+        try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(new FileOutputStream(file, true)))) {
+            out.writeByte(lx);
+            out.writeShort(y);
+            out.writeByte(lz);
+            out.writeByte(type.id);
+        } catch (IOException e) {
+            System.err.println("Failed to save tree spill for chunk " + cx + "," + cz + ": " + e.getMessage());
+        }
+    }
+
+    /** Reads and deletes the spill file of a chunk: {lx, y, lz, blockId} per record, in the order they were written. */
+    public static java.util.List<int[]> takeSpill(File dir, int cx, int cz) {
+        File file = spillFile(dir, cx, cz);
+        java.util.List<int[]> out = new java.util.ArrayList<>();
+        if (!file.isFile()) return out;
+        try (DataInputStream in = new DataInputStream(new BufferedInputStream(new FileInputStream(file)))) {
+            while (true) {
+                int lx = in.readUnsignedByte(), y = in.readUnsignedShort(), lz = in.readUnsignedByte(), id = in.readUnsignedByte();
+                out.add(new int[]{lx, y, lz, id});
+            }
+        } catch (java.io.EOFException done) {
+            // end of the records
+        } catch (IOException e) {
+            System.err.println("Failed to read tree spill for chunk " + cx + "," + cz + ": " + e.getMessage());
+        }
+        file.delete();
+        return out;
+    }
+
     public static boolean chunkExists(File dir, int cx, int cz) {
         return chunkFile(dir, cx, cz).isFile();
     }

@@ -153,7 +153,7 @@ public class TerrainGenerator implements WorldGenerator {
 
         floodSubmergedCaves(chunk, heights);
 
-        placeTrees(chunk, heights, dominantBiome, treeProbability, rnd);
+        placeTrees(chunk, heights, dominantBiome, treeProbability, rnd, world);
     }
 
     /**
@@ -190,9 +190,13 @@ public class TerrainGenerator implements WorldGenerator {
      * doesn't flicker into an unnatural mixture near a border the way blending it would.
      */
     static void placeTrees(Chunk chunk, int[][] heights, Biome[][] dominantBiome, float[][] treeProbability, Random rnd) {
+        placeTrees(chunk, heights, dominantBiome, treeProbability, rnd, null);
+    }
+
+    static void placeTrees(Chunk chunk, int[][] heights, Biome[][] dominantBiome, float[][] treeProbability, Random rnd, World world) {
         java.util.List<int[]> placed = new java.util.ArrayList<>(); // {x, z, canopyRadius}
-        for (int x = 1; x < Chunk.SIZE_X - 1; x++) {
-            for (int z = 1; z < Chunk.SIZE_Z - 1; z++) {
+        for (int x = 0; x < Chunk.SIZE_X; x++) {
+            for (int z = 0; z < Chunk.SIZE_Z; z++) {
                 if (!suitableColumn(chunk, x, z, heights[x][z], treeProbability[x][z])) continue;
                 if (rnd.nextFloat() >= treeProbability[x][z]) continue;
 
@@ -211,32 +215,50 @@ public class TerrainGenerator implements WorldGenerator {
 
                 if (!fitsAndIsSuitable(chunk, x, z, heights, species, placed)) continue;
 
-                species.place(chunk, x, heights[x][z] + 1, z, rnd);
+                // The tree is planned whole; what lies beyond this chunk's border goes to the neighbouring chunk (World.spill), so a
+                // tree is never cut off at a border.
+                TreePlanner.Plan plan = planWithRetries(species, chunk, world, x, heights[x][z] + 1, z, rnd);
+                if (plan.isEmpty()) continue;
+                plan.commit(chunk, world);
                 placed.add(new int[]{x, z, species.canopyRadius});
 
                 float clusterChance = clusterChanceFor(dominantBiome[x][z]);
                 if (rnd.nextFloat() < clusterChance) {
-                    placeClusterSatellites(chunk, x, z, species, heights, dominantBiome, treeProbability, placed, rnd);
+                    placeClusterSatellites(chunk, x, z, species, heights, dominantBiome, treeProbability, placed, rnd, world);
                 }
             }
         }
     }
 
+    /** How many times a tree that refuses to grow (a mangrove whose roots would be too long) is tried again with fresh dice: vanilla makes many placement attempts per chunk. */
+    private static final int PLAN_ATTEMPTS = 5;
+
+    private static TreePlanner.Plan planWithRetries(TreeSpecies species, Chunk chunk, World world, int x, int y, int z, Random rnd) {
+        TreePlanner.Plan plan = null;
+        for (int i = 0; i < PLAN_ATTEMPTS; i++) {
+            plan = TreePlanner.plan(species, chunk, world, x, y, z, rnd);
+            if (!plan.isEmpty()) break;
+        }
+        return plan;
+    }
+
     private static void placeClusterSatellites(Chunk chunk, int centerX, int centerZ, TreeSpecies species,
                                          int[][] heights, Biome[][] dominantBiome, float[][] treeProbability,
-                                         java.util.List<int[]> placed, Random rnd) {
+                                         java.util.List<int[]> placed, Random rnd, World world) {
         int satellites = 1 + rnd.nextInt(3);
         int reach = species.minSpacing * 2;
         for (int s = 0; s < satellites; s++) {
             int sx = centerX + rnd.nextInt(reach + 1) - reach / 2;
             int sz = centerZ + rnd.nextInt(reach + 1) - reach / 2;
-            if (sx < 1 || sx >= Chunk.SIZE_X - 1 || sz < 1 || sz >= Chunk.SIZE_Z - 1) continue;
+            if (sx < 0 || sx >= Chunk.SIZE_X || sz < 0 || sz >= Chunk.SIZE_Z) continue;
             if (!suitableColumn(chunk, sx, sz, heights[sx][sz], treeProbability[sx][sz])) continue;
             // Satellites stay the same species as the cluster's seed tree, regardless of what
             // this exact column's own dominant biome would independently pick - a cluster is
             // visually one clump of one species, not a mixed grove.
             if (!fitsAndIsSuitable(chunk, sx, sz, heights, species, placed)) continue;
-            species.place(chunk, sx, heights[sx][sz] + 1, sz, rnd);
+            TreePlanner.Plan plan = planWithRetries(species, chunk, world, sx, heights[sx][sz] + 1, sz, rnd);
+            if (plan.isEmpty()) continue;
+            plan.commit(chunk, world);
             placed.add(new int[]{sx, sz, species.canopyRadius});
         }
     }
@@ -252,11 +274,10 @@ public class TerrainGenerator implements WorldGenerator {
         return top == BlockType.GRASS_BLOCK || top == BlockType.SNOW_BLOCK || top == BlockType.MUD;
     }
 
-    /** Canopy fits inside this chunk, doesn't exceed world height, terrain isn't too steep
-     *  underfoot, and isn't within another tree's minimum spacing. */
+    /** The tree stays under the world height, the terrain isn't too steep underfoot, and it isn't within another tree's minimum
+     *  spacing (that the whole tree lies inside the chunk is checked on its plan, see {@link #placeTrees}). */
     static boolean fitsAndIsSuitable(Chunk chunk, int x, int z, int[][] heights, TreeSpecies species, java.util.List<int[]> placed) {
         int r = species.canopyRadius;
-        if (x - r < 0 || x + r >= Chunk.SIZE_X || z - r < 0 || z + r >= Chunk.SIZE_Z) return false;
         if (heights[x][z] + species.maxTotalHeight() >= Chunk.SIZE_Y) return false;
         if (!slopeOk(heights, x, z)) return false;
         for (int[] p : placed) {

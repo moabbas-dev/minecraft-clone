@@ -429,9 +429,53 @@ public class TextureAtlas {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, MAX_MIP_LEVEL);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
-        glGenerateMipmap(GL_TEXTURE_2D);
         memFree(buffer);
+        uploadMipLevels(image);
         return id;
+    }
+
+    /** The leaf tiles: their mip levels are DARK_CUTOUT (every leaves.png.mcmeta in the client says {@code "mipmap_strategy": "dark_cutout"}). */
+    private static final java.util.Set<Tile> LEAF_TILES = java.util.EnumSet.of(
+            Tile.LEAVES, Tile.BIRCH_LEAVES, Tile.SPRUCE_LEAVES, Tile.JUNGLE_LEAVES, Tile.ACACIA_LEAVES,
+            Tile.MANGROVE_LEAVES, Tile.DARK_OAK_LEAVES, Tile.CHERRY_LEAVES);
+
+    /**
+     * Levels 0-4 of the atlas, built cell by cell with {@link MipmapChain} (each cell is its tile plus its wrapped border, so a cell's
+     * chain never reads its neighbours): vanilla builds a sprite's mips with the sprite's own strategy, not one filter over the whole atlas.
+     */
+    private void uploadMipLevels(BufferedImage image) {
+        int w = image.getWidth(), h = image.getHeight();
+        int[][] levels = new int[MAX_MIP_LEVEL + 1][];
+        for (int l = 0; l <= MAX_MIP_LEVEL; l++) levels[l] = new int[(w >> l) * (h >> l)];
+        int[] cell = new int[CELL_PX * CELL_PX];
+        for (int row = 0; row < ROWS; row++) {
+            for (int col = 0; col < COLS; col++) {
+                int index = row * COLS + col;
+                Tile tile = index < Tile.values().length ? Tile.values()[index] : null;
+                for (int y = 0; y < CELL_PX; y++) for (int x = 0; x < CELL_PX; x++) cell[y * CELL_PX + x] = image.getRGB(col * CELL_PX + x, row * CELL_PX + y);
+                MipmapChain.Strategy strategy = MipmapChain.strategyFor(cell, tile != null && LEAF_TILES.contains(tile), tile == Tile.GLASS);
+                int[][] chain = MipmapChain.generate(cell, CELL_PX, MAX_MIP_LEVEL, strategy);
+                for (int l = 0; l <= MAX_MIP_LEVEL; l++) {
+                    int size = CELL_PX >> l, stride = w >> l;
+                    for (int y = 0; y < size; y++) {
+                        System.arraycopy(chain[l], y * size, levels[l], (row * size + y) * stride + col * size, size);
+                    }
+                }
+            }
+        }
+        for (int l = 1; l <= MAX_MIP_LEVEL; l++) {
+            int lw = w >> l, lh = h >> l;
+            ByteBuffer b = memAlloc(lw * lh * 4);
+            for (int argb : levels[l]) {
+                b.put((byte) ((argb >> 16) & 0xFF));
+                b.put((byte) ((argb >> 8) & 0xFF));
+                b.put((byte) (argb & 0xFF));
+                b.put((byte) ((argb >> 24) & 0xFF));
+            }
+            b.flip();
+            glTexImage2D(GL_TEXTURE_2D, l, GL_RGBA8, lw, lh, 0, GL_RGBA, GL_UNSIGNED_BYTE, b);
+            memFree(b);
+        }
     }
 
     // ---------- placeholders and composed tiles ----------
