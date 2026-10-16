@@ -155,6 +155,37 @@ class FluidSimTest {
     }
 
     @Test
+    void unsettledFluidKeepsFlowingAfterTheChunkIsSavedAndLoadedAgain() throws Exception {
+        java.io.File dir = java.nio.file.Files.createTempDirectory("fluidsave").toFile();
+        World first = flat();
+        first.setSaveDir(dir);
+        first.setBlock(8, 4, 8, BlockType.WATER);
+        first.fluids().tick(first); // one tick only: nothing has spread yet, and the pending tick is not saved
+        WorldIO.saveChunk(dir, first.getChunk(0, 0));
+        World second = new World(1L, new FlatWorldGenerator());
+        second.setSaveDir(dir);
+        second.generateChunk(second.getOrCreateChunk(0, 0));
+        assertEquals(BlockType.WATER, second.getBlock(8, 4, 8));
+        assertTrue(second.fluids().pending() > 0, "the source with room beside it was scheduled again");
+        second.fluids().settle(second, 800);
+        assertEquals(BlockType.WATER_FLOW_7, second.getBlock(9, 4, 8));
+        assertEquals(BlockType.WATER_FLOW_1, second.getBlock(15, 4, 8));
+    }
+
+    @Test
+    void aSettledOceanDoesNotWakeUpWhenItsChunkLoads() throws Exception {
+        java.io.File dir = java.nio.file.Files.createTempDirectory("fluidsave2").toFile();
+        World first = flat();
+        first.setSaveDir(dir);
+        for (int x = 0; x < 16; x++) for (int z = 0; z < 16; z++) first.getChunk(0, 0).setLocal(x, 4, z, BlockType.WATER);
+        WorldIO.saveChunk(dir, first.getChunk(0, 0));
+        World second = new World(1L, new FlatWorldGenerator());
+        second.setSaveDir(dir);
+        second.generateChunk(second.getOrCreateChunk(0, 0));
+        assertEquals(0, second.fluids().pending(), "sources with only water or ground beside them have nothing to do");
+    }
+
+    @Test
     void thePlayersBlockLightComesFromLava() {
         assertEquals(15, LightProperties.emission(BlockType.LAVA));
         assertEquals(1, LightProperties.dampening(BlockType.LAVA_FLOW_2));

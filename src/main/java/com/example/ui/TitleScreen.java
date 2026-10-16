@@ -67,7 +67,7 @@ public class TitleScreen extends McScreen {
             g.font.drawRotated(g.ui, splash, g.w / 2f + 123, 69, (float) Math.toRadians(-20), Math.max(1f, sp), 1f, 1f, 0f, true);
         }
 
-        g.text("Minecraft 1.8 Clone", 2, g.h - 10, 0xFFFFFF);
+        g.text("Minecraft 26.3 Clone", 2, g.h - 10, 0xFFFFFF);
         String right = "Not affiliated with Mojang AB";
         g.text(right, g.w - g.textWidth(right) - 2, g.h - 10, 0xFFFFFF);
     }

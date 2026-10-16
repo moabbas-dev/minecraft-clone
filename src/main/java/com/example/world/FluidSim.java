@@ -126,6 +126,39 @@ public final class FluidSim {
         return false;
     }
 
+    /**
+     * Scheduled fluid ticks are not saved, so when a chunk comes back from disk every fluid that may not have settled gets a tick
+     * again: any flowing block, and any source with room beside or below it to spread into. The ticks wait a second so that the
+     * neighbouring chunks are loaded by then (an unloaded neighbour counts as a wall).
+     */
+    void chunkRestored(World world, Chunk chunk) {
+        int ox = chunk.worldOriginX(), oz = chunk.worldOriginZ();
+        for (int lx = 0; lx < Chunk.SIZE_X; lx++) {
+            for (int lz = 0; lz < Chunk.SIZE_Z; lz++) {
+                int top = Math.min(Chunk.SIZE_Y - 1, chunk.getColumnHeight(lx, lz));
+                for (int y = 0; y <= top; y++) {
+                    BlockType b = chunk.getLocal(lx, y, lz);
+                    if (!b.isFluid()) continue;
+                    if (b.isFluidSource() && !hasRoomToSpread(chunk, lx, y, lz, b.isLava())) continue;
+                    schedule(ox + lx, y, oz + lz, RESTORE_DELAY + delayOf(b));
+                }
+            }
+        }
+    }
+
+    private static final int RESTORE_DELAY = 20;
+
+    /** A source can still spread when the cell below or one of the four beside it (inside the chunk) can hold fluid without being the same source. */
+    private static boolean hasRoomToSpread(Chunk chunk, int lx, int y, int lz, boolean lava) {
+        if (y > 0 && canPassThrough(chunk.getLocal(lx, y - 1, lz), lava)) return true;
+        for (int[] d : HORIZONTAL) {
+            int nx = lx + d[0], nz = lz + d[1];
+            if (nx < 0 || nx >= Chunk.SIZE_X || nz < 0 || nz >= Chunk.SIZE_Z) continue; // across the border: left to the neighbour's own scan
+            if (canPassThrough(chunk.getLocal(nx, y, nz), lava)) return true;
+        }
+        return false;
+    }
+
     // ---- ticking ----
 
     /** One game tick (20 Hz): runs the fluid ticks that have come due. */

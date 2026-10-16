@@ -255,7 +255,14 @@ public enum BlockType {
     LAVA_FALLING(243, "Lava", false, true, -1f, 15f),
     BUCKET(244, "Bucket", false, true, -1f, 0f),
     WATER_BUCKET(245, "Water Bucket", false, true, -1f, 0f),
-    LAVA_BUCKET(246, "Lava Bucket", false, true, -1f, 0f);
+    LAVA_BUCKET(246, "Lava Bucket", false, true, -1f, 0f),
+    // Farmland keeps its moisture 0-7 in the block state in vanilla; here FARMLAND is 0, FARMLAND_MOIST is 7 and these are 1-6.
+    FARMLAND_1(247, "Farmland", true, true, 0.6f, 0f),
+    FARMLAND_2(248, "Farmland", true, true, 0.6f, 0f),
+    FARMLAND_3(249, "Farmland", true, true, 0.6f, 0f),
+    FARMLAND_4(250, "Farmland", true, true, 0.6f, 0f),
+    FARMLAND_5(251, "Farmland", true, true, 0.6f, 0f),
+    FARMLAND_6(252, "Farmland", true, true, 0.6f, 0f);
 
     public final int id;
     public final String displayName;

@@ -427,7 +427,7 @@ All from the 26.3 client (`SkyColors`, `timeline/day.json`, the biome `sky_color
 - [x] The sun and moon angle is eased by the timeline's cubic bezier (`SkyDetails.sunAngleDegrees`; the sun crosses the horizon at ticks about 12542 and 23460), and the sunrise / sunset fan uses the 32 real `sunrise_sunset_color` keyframes (#AARRGGBB).
 - [x] Fog: start = d - clamp(d / 10, 4, 64) for render distance d, end = d; rain adds the environment fog from -160 to 768 (strength eased, 0.5 in deserts, savannas and badlands, less without sky light); underwater -8 to 96 x max(0.25, vision); lava 0.25 to 1 (section 24). The cloud field is 48 cells in radius.
 - [x] Biome tables (water colour, underwater fog, sky, fog) are the real values; the white lightning overlay was removed (vanilla only changes the sky colour).
-- **Differences:** the underwater fog eases between surface and water (vanilla switches at once); swamp / mangrove water fog end x0.85 is not applied; the dark disc below the horizon is not drawn.
+- **Fixed in section 26:** the underwater fog now switches at once, swamp / mangrove water fog end x0.85 is applied, and the dark disc below the horizon is drawn.
 - Tests: `DayNightTest`, `CelestialWeatherTest`, `BiomeAtmosphereTest` rewritten.
 
 ## 19. Copper tools and the six spears (G19)
@@ -440,7 +440,7 @@ All from the 26.3 client (`SkyColors`, `timeline/day.json`, the biome `sky_color
 ## 20. Torches, farmland, hoes and random ticks (G20)
 
 - [x] Torches: floor torch and four wall torches (`BlockSupport`: a torch needs a sturdy face, and drops as an item when it loses it), light 14, real model (a 2 x 10 x 2 px box, the wall one leaning 22.5 degrees), recipe coal or charcoal over a stick (4). Not done: the flame and smoke particles (needs a new sprite-particle emitter).
-- [x] Farmland: a hoe turns grass or dirt into farmland (not from below, with the block above free), 15/16 high with the indented side. `RandomTicks` (3 random ticks per 16-cubed section per tick within 8 chunks) dries and wets it: moist with water within 4 blocks or rain, otherwise a dry one has a 1-in-7 chance each tick to become dirt, and any solid block above turns it to dirt. **Approximation:** vanilla keeps a moisture level 0-7 and steps it per tick; this has two states. Not done: trampling and crops (no farming exists).
+- [x] Farmland: a hoe turns grass or dirt into farmland (not from below, with the block above free), 15/16 high with the indented side. `RandomTicks` (3 random ticks per 16-cubed section per tick within 8 chunks) dries and wets it: moist with water within 4 blocks or rain, otherwise a dry one has a 1-in-7 chance each tick to become dirt, and any solid block above turns it to dirt. Moisture 0-7 is exact since section 26. Not done: trampling and crops (no farming exists).
 - [x] Fixes found on the way: glass was walk-through (now solid); the translucent pass drew everything at alpha 0.85 - now the texture's own alpha (water 180, ice 190), and glass, plants and torches are cutouts in the opaque pass; a non-solid block can be placed where the player stands.
 - Tests: `TorchAndFarmlandTest`.
 
@@ -481,8 +481,8 @@ Read from `FlowingFluid`, `WaterFluid`, `LavaFluid`, `LiquidBlock`, `FluidRender
 - [x] Every state is its own block id (231-243), so saves need nothing new; `BlockType.isWater / isLava / isFluid / fluidAmount` replace the old `== WATER` checks everywhere (swimming, spawning, explosions, raycast, farmland moisture, fall damage, light dampening 1).
 - [x] Rendering: corner heights averaged over the four cells at each corner (a nearly full cell weighs ten times, 1 when the fluid is above), sloped surfaces, side faces cut to those heights with the flowing sprite, the still sprite on top (the flowing one, turned in quarter turns to the flow, where it moves), 0.001 inset, no face against the same fluid. Lava is lit 15 and drawn opaque; water is tinted by the biome and blended.
 - [x] Buckets: recipe three iron ingots, scoop a still source (the empty bucket's ray stops at sources), pour into the aimed cell (the clicked block when a plant, else the cell in front of the face); empty buckets stack to 16, full ones to 1.
-- [x] Lava: 4 damage per hit (armor reduces it, `DamageSource.LAVA`) and 15 seconds of fire for the player and for mobs; the dark red fog (0.6, 0, 0) seen from 0.25 to 1 block; swimming in lava is 0.4 x the water speed (drag 0.5 against 0.8) and does not lift the swimmer. Thin flowing water (surface less than 0.3 above the feet) is waded, not swum.
-- **Differences / not done:** the water and lava textures show their first frame only (no animation); the top texture is turned in 90 degree steps, not smoothly; fluids do not push entities; lava does not start fires or burn items; no bucket, fizz or splash sounds (none among the user's files); no waterlogging, cauldrons, milk, powder snow or fish buckets; scheduled fluid ticks are not saved (unsettled flow freezes after a reload); the nether lava numbers (delay 10, spread 4) are not used.
+- [x] Lava: 4 damage per hit (armor reduces it, `DamageSource.LAVA`) and 15 seconds of fire for the player and for mobs; the dark red fog (#991900, section 26) seen from 0.25 to 1 block; swimming in lava is 0.4 x the water speed (drag 0.5 against 0.8) and does not lift the swimmer. Thin flowing water (surface less than 0.3 above the feet) is waded, not swum.
+- **Differences / not done:** the water and lava textures show their first frame only (no animation); the top texture is turned in 90 degree steps, not smoothly; fluids do not push entities; lava does not start fires or burn items; no bucket, fizz or splash sounds (none among the user's files); no waterlogging, cauldrons, milk, powder snow or fish buckets; scheduled fluid ticks are not saved, but unsettled fluid is woken again when its chunk loads (section 26); the nether lava numbers (delay 10, spread 4) are not used.
 - Tests: `FluidSimTest` (11), `BucketTest` (4).
 
 ## 25. What is still wrong or open (end of the "fix everything" day)
@@ -491,5 +491,18 @@ Read from `FlowingFluid`, `WaterFluid`, `LavaFluid`, `LiquidBlock`, `FluidRender
 - No farming (crops, trampling), so the new food and seed items are test-controller only; no torch / flame particles, heart particles or snow-biome rain particles.
 - The spear has no charge or lunge; the bow has no offhand use.
 - Fire blocks, charged creepers, night vision, blindness and darkness are missing.
-- Dry-farmland decay is a 1-in-7 step instead of vanilla's moisture levels; the burning overlay is flattened.
-- Tests: 887 passing.
+- The burning overlay is flattened; the fluid textures are not animated and the flowing top is turned in quarter turns only.
+- Tests: 889 passing.
+
+## 26. Fix pass: farmland moisture, fogs, dark disc, fluid reload (G26)
+
+Each item was checked on minecraft.wiki (Farmland, Fog, Biome tag (Java Edition), Void; pages opened in the browser) and then against the 26.3 jar for the exact numbers, and tested in a seeded regular world as well as the flat one.
+
+- [x] **Farmland moisture 0-7** (wiki: Farmland, "Block states": moisture 0-7, only 7 shows the wet texture, newly hydrated farmland jumps to 7; hydration: water within 4 blocks horizontally, from the farmland's own level to one above, or rain). `FarmlandBlock.randomTick` in the jar: near water or rain and moisture below 7 -> 7; otherwise moisture above 0 -> one less; otherwise (no crop) -> dirt. Blocks FARMLAND (0), FARMLAND_1..6 (ids 247-252) and FARMLAND_MOIST (7). Replaces the 1-in-7 approximation.
+- [x] **Lava fog colour** was wrong (0.6, 0, 0): `LavaFogEnvironment.COLOR` is #991900 in the jar (the wiki rounds it to #991A00, (0.6, 0.1, 0)).
+- [x] **Underwater fog switches at once** when the camera crosses the surface (wiki, Fog: "a much thicker initial fog is applied" on entering, receding with time - which `waterVision` already does); the invented 3 per second ease is gone.
+- [x] **Swamp and mangrove swamp water fog**: `minecraft:visual/water_fog_end_distance` multiplied by 0.85 in both biome files (the wiki's `has_closer_water_fog` tag, replaced by this attribute in 25w42a); blended by the biome weights.
+- [x] **Dark disc**: `SkyRenderer.renderDarkDisc` draws a black radius-512 disc 4 blocks below the camera while the eye is below the horizon height (63, or the world's bottom in a flat world) and not under water (`shouldRenderDarkDisc`; wiki, Void: the void is black).
+- [x] **Fluid reload**: `FluidSim.chunkRestored` re-schedules every flowing block, and every source with room to spread, when a chunk is loaded from disk (a second later, so the neighbours are loaded). A settled ocean schedules nothing.
+- Not changed on purpose: the flowing texture is still the first frame in quarter turns, the burning overlay is still flat, the test controller's `respawn` command only resets health (the real Respawn button resets everything).
+- Tests: `TorchAndFarmlandTest` (moisture steps), `FluidSimTest` (reload).

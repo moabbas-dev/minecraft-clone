@@ -68,6 +68,7 @@ public class World {
         byte[] saved = saveDir != null ? WorldIO.loadChunk(saveDir, chunk.chunkX, chunk.chunkZ) : null;
         if (saved != null) {
             chunk.importBlocks(saved);
+            fluids.chunkRestored(this, chunk);
         } else {
             generator.generate(chunk, this);
             chunk.setFreshlyGenerated(true);

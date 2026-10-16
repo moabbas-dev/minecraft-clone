@@ -177,7 +177,8 @@ public class BlockTextureMap {
         uniform(BlockType.BOW_PULLING_0, Tile.BOW_PULLING_0);
         uniform(BlockType.BOW_PULLING_1, Tile.BOW_PULLING_1);
         uniform(BlockType.BOW_PULLING_2, Tile.BOW_PULLING_2);
-        put(BlockType.FARMLAND, Tile.FARMLAND, Tile.DIRT, Tile.DIRT);
+        // only moisture 7 shows the wet top (minecraft.wiki/w/Farmland, block states)
+        for (int m = 0; m <= 6; m++) put(com.example.world.BlockSupport.farmland(m), Tile.FARMLAND, Tile.DIRT, Tile.DIRT);
         put(BlockType.FARMLAND_MOIST, Tile.FARMLAND_MOIST, Tile.DIRT, Tile.DIRT);
         uniform(BlockType.COPPER_SWORD, Tile.COPPER_SWORD);
         uniform(BlockType.COPPER_AXE, Tile.COPPER_AXE);

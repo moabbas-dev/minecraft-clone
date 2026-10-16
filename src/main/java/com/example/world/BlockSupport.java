@@ -21,8 +21,22 @@ public final class BlockSupport {
         return isFloorTorch(t) || isWallTorch(t);
     }
 
+    /** FarmBlock's MOISTURE state, 0-7 (0 for anything that is not farmland). */
+    public static int moisture(BlockType t) {
+        if (t == BlockType.FARMLAND) return 0;
+        if (t == BlockType.FARMLAND_MOIST) return 7;
+        return t.id >= 247 && t.id <= 252 ? t.id - 246 : 0;
+    }
+
+    /** The farmland block with this moisture, 0-7. */
+    public static BlockType farmland(int moisture) {
+        if (moisture <= 0) return BlockType.FARMLAND;
+        if (moisture >= 7) return BlockType.FARMLAND_MOIST;
+        return BlockType.byId(246 + moisture);
+    }
+
     public static boolean isFarmland(BlockType t) {
-        return t == BlockType.FARMLAND || t == BlockType.FARMLAND_MOIST;
+        return t == BlockType.FARMLAND || t == BlockType.FARMLAND_MOIST || (t.id >= 247 && t.id <= 252);
     }
 
     /**

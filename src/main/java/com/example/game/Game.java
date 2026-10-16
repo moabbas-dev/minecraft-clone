@@ -92,11 +92,10 @@ public class Game implements GameAccess {
     private float mineHitClock = 0f;
 
     // Underwater fog (WaterFogEnvironment): from -8 to 96 blocks times max(0.25, water vision), the water vision growing with the time
-    // spent underwater (LocalPlayer.getWaterVision); the default water fog colour is #050533. The ease between the surface and the
-    // underwater fog when crossing the water plane is this project's own (vanilla switches at once).
+    // spent underwater (LocalPlayer.getWaterVision); the default water fog colour is #050533. The fog switches at once when
+    // the camera crosses the water plane, as in vanilla.
     private static final float UNDERWATER_FOG_START = -8f;
     private static final float UNDERWATER_FOG_END = 96f;
-    private static final float UNDERWATER_TRANSITION_RATE = 3f;
     private static final Vector3f DEFAULT_UNDERWATER_FOG = new Vector3f(5 / 255f, 5 / 255f, 0x33 / 255f);
     /** Global wind-sway multiplier (see Shaders.CHUNK_VERTEX) - the one debug/tuning knob for
      *  this feature: set to 0f to disable wind entirely with no other code changes, per the
@@ -325,7 +324,7 @@ public class Game implements GameAccess {
     }
 
     private void init() {
-        window = new Window(1280, 720, "Minecraft 1.8 Clone");
+        window = new Window(1280, 720, "Minecraft 26.3 Clone");
         input = new Input(window.getHandle());
         window.releaseMouse(); // start on the title screen with a free cursor
 
@@ -518,7 +517,7 @@ public class Game implements GameAccess {
         resetGameplayState(new Inventory(), settings.difficulty());
         weather = new Weather(seed);
 
-        window.setTitle("Minecraft 1.8 Clone - " + settings.name());
+        window.setTitle("Minecraft 26.3 Clone - " + settings.name());
         window.captureMouse();
         input.resyncMousePosition();
         state = GameState.IN_GAME;
@@ -582,7 +581,7 @@ public class Game implements GameAccess {
         }
         weather = new Weather(meta.seed());
 
-        window.setTitle("Minecraft 1.8 Clone - " + meta.settings().name());
+        window.setTitle("Minecraft 26.3 Clone - " + meta.settings().name());
         window.captureMouse();
         input.resyncMousePosition();
         state = GameState.IN_GAME;
@@ -940,7 +939,7 @@ public class Game implements GameAccess {
         if (titleTimer > 0.25) {
             titleTimer = 0;
             ItemStack sel = inventory.selected();
-            window.setTitle(String.format("Minecraft 1.8 Clone - Selected: %s (%.0f,%.0f,%.0f)%s",
+            window.setTitle(String.format("Minecraft 26.3 Clone - Selected: %s (%.0f,%.0f,%.0f)%s",
                     sel.isEmpty() ? "-" : sel.type().displayName, player.position.x, player.position.y, player.position.z,
                     player.isFlying() ? " [flying]" : ""));
         }
@@ -2112,7 +2111,7 @@ public class Game implements GameAccess {
         waterVisionSeconds = submerged ? waterVisionSeconds + dt : 0f;
         float vision = waterVision(waterVisionSeconds * 20f, submerged);
         underwaterFogColor = brightenByVision(underwaterFogColor, vision);
-        underwaterBlend += ((submerged ? 1f : 0f) - underwaterBlend) * Math.min(1f, UNDERWATER_TRANSITION_RATE * dt);
+        underwaterBlend = submerged ? 1f : 0f; // vanilla switches to the water fog at once when the camera crosses the surface
 
         // AtmosphericFogEnvironment: the render-distance fog ends at the render distance and starts clamp(d / 10, 4, 64) before it;
         // rain adds a second, environmental fog from -160 to 768 blocks (strength eased, thinner without sky light or precipitation).
@@ -2128,11 +2127,22 @@ public class Game implements GameAccess {
         envFogStrength = 1f - underwaterBlend;
 
         Vector3f fogColor = new Vector3f(surfaceFogColor).lerp(underwaterFogColor, underwaterBlend);
-        float underwaterEnd = UNDERWATER_FOG_END * Math.max(0.25f, vision);
+        // swamp and mangrove swamp: water_fog_end_distance multiplied by 0.85 (biome attributes), blended with the biome weights
+        float waterFogScale = 1f;
+        if (climate != null) {
+            float sum = 0f, closer = 0f;
+            float[] w = climate.weights();
+            for (int i = 0; i < w.length; i++) {
+                sum += w[i];
+                if (i == com.example.world.Biome.SWAMP.ordinal() || i == com.example.world.Biome.MANGROVE.ordinal()) closer += w[i];
+            }
+            if (sum > 0f) waterFogScale = 1f - 0.15f * closer / sum;
+        }
+        float underwaterEnd = UNDERWATER_FOG_END * waterFogScale * Math.max(0.25f, vision);
         float fogStart = surfaceFogStart + (UNDERWATER_FOG_START - surfaceFogStart) * underwaterBlend;
         float fogEnd = surfaceFogEnd + (underwaterEnd - surfaceFogEnd) * underwaterBlend;
         if (player.isHeadInLava()) { // LavaFogEnvironment: dark red, seen from 0.25 to 1 block
-            fogColor.set(0.6f, 0f, 0f);
+            fogColor.set(0x99 / 255f, 0x19 / 255f, 0f); // LavaFogEnvironment.COLOR (#991900 in the jar; the wiki rounds it to #991A00)
             fogStart = 0.25f;
             fogEnd = 1f;
             envFogStrength = 0f;
@@ -2164,7 +2174,9 @@ public class Game implements GameAccess {
         chunkShader.setUniform("uWindStrength", WIND_STRENGTH);
         atlas.bind(0);
 
-        renderSkyDisc(eye, skyColor, fogColor, skyFogEnd, sunrise, sunAngle);
+        renderSkyDisc(eye, skyColor, fogColor, skyFogEnd, sunrise, sunAngle,
+                // shouldRenderDarkDisc: the eye is below the horizon height (63, or the world's bottom in a flat world) and not under water
+                eye.y < (climate == null ? 0f : 63f) && !submerged);
         chunkShader.setUniform("uFogColor", fogColor.x, fogColor.y, fogColor.z);
         chunkShader.setUniform("uFogStart", fogStart);
         chunkShader.setUniform("uFogEnd", fogEnd);
@@ -2224,7 +2236,8 @@ public class Game implements GameAccess {
      * colour, which the sky fog (0 to min(render distance, 512)) turns into the fog colour toward the horizon, and the dawn or dusk
      * glow, a fan around the sun's side of the horizon whose alpha fades out to its rim.
      */
-    private void renderSkyDisc(Vector3f eye, Vector3f skyColor, Vector3f fogColor, float skyFogEnd, float[] sunrise, float sunAngleDegrees) {
+    private void renderSkyDisc(Vector3f eye, Vector3f skyColor, Vector3f fogColor, float skyFogEnd, float[] sunrise, float sunAngleDegrees,
+                               boolean darkDisc) {
         if (whiteTexture == null) whiteTexture = com.example.engine.EntityTexture.solid(0xFFFFFF);
         whiteTexture.bind(0);
         chunkShader.setUniform("uLitMode", LIT_UNLIT);
@@ -2251,6 +2264,13 @@ public class Game implements GameAccess {
             sunriseMesh.draw();
             chunkShader.setUniform("uLitMode", LIT_UNLIT);
             chunkShader.setUniform("uAlpha", 1f);
+        }
+        if (darkDisc) { // SkyRenderer.renderDarkDisc: a black disc 4 blocks below the camera (12 above the disc at -16)
+            chunkShader.setUniform("uModel", new Matrix4f().translation(eye.x, eye.y + 12f, eye.z));
+            chunkShader.setUniform("uFogStart", 0f);
+            chunkShader.setUniform("uFogEnd", skyFogEnd);
+            skyDiscMesh.upload(SkyDetails.skyDisc(new float[]{0f, 0f, 0f}, -16f));
+            skyDiscMesh.draw();
         }
         glDepthMask(true);
         if (culled) glEnable(GL_CULL_FACE);

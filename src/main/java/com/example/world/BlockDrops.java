@@ -84,6 +84,7 @@ public final class BlockDrops {
         }
         OVERRIDES.put(BlockType.FARMLAND, List.of(Drop.of(BlockType.DIRT)));
         OVERRIDES.put(BlockType.FARMLAND_MOIST, List.of(Drop.of(BlockType.DIRT)));
+        for (int m = 1; m <= 6; m++) OVERRIDES.put(BlockSupport.farmland(m), List.of(Drop.of(BlockType.DIRT)));
 
         // Fragile blocks that shatter without yielding anything.
         OVERRIDES.put(BlockType.GLASS, NOTHING);

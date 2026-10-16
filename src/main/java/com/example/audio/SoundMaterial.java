@@ -37,7 +37,8 @@ public enum SoundMaterial {
 
         // --- Gravel family: DIRT/MUD/CLAY/GRAVEL - "packed earth" is closer to gravel's texture
         // than to grass or stone in this asset set; an explicit approximation, not verified vanilla. ---
-        for (BlockType b : new BlockType[]{BlockType.DIRT, BlockType.MUD, BlockType.CLAY, BlockType.GRAVEL, BlockType.FARMLAND, BlockType.FARMLAND_MOIST}) {
+        for (BlockType b : new BlockType[]{BlockType.DIRT, BlockType.MUD, BlockType.CLAY, BlockType.GRAVEL, BlockType.FARMLAND, BlockType.FARMLAND_1, BlockType.FARMLAND_2, BlockType.FARMLAND_3,
+                BlockType.FARMLAND_4, BlockType.FARMLAND_5, BlockType.FARMLAND_6, BlockType.FARMLAND_MOIST}) {
             BY_BLOCK.put(b, GRAVEL);
         }
 

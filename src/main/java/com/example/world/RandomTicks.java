@@ -5,8 +5,8 @@ import java.util.Random;
 /**
  * Vanilla's random ticks (randomTickSpeed 3): every tick, in every 16 x 16 x 16 section of every loaded chunk near the player,
  * three random blocks get a random tick, so a given block is ticked about once in 68 seconds. Only farmland uses them here
- * (FarmBlock.randomTick): it becomes moist when water is within 4 blocks horizontally (up to 1 above) or rain falls on it, dries
- * one step when neither, and turns back into dirt once dry for good.
+ * (FarmBlock.randomTick): its moisture jumps to 7 when water is within 4 blocks horizontally (from its own level to 1 above) or rain falls on it,
+ * drops one level per tick when neither, and at 0 it turns back into dirt.
  */
 public final class RandomTicks {
     private RandomTicks() {
@@ -20,8 +20,6 @@ public final class RandomTicks {
 
     public static final int PER_SECTION = 3;
     private static final int SECTION = 16;
-    /** A dry farmland has moisture 6..0 and then turns to dirt: seven dry ticks on average, approximated by a 1 in 7 chance each tick. */
-    static final int DRY_FARMLAND_ODDS = 7;
 
     /**
      * One game tick of random ticks for the chunks within {@code radiusChunks} of chunk ({@code cx}, {@code cz}).
@@ -47,14 +45,18 @@ public final class RandomTicks {
         }
     }
 
+    /**
+     * FarmlandBlock.randomTick: near water or under rain it becomes moisture 7; otherwise it loses one level, and at 0 it turns to
+     * dirt (nothing here keeps farmland alive the way a crop does).
+     */
     public static void farmlandTick(World world, Random random, int x, int y, int z, BlockType t, Rain rainingAt) {
-        boolean wet = isNearWater(world, x, y, z) || rainingAt.at(x, y + 1, z);
-        if (wet) {
-            if (t != BlockType.FARMLAND_MOIST) world.setBlock(x, y, z, BlockType.FARMLAND_MOIST);
-        } else if (t == BlockType.FARMLAND_MOIST) {
-            world.setBlock(x, y, z, BlockType.FARMLAND); // moisture 7 -> 6
-        } else if (random.nextInt(DRY_FARMLAND_ODDS) == 0) {
-            world.setBlock(x, y, z, BlockType.DIRT); // moisture 0 and no crop: dirt again (nothing here keeps farmland alive)
+        int moisture = BlockSupport.moisture(t);
+        if (isNearWater(world, x, y, z) || rainingAt.at(x, y + 1, z)) {
+            if (moisture < 7) world.setBlock(x, y, z, BlockType.FARMLAND_MOIST);
+        } else if (moisture > 0) {
+            world.setBlock(x, y, z, BlockSupport.farmland(moisture - 1));
+        } else {
+            world.setBlock(x, y, z, BlockType.DIRT);
         }
     }
 

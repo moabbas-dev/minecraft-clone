@@ -131,13 +131,21 @@ class TorchAndFarmlandTest {
         RandomTicks.farmlandTick(world, r, 5, G, 5, BlockType.FARMLAND, dry);
         assertEquals(BlockType.FARMLAND_MOIST, world.getBlock(5, G, 5));
         world.setBlock(9, G + 1, 5, BlockType.AIR);
-        RandomTicks.farmlandTick(world, r, 5, G, 5, BlockType.FARMLAND_MOIST, dry);
-        assertEquals(BlockType.FARMLAND, world.getBlock(5, G, 5), "moist dries one step");
-        int ticks = 0;
-        while (world.getBlock(5, G, 5) == BlockType.FARMLAND && ticks++ < 1000) {
-            RandomTicks.farmlandTick(world, r, 5, G, 5, BlockType.FARMLAND, dry);
+        // moisture 7 -> 0 one level per random tick (FarmlandBlock.randomTick), then dirt on the next
+        for (int expected = 6; expected >= 0; expected--) {
+            RandomTicks.farmlandTick(world, r, 5, G, 5, world.getBlock(5, G, 5), dry);
+            assertEquals(expected, BlockSupport.moisture(world.getBlock(5, G, 5)), "dries one level");
         }
-        assertEquals(BlockType.DIRT, world.getBlock(5, G, 5));
+        assertEquals(BlockType.FARMLAND, world.getBlock(5, G, 5));
+        RandomTicks.farmlandTick(world, r, 5, G, 5, BlockType.FARMLAND, dry);
+        assertEquals(BlockType.DIRT, world.getBlock(5, G, 5), "dry at 0 and nothing planted: dirt");
+        // a partly dry one jumps straight back to 7 when water returns
+        world.setBlock(5, G, 5, BlockSupport.farmland(3));
+        world.setBlock(9, G + 1, 5, BlockType.WATER);
+        RandomTicks.farmlandTick(world, r, 5, G, 5, world.getBlock(5, G, 5), dry);
+        assertEquals(BlockType.FARMLAND_MOIST, world.getBlock(5, G, 5));
+        world.setBlock(9, G + 1, 5, BlockType.AIR);
+        world.setBlock(5, G, 5, BlockType.FARMLAND);
         // rain wets it too
         world.setBlock(5, G, 5, BlockType.FARMLAND);
         RandomTicks.farmlandTick(world, r, 5, G, 5, BlockType.FARMLAND, (x, y, z) -> true);

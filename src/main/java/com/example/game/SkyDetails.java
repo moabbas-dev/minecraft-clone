@@ -56,13 +56,18 @@ final class SkyDetails {
 
     /** The sky disc of SkyRenderer.buildSkyDisc as triangles: centre (0, 16, 0), a rim of 8 segments at radius 512, coloured {@code rgb}. */
     static float[] skyDisc(float[] rgb) {
+        return skyDisc(rgb, 16f);
+    }
+
+    /** The same fan at height {@code y} (SkyRenderer.buildSkyDisc: +16 for the sky disc, -16 for the dark disc below the horizon). */
+    static float[] skyDisc(float[] rgb, float y) {
         float[] out = new float[8 * 3 * FLOATS_PER_VERTEX];
         int n = 0;
         for (int i = 0; i < 8; i++) {
             double a0 = Math.toRadians(-180 + i * 45), a1 = Math.toRadians(-180 + (i + 1) * 45);
-            n = vertex(out, n, 0f, 16f, 0f, 1f, rgb[0], rgb[1], rgb[2]);
-            n = vertex(out, n, (float) (512 * Math.cos(a1)), 16f, (float) (512 * Math.sin(a1)), 1f, rgb[0], rgb[1], rgb[2]);
-            n = vertex(out, n, (float) (512 * Math.cos(a0)), 16f, (float) (512 * Math.sin(a0)), 1f, rgb[0], rgb[1], rgb[2]);
+            n = vertex(out, n, 0f, y, 0f, 1f, rgb[0], rgb[1], rgb[2]);
+            n = vertex(out, n, (float) (512 * Math.cos(a1)), y, (float) (512 * Math.sin(a1)), 1f, rgb[0], rgb[1], rgb[2]);
+            n = vertex(out, n, (float) (512 * Math.cos(a0)), y, (float) (512 * Math.sin(a0)), 1f, rgb[0], rgb[1], rgb[2]);
         }
         return out;
     }
