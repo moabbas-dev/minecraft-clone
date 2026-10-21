@@ -25,14 +25,29 @@ public final class Json {
     };
 
     private final String text;
+    private final boolean keepNumberLiterals;
     private int pos;
 
-    private Json(String text) {
+    private Json(String text, boolean keepNumberLiterals) {
         this.text = text;
+        this.keepNumberLiterals = keepNumberLiterals;
     }
 
     public static Object parse(String text) {
-        Json parser = new Json(text);
+        return parse(text, false);
+    }
+
+    /**
+     * Like {@link #parse(String)} but every number becomes a {@link NumberLiteral} keeping its source text, so
+     * that {@code float}/{@code int} reads convert the literal itself, as vanilla's JSON stack does (Gson's
+     * {@code LazilyParsedNumber}: {@code floatValue = Float.parseFloat(text)}, {@code doubleValue = Double.parseDouble(text)}).
+     */
+    public static Object parseWithNumberLiterals(String text) {
+        return parse(text, true);
+    }
+
+    private static Object parse(String text, boolean keepNumberLiterals) {
+        Json parser = new Json(text, keepNumberLiterals);
         parser.skipWhitespace();
         Object value = parser.readValue();
         parser.skipWhitespace();
@@ -212,6 +227,9 @@ public final class Json {
             }
         }
         String literal = text.substring(start, pos);
+        if (keepNumberLiterals) {
+            return new NumberLiteral(literal);
+        }
         if (integral) {
             try {
                 return Long.parseLong(literal);
@@ -263,6 +281,72 @@ public final class Json {
 
     private JsonParseException error(String message) {
         return new JsonParseException(message + " at offset " + pos);
+    }
+
+    /**
+     * A JSON number kept as its source text. The conversions mirror Gson's {@code LazilyParsedNumber} (verified
+     * with {@code javap} on gson 2.13): {@code floatValue} is {@code Float.parseFloat}, {@code doubleValue} is
+     * {@code Double.parseDouble}, {@code longValue} is {@code Long.parseLong}, {@code intValue} tries
+     * {@code Integer.parseInt}, then {@code (int) Long.parseLong}, then {@code BigDecimal.intValue()}.
+     */
+    public static final class NumberLiteral extends Number {
+
+        private final String literal;
+
+        public NumberLiteral(String literal) {
+            this.literal = literal;
+        }
+
+        public String literal() {
+            return literal;
+        }
+
+        @Override
+        public int intValue() {
+            try {
+                return Integer.parseInt(literal);
+            } catch (NumberFormatException e) {
+                try {
+                    return (int) Long.parseLong(literal);
+                } catch (NumberFormatException e2) {
+                    return new java.math.BigDecimal(literal).intValue();
+                }
+            }
+        }
+
+        @Override
+        public long longValue() {
+            try {
+                return Long.parseLong(literal);
+            } catch (NumberFormatException e) {
+                return new java.math.BigDecimal(literal).longValue();
+            }
+        }
+
+        @Override
+        public float floatValue() {
+            return Float.parseFloat(literal);
+        }
+
+        @Override
+        public double doubleValue() {
+            return Double.parseDouble(literal);
+        }
+
+        @Override
+        public String toString() {
+            return literal;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            return o instanceof NumberLiteral other && literal.equals(other.literal);
+        }
+
+        @Override
+        public int hashCode() {
+            return literal.hashCode();
+        }
     }
 
     /** Thrown for malformed JSON. */

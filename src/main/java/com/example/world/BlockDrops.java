@@ -98,6 +98,15 @@ public final class BlockDrops {
         // Diamond ore yields the diamond item (needed for the diamond tier); an iron-or-better pickaxe is
         // still required by ToolEffectiveness.
         OVERRIDES.put(BlockType.DIAMOND_ORE, List.of(Drop.of(BlockType.DIAMOND)));
+
+        // G28 terrain blocks, from the 26.3 loot tables (data/minecraft/loot_table/blocks/<name>.json) without Silk Touch
+        // or Fortune (neither enchantment exists here). Every other new block drops itself (survives_explosion only).
+        OVERRIDES.put(BlockType.DEEPSLATE, List.of(Drop.of(BlockType.COBBLED_DEEPSLATE)));
+        OVERRIDES.put(BlockType.DEEPSLATE_IRON_ORE, List.of(Drop.of(BlockType.RAW_IRON)));
+        OVERRIDES.put(BlockType.MYCELIUM, List.of(Drop.of(BlockType.DIRT)));
+        OVERRIDES.put(BlockType.PODZOL, List.of(Drop.of(BlockType.DIRT)));
+        OVERRIDES.put(BlockType.PACKED_ICE, NOTHING); // its only pool needs minecraft:tool/can_silk_touch
+        OVERRIDES.put(BlockType.POWDER_SNOW, NOTHING); // its loot table has no pools
     }
 
     /** The drop definitions for a block (empty = drops nothing). Never null. */

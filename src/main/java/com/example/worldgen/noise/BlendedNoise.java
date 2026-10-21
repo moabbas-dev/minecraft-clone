@@ -1,25 +1,30 @@
 package com.example.worldgen.noise;
 
 import com.example.worldgen.Interval;
-import com.example.worldgen.Mth;
+import com.example.worldgen.density.DensityFunction;
+import com.example.worldgen.density.DensitySampler;
+import com.example.worldgen.density.DfRewriteRule;
+import com.example.worldgen.density.generator.NoiseFunction;
+import com.example.worldgen.density.op.BinaryFunction;
+import com.example.worldgen.density.op.ClampFunction;
+import com.example.worldgen.density.op.LerpFunction;
 import com.example.worldgen.random.RandomSource;
 
 /**
- * Port of {@code net.minecraft.world.level.levelgen.synth.BlendedNoise} (26.3), the
- * {@code minecraft:old_blended_noise} density function behind {@code overworld/base_3d_noise}.
- * Constants from the 26.3 bytecode: {@code BASE_SCALE = 684.412}, limit noises start at octave
- * -15 with amplitude factor {@code 0.9999847412109375}, the main noise starts at octave -7 with
- * factor {@code 12.75}; the random source comes from {@code createRandom("minecraft:terrain")}.
+ * Port of {@code net.minecraft.world.level.levelgen.synth.BlendedNoise} (26.3), the density function
+ * {@code minecraft:old_blended_noise} ({@code xz_scale}, {@code y_scale}, {@code xz_factor}, {@code y_factor} in
+ * [0.001, 1000], {@code smear_scale_multiplier} in [1, 8]) behind {@code overworld/base_3d_noise}. Constants from
+ * the 26.3 bytecode: {@code BASE_SCALE = 684.412}, limit noises start at octave -15 with amplitude factor
+ * {@code 0.9999847412109375}, the main noise starts at octave -7 with factor {@code 12.75}; the random source is
+ * {@code createRandom("minecraft:terrain")}.
  *
- * <p>Evaluation ({@code compileSampler}): with {@code xz = 684.412 * xzScale} and
- * {@code yv = 684.412 * yScale}, {@code alpha = clamp(main(x*xz/xzFactor, y*yv/yFactor,
- * z*xz/xzFactor) + 0.5, 0, 1)} and the result is {@code min} when alpha is 0, {@code max} when it
- * is 1, otherwise {@code lerp(alpha, min, max)} of the two limit noises sampled at
- * {@code (x*xz, y*yv, z*xz)}, all in float. Vanilla composes this from its
- * {@code NoiseFunction/ConstAdd/Clamp/Lerp} samplers; {@link Sampler} reproduces that composition
- * for single block positions.
+ * <p>{@link #compileSampler(RandomSource)} composes vanilla's samplers exactly:
+ * {@code Lerp(Clamp(ConstAdd(main, 0.5), 0, 1), minLimit, maxLimit)} where the limit noises are sampled at
+ * {@code (x, y, z) * (684.412 * xzScale, 684.412 * yScale)} and the main noise at those scales divided by
+ * {@code xzFactor} / {@code yFactor}.
  */
-public record BlendedNoise(double xzScale, double yScale, double xzFactor, double yFactor, double smearScaleMultiplier) {
+public record BlendedNoise(double xzScale, double yScale, double xzFactor, double yFactor, double smearScaleMultiplier)
+        implements DensityFunction {
 
     /** The {@code Identifier} vanilla hashes for this noise's random source. */
     public static final String NOISE_SEED = "minecraft:terrain";
@@ -49,9 +54,9 @@ public record BlendedNoise(double xzScale, double yScale, double xzFactor, doubl
     }
 
     /**
-     * {@code BlendedNoise.createFbm}: {@code 1 - firstOctave} smeared Perlin octaves created from
-     * the lowest frequency layer index down (frequency 1, 1/2, 1/4, ... with amplitude doubling),
-     * each smeared at {@code smearScale * frequency}.
+     * {@code BlendedNoise.createFbm}: {@code 1 - firstOctave} smeared Perlin octaves created from the lowest
+     * frequency layer index down (frequency 1, 1/2, 1/4, ... with amplitude doubling), each smeared at
+     * {@code smearScale * frequency}.
      */
     public static NoiseStack createFbm(RandomSource random, int firstOctave, double smearScale, double factor) {
         if (firstOctave > 0) {
@@ -83,42 +88,40 @@ public record BlendedNoise(double xzScale, double yScale, double xzFactor, doubl
         return total;
     }
 
+    @Override
+    public DensitySampler compileSampler(CompileContext context) {
+        return compileSampler(context.createRandom(NOISE_SEED));
+    }
+
+    /** {@code BlendedNoise.compileSampler(RandomSource)}. */
+    public DensitySampler compileSampler(RandomSource random) {
+        FbmSet fbms = createFbmSet(random);
+        double xz = xzMultiplier();
+        double y = yMultiplier();
+        DensitySampler minLimitNoise = new NoiseFunction.Sampler(fbms.minLimitNoise(), xz, y);
+        DensitySampler maxLimitNoise = new NoiseFunction.Sampler(fbms.maxLimitNoise(), xz, y);
+        DensitySampler mainNoise = new NoiseFunction.Sampler(fbms.mainNoise(), xz / xzFactor, y / yFactor);
+        DensitySampler choice = new ClampFunction.Sampler(new BinaryFunction.ConstAddSampler(mainNoise, 0.5F), 0.0F, 1.0F);
+        return new LerpFunction.Sampler(choice, minLimitNoise, maxLimitNoise);
+    }
+
     /** The output range: that of one limit stack. */
+    @Override
     public Interval range() {
         return computeFbmRange(LIMIT_FIRST_OCTAVE, yMultiplier() * smearScaleMultiplier, LIMIT_FACTOR);
     }
 
-    /** Vanilla's {@code compileSampler(RandomSource)} for point evaluation. */
-    public Sampler compileSampler(RandomSource random) {
-        FbmSet set = createFbmSet(random);
-        double xz = xzMultiplier();
-        double y = yMultiplier();
-        return new Sampler(set, xz, y, xz / xzFactor, y / yFactor);
+    @Override
+    public int domainAxes() {
+        return ALL_AXES;
+    }
+
+    @Override
+    public DensityFunction rewriteChildren(DfRewriteRule rule) {
+        return this;
     }
 
     /** {@code BlendedNoise.FbmSet}. */
     public record FbmSet(NoiseStack minLimitNoise, NoiseStack maxLimitNoise, NoiseStack mainNoise) {
-    }
-
-    /** The compiled {@code Lerp(Clamp(ConstAdd(main, 0.5), 0, 1), minLimit, maxLimit)} sampler. */
-    public record Sampler(FbmSet noises, double limitXzScale, double limitYScale, double mainXzScale, double mainYScale) {
-
-        public float sampleValue(int blockX, int blockY, int blockZ) {
-            float main = noises.mainNoise.get((double) blockX * mainXzScale, (double) blockY * mainYScale,
-                    (double) blockZ * mainXzScale);
-            float alpha = Mth.clamp(main + 0.5F, 0.0F, 1.0F);
-            if (alpha == 0.0F) {
-                return limit(noises.minLimitNoise, blockX, blockY, blockZ);
-            }
-            if (alpha == 1.0F) {
-                return limit(noises.maxLimitNoise, blockX, blockY, blockZ);
-            }
-            return Mth.lerp(alpha, limit(noises.minLimitNoise, blockX, blockY, blockZ),
-                    limit(noises.maxLimitNoise, blockX, blockY, blockZ));
-        }
-
-        private float limit(NoiseStack noise, int blockX, int blockY, int blockZ) {
-            return noise.get((double) blockX * limitXzScale, (double) blockY * limitYScale, (double) blockZ * limitXzScale);
-        }
     }
 }

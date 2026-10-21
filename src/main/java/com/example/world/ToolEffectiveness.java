@@ -104,7 +104,12 @@ public final class ToolEffectiveness {
             BlockType.BRICKS, BlockType.OBSIDIAN, BlockType.COAL_ORE, BlockType.IRON_ORE,
             BlockType.GOLD_ORE, BlockType.DIAMOND_ORE, BlockType.GOLD_BLOCK, BlockType.IRON_BLOCK,
             BlockType.DIAMOND_BLOCK, BlockType.NETHERRACK, BlockType.TERRACOTTA, BlockType.FURNACE,
-            BlockType.COPPER_ORE, BlockType.SMOOTH_STONE, BlockType.BLAST_FURNACE, BlockType.SMOKER);
+            BlockType.COPPER_ORE, BlockType.SMOOTH_STONE, BlockType.BLAST_FURNACE, BlockType.SMOKER,
+            // G28: tags/block/mineable/pickaxe.json in the 26.3 jar.
+            BlockType.CALCITE, BlockType.CINNABAR, BlockType.DEEPSLATE, BlockType.COBBLED_DEEPSLATE, BlockType.DEEPSLATE_IRON_ORE,
+            BlockType.GRANITE, BlockType.PACKED_ICE, BlockType.RAW_COPPER_BLOCK, BlockType.RAW_IRON_BLOCK, BlockType.RED_SANDSTONE,
+            BlockType.SULFUR, BlockType.TUFF, BlockType.WHITE_TERRACOTTA, BlockType.ORANGE_TERRACOTTA, BlockType.YELLOW_TERRACOTTA,
+            BlockType.BROWN_TERRACOTTA, BlockType.RED_TERRACOTTA, BlockType.LIGHT_GRAY_TERRACOTTA);
 
     /** Blocks an axe speeds up: every log species, planks, and the wood-family furniture blocks. */
     private static final Set<BlockType> AXE_BLOCKS = EnumSet.of(
@@ -115,7 +120,9 @@ public final class ToolEffectiveness {
     /** Blocks a shovel speeds up: loose/soft ground blocks. */
     private static final Set<BlockType> SHOVEL_BLOCKS = EnumSet.of(
             BlockType.DIRT, BlockType.GRASS_BLOCK, BlockType.SAND, BlockType.RED_SAND,
-            BlockType.GRAVEL, BlockType.CLAY, BlockType.SNOW_BLOCK, BlockType.MUD);
+            BlockType.GRAVEL, BlockType.CLAY, BlockType.SNOW_BLOCK, BlockType.MUD,
+            // G28: tags/block/mineable/shovel.json in the 26.3 jar.
+            BlockType.COARSE_DIRT, BlockType.MYCELIUM, BlockType.PODZOL);
 
     /** Ore blocks that need at least this harvest level to drop anything (0 = no minimum -
      *  breakable, and its normal drop obtainable, by hand or any tool). */
@@ -135,6 +142,12 @@ public final class ToolEffectiveness {
         m.put(BlockType.DIAMOND_BLOCK, Tier.IRON.harvestLevel);
         m.put(BlockType.OBSIDIAN, Tier.DIAMOND.harvestLevel);
         m.put(BlockType.SNOW_BLOCK, Tier.WOOD.harvestLevel); // needs a shovel for its snowballs
+        // G28: tags/block/needs_stone_tool.json; packed ice is pickaxe-mineable but its Properties have no
+        // requiresCorrectToolForDrops, so any hand breaks it at the harvestable speed.
+        m.put(BlockType.DEEPSLATE_IRON_ORE, Tier.STONE.harvestLevel);
+        m.put(BlockType.RAW_COPPER_BLOCK, Tier.STONE.harvestLevel);
+        m.put(BlockType.RAW_IRON_BLOCK, Tier.STONE.harvestLevel);
+        m.remove(BlockType.PACKED_ICE);
         return m;
     }
 

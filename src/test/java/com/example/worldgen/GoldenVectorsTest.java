@@ -173,10 +173,11 @@ class GoldenVectorsTest {
         pf("bn.range.min", bn.range().min());
         pf("bn.range.max", bn.range().max());
         for (long s : SEEDS) {
-            BlendedNoise.Sampler sampler = bn.compileSampler(new XoroshiroRandomSource(s).forkPositional().fromHashOf(BlendedNoise.NOISE_SEED));
+            com.example.worldgen.density.DensitySampler sampler = bn.compileSampler(new XoroshiroRandomSource(s).forkPositional().fromHashOf(BlendedNoise.NOISE_SEED));
             int[][] bp = {{0, 0, 0}, {5, 64, -9}, {-1000, -60, 2000}, {123456, 300, -654321}, {7, 7, 7}};
             for (int[] q : bp) {
-                pf("bn." + s + "." + q[0] + "." + q[1] + "." + q[2], sampler.sampleValue(q[0], q[1], q[2]));
+                pf("bn." + s + "." + q[0] + "." + q[1] + "." + q[2],
+                        sampler.sampleValue(com.example.worldgen.density.SamplerContext.EMPTY_UNCACHED, q[0], q[1], q[2]));
             }
         }
     }

@@ -69,12 +69,33 @@ public enum SoundMaterial {
         }
 
         BY_BLOCK.put(BlockType.GLASS, GLASS);
+
+        // G28 terrain blocks whose 26.3 Properties name a SoundType this enum has assets for (Blocks static initializer;
+        // no .sound(...) call means SoundType.STONE). Their own vanilla sound types are exact here, not approximations.
+        for (BlockType b : new BlockType[]{BlockType.GRANITE, BlockType.RAW_COPPER_BLOCK, BlockType.RAW_IRON_BLOCK,
+                BlockType.RED_SANDSTONE, BlockType.WHITE_TERRACOTTA, BlockType.ORANGE_TERRACOTTA, BlockType.YELLOW_TERRACOTTA,
+                BlockType.BROWN_TERRACOTTA, BlockType.RED_TERRACOTTA, BlockType.LIGHT_GRAY_TERRACOTTA}) {
+            BY_BLOCK.put(b, STONE);
+        }
+        BY_BLOCK.put(BlockType.COARSE_DIRT, GRAVEL);
+        BY_BLOCK.put(BlockType.PODZOL, GRAVEL);
+        BY_BLOCK.put(BlockType.MYCELIUM, GRASS);
+        BY_BLOCK.put(BlockType.PACKED_ICE, GLASS);
         // AIR, WATER, and every tool/STICK/food item (see ToolEffectiveness/FoodRegistry): never targeted for
         // break/place, and never solid-collision ground for footsteps either - deliberately
         // left unmapped, materialFor() returns null for all of them.
     }
 
-    /** Null for AIR/WATER/anything never solid-collision-walkable or player-breakable. */
+    /**
+     * Blocks whose 26.3 SoundType (CALCITE, CINNABAR, DEEPSLATE, SULFUR, TUFF, POWDER_SNOW) has its own sound files that are
+     * not in this project's {@code sounds/} folder. They are left silent (materialFor returns null) rather than given
+     * another block's sound; docs/PARITY.md section 28 lists them.
+     */
+    public static final java.util.Set<BlockType> MISSING_VANILLA_SOUND = java.util.EnumSet.of(
+            BlockType.CALCITE, BlockType.CINNABAR, BlockType.DEEPSLATE, BlockType.COBBLED_DEEPSLATE,
+            BlockType.DEEPSLATE_IRON_ORE, BlockType.SULFUR, BlockType.TUFF, BlockType.POWDER_SNOW);
+
+    /** Null for AIR/WATER/anything never solid-collision-walkable or player-breakable, and for {@link #MISSING_VANILLA_SOUND}. */
     public static SoundMaterial materialFor(BlockType type) {
         return BY_BLOCK.get(type);
     }

@@ -1,6 +1,8 @@
 package com.example.worldgen.noise;
 
 import com.example.worldgen.Interval;
+import com.example.worldgen.density.DensityBuffer;
+import com.example.worldgen.density.DensityVolume;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -56,6 +58,15 @@ public class NoiseStack implements Noise {
             sum += layer.amplitude * layer.noise.get(x * f, z * f);
         }
         return sum;
+    }
+
+    /** {@code NoiseStack.addToVolume}: each layer adds into the buffer at its frequency and amplitude. */
+    @Override
+    public void addToVolume(DensityBuffer buffer, DensityVolume volume, double xzScale, double yScale, float amplitude) {
+        for (Layer layer : layers) {
+            double frequency = layer.frequency;
+            layer.noise.addToVolume(buffer, volume, xzScale * frequency, yScale * frequency, amplitude * layer.amplitude);
+        }
     }
 
     public Noise getLayer(int index) {

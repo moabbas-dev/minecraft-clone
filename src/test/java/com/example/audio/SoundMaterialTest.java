@@ -20,8 +20,19 @@ class SoundMaterialTest {
         List<BlockType> placeable = Arrays.asList(BlockType.PLACEABLE);
         for (BlockType type : BlockType.values()) {
             if (type == BlockType.AIR || type == BlockType.WATER || !placeable.contains(type)) continue;
+            if (SoundMaterial.MISSING_VANILLA_SOUND.contains(type)) continue;
             assertNotNull(SoundMaterial.materialFor(type), type + " must have a sound material");
         }
+    }
+
+    @Test
+    void blocksWithoutTheirVanillaSoundAssetStaySilent() {
+        for (BlockType type : SoundMaterial.MISSING_VANILLA_SOUND) {
+            assertNull(SoundMaterial.materialFor(type), type + " must not borrow another block's sound");
+        }
+        assertEquals(SoundMaterial.GLASS, SoundMaterial.materialFor(BlockType.PACKED_ICE)); // SoundType.GLASS
+        assertEquals(SoundMaterial.GRASS, SoundMaterial.materialFor(BlockType.MYCELIUM)); // SoundType.GRASS
+        assertEquals(SoundMaterial.GRAVEL, SoundMaterial.materialFor(BlockType.PODZOL)); // SoundType.GRAVEL
     }
 
     @Test

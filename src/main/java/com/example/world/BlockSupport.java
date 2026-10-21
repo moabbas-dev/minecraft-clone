@@ -67,7 +67,9 @@ public final class BlockSupport {
      * (its top is 1/16 low), water and every non-solid block cannot; glass, ice and the like can.
      */
     public static boolean isSturdy(BlockType t) {
-        return t.isSolidCollision() && t != BlockType.CHEST && !ChunkMeshBuilder.isAnyLeaves(t) && !isFarmland(t) && !isTorch(t);
+        // powder snow: its support shape (the collision shape without an entity) is empty in vanilla
+        return t.isSolidCollision() && t != BlockType.CHEST && t != BlockType.POWDER_SNOW && !ChunkMeshBuilder.isAnyLeaves(t)
+                && !isFarmland(t) && !isTorch(t);
     }
 
     /** Whether the block of this type at (x, y, z) still has what it needs. */

@@ -164,6 +164,34 @@ public class TextureAtlas {
         REAL_TEXTURE_PATHS.put(Tile.SMOKER_SIDE, "textures/block/smoker_side.png");
         REAL_TEXTURE_PATHS.put(Tile.COPPER_ORE, "textures/block/copper_ore.png");
         REAL_TEXTURE_PATHS.put(Tile.SMOOTH_STONE, "textures/block/smooth_stone.png");
+        // G28 terrain blocks: the texture names their 26.3 block models use (assets/minecraft/models/block/<name>.json).
+        REAL_TEXTURE_PATHS.put(Tile.CALCITE, "textures/block/calcite.png");
+        REAL_TEXTURE_PATHS.put(Tile.CINNABAR, "textures/block/cinnabar.png");
+        REAL_TEXTURE_PATHS.put(Tile.COARSE_DIRT, "textures/block/coarse_dirt.png");
+        REAL_TEXTURE_PATHS.put(Tile.DEEPSLATE, "textures/block/deepslate.png");
+        REAL_TEXTURE_PATHS.put(Tile.DEEPSLATE_TOP, "textures/block/deepslate_top.png");
+        REAL_TEXTURE_PATHS.put(Tile.COBBLED_DEEPSLATE, "textures/block/cobbled_deepslate.png");
+        REAL_TEXTURE_PATHS.put(Tile.DEEPSLATE_IRON_ORE, "textures/block/deepslate_iron_ore.png");
+        REAL_TEXTURE_PATHS.put(Tile.GRANITE, "textures/block/granite.png");
+        REAL_TEXTURE_PATHS.put(Tile.MYCELIUM_TOP, "textures/block/mycelium_top.png");
+        REAL_TEXTURE_PATHS.put(Tile.MYCELIUM_SIDE, "textures/block/mycelium_side.png");
+        REAL_TEXTURE_PATHS.put(Tile.PODZOL_TOP, "textures/block/podzol_top.png");
+        REAL_TEXTURE_PATHS.put(Tile.PODZOL_SIDE, "textures/block/podzol_side.png");
+        REAL_TEXTURE_PATHS.put(Tile.POWDER_SNOW, "textures/block/powder_snow.png");
+        REAL_TEXTURE_PATHS.put(Tile.PACKED_ICE, "textures/block/packed_ice.png");
+        REAL_TEXTURE_PATHS.put(Tile.RAW_COPPER_BLOCK, "textures/block/raw_copper_block.png");
+        REAL_TEXTURE_PATHS.put(Tile.RAW_IRON_BLOCK, "textures/block/raw_iron_block.png");
+        REAL_TEXTURE_PATHS.put(Tile.RED_SANDSTONE_TOP, "textures/block/red_sandstone_top.png");
+        REAL_TEXTURE_PATHS.put(Tile.RED_SANDSTONE_SIDE, "textures/block/red_sandstone.png");
+        REAL_TEXTURE_PATHS.put(Tile.RED_SANDSTONE_BOTTOM, "textures/block/red_sandstone_bottom.png");
+        REAL_TEXTURE_PATHS.put(Tile.SULFUR, "textures/block/sulfur.png");
+        REAL_TEXTURE_PATHS.put(Tile.TUFF, "textures/block/tuff.png");
+        REAL_TEXTURE_PATHS.put(Tile.WHITE_TERRACOTTA, "textures/block/white_terracotta.png");
+        REAL_TEXTURE_PATHS.put(Tile.ORANGE_TERRACOTTA, "textures/block/orange_terracotta.png");
+        REAL_TEXTURE_PATHS.put(Tile.YELLOW_TERRACOTTA, "textures/block/yellow_terracotta.png");
+        REAL_TEXTURE_PATHS.put(Tile.BROWN_TERRACOTTA, "textures/block/brown_terracotta.png");
+        REAL_TEXTURE_PATHS.put(Tile.RED_TERRACOTTA, "textures/block/red_terracotta.png");
+        REAL_TEXTURE_PATHS.put(Tile.LIGHT_GRAY_TERRACOTTA, "textures/block/light_gray_terracotta.png");
         // CHEST, SUN, MOON, RAIN: no real block-texture equivalent, always procedural.
         REAL_TEXTURE_PATHS.put(Tile.WOODEN_SWORD, "textures/item/wooden_sword.png");
         REAL_TEXTURE_PATHS.put(Tile.STONE_SWORD, "textures/item/stone_sword.png");

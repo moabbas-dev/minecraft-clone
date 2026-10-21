@@ -262,7 +262,40 @@ public enum BlockType {
     FARMLAND_3(249, "Farmland", true, true, 0.6f, 0f),
     FARMLAND_4(250, "Farmland", true, true, 0.6f, 0f),
     FARMLAND_5(251, "Farmland", true, true, 0.6f, 0f),
-    FARMLAND_6(252, "Farmland", true, true, 0.6f, 0f);
+    FARMLAND_6(252, "Farmland", true, true, 0.6f, 0f),
+
+    // ---- Vanilla terrain blocks (G28; docs/PARITY.md section 28) ----
+    // Every hardness below is the destroyTime of the block's Properties in the 26.3 client's Blocks static initializer
+    // (strength(F) sets destroyTime and explosion resistance to the same value, strength(FF) sets them separately; the
+    // resistances are in Explosions.blastResistance). None of these emits light. Ids start at 256 (255 stays unused).
+    CALCITE(256, "Calcite", true, false, 0.75f, 0f),
+    CINNABAR(257, "Cinnabar", true, false, 1.5f, 0f),
+    COARSE_DIRT(258, "Coarse Dirt", true, false, 0.5f, 0f),
+    // Vanilla deepslate is a RotatedPillarBlock (axis x/y/z); only axis=y exists here (see VanillaBlocks).
+    DEEPSLATE(259, "Deepslate", true, false, 3.0f, 0f),
+    // What deepslate drops without Silk Touch (loot_table/blocks/deepslate.json); ofLegacyCopy(DEEPSLATE).strength(3.5, 6).
+    COBBLED_DEEPSLATE(260, "Cobbled Deepslate", true, false, 3.5f, 0f),
+    // ofLegacyCopy(IRON_ORE).strength(4.5, 3).
+    DEEPSLATE_IRON_ORE(261, "Deepslate Iron Ore", true, false, 4.5f, 0f),
+    GRANITE(262, "Granite", true, false, 1.5f, 0f),
+    MYCELIUM(263, "Mycelium", true, false, 0.6f, 0f),
+    PODZOL(264, "Podzol", true, false, 0.5f, 0f),
+    // Vanilla: noOcclusion, an empty visual shape and a collision shape that depends on the entity (PowderSnowBlock);
+    // here it is a non-occluding full-collision cube - the missing behaviour is listed in docs/PARITY.md section 28.
+    POWDER_SNOW(265, "Powder Snow", true, true, 0.25f, 0f),
+    PACKED_ICE(266, "Packed Ice", true, false, 0.5f, 0f),
+    RAW_COPPER_BLOCK(267, "Block of Raw Copper", true, false, 5.0f, 0f),
+    RAW_IRON_BLOCK(268, "Block of Raw Iron", true, false, 5.0f, 0f),
+    RED_SANDSTONE(269, "Red Sandstone", true, false, 0.8f, 0f),
+    SULFUR(270, "Sulfur", true, false, 1.5f, 0f),
+    TUFF(271, "Tuff", true, false, 1.5f, 0f),
+    // Blocks.DYED_TERRACOTTA: every colour shares one Properties lambda, strength(1.25, 4.2) like plain terracotta.
+    WHITE_TERRACOTTA(272, "White Terracotta", true, false, 1.25f, 0f),
+    ORANGE_TERRACOTTA(273, "Orange Terracotta", true, false, 1.25f, 0f),
+    YELLOW_TERRACOTTA(274, "Yellow Terracotta", true, false, 1.25f, 0f),
+    BROWN_TERRACOTTA(275, "Brown Terracotta", true, false, 1.25f, 0f),
+    RED_TERRACOTTA(276, "Red Terracotta", true, false, 1.25f, 0f),
+    LIGHT_GRAY_TERRACOTTA(277, "Light Gray Terracotta", true, false, 1.25f, 0f);
 
     public final int id;
     public final String displayName;
@@ -372,6 +405,10 @@ public enum BlockType {
             SAND, GRAVEL, SANDSTONE, GLASS, BRICKS, MOSSY_COBBLESTONE, OBSIDIAN,
             COAL_ORE, IRON_ORE, GOLD_ORE, DIAMOND_ORE, COPPER_ORE, IRON_BLOCK, GOLD_BLOCK, DIAMOND_BLOCK,
             SMOOTH_STONE, BOOKSHELF, CRAFTING_TABLE, FURNACE, BLAST_FURNACE, SMOKER, CHEST, TNT, ICE, SNOW_BLOCK, CLAY,
-            PUMPKIN, NETHERRACK, GLOWSTONE, TERRACOTTA, RED_SAND
+            PUMPKIN, NETHERRACK, GLOWSTONE, TERRACOTTA, RED_SAND,
+            // G28 terrain blocks. Powder snow has no block item in vanilla (it is placed from a powder snow bucket), so it is not here.
+            CALCITE, CINNABAR, COARSE_DIRT, DEEPSLATE, COBBLED_DEEPSLATE, DEEPSLATE_IRON_ORE, GRANITE, MYCELIUM, PODZOL,
+            PACKED_ICE, RAW_COPPER_BLOCK, RAW_IRON_BLOCK, RED_SANDSTONE, SULFUR, TUFF,
+            WHITE_TERRACOTTA, ORANGE_TERRACOTTA, YELLOW_TERRACOTTA, BROWN_TERRACOTTA, RED_TERRACOTTA, LIGHT_GRAY_TERRACOTTA
     };
 }

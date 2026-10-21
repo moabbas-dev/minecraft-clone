@@ -28,7 +28,11 @@ public final class Explosions {
             case OBSIDIAN -> 1200f;
             case WATER -> 100f;
             case STONE, COBBLESTONE, MOSSY_COBBLESTONE, SMOOTH_STONE, BRICKS, IRON_BLOCK, GOLD_BLOCK, DIAMOND_BLOCK -> 6f;
-            case TERRACOTTA -> 4.2f;
+            case TERRACOTTA, WHITE_TERRACOTTA, ORANGE_TERRACOTTA, YELLOW_TERRACOTTA, BROWN_TERRACOTTA, RED_TERRACOTTA,
+                    LIGHT_GRAY_TERRACOTTA -> 4.2f;
+            // G28 (26.3 Blocks static initializer, strength(destroyTime, resistance)); the rest of them equal their hardness
+            case CINNABAR, DEEPSLATE, COBBLED_DEEPSLATE, GRANITE, RAW_COPPER_BLOCK, RAW_IRON_BLOCK, SULFUR, TUFF -> 6f;
+            case DEEPSLATE_IRON_ORE -> 3f;
             case OAK_PLANKS -> 3f;
             case SANDSTONE -> 0.8f;
             case ICE -> 0.5f;

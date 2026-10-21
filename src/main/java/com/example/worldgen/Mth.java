@@ -52,6 +52,70 @@ public final class Mth {
         return Math.min(v, max);
     }
 
+    /** {@code Mth.sqrt(float)}: {@code (float) Math.sqrt((double) x)}. */
+    public static float sqrt(float x) {
+        return (float) Math.sqrt(x);
+    }
+
+    /** {@code Mth.cube(float)}: {@code x * x * x}. */
+    public static float cube(float x) {
+        return x * x * x;
+    }
+
+    /** {@code Mth.lengthSquared(float, float)}: {@code x * x + y * y}. */
+    public static float lengthSquared(float x, float y) {
+        return x * x + y * y;
+    }
+
+    /** {@code Mth.length(float, float)}: {@code (float) Math.sqrt((double) lengthSquared(x, y))}. */
+    public static float length(float x, float y) {
+        return (float) Math.sqrt(lengthSquared(x, y));
+    }
+
+    /** {@code Mth.lengthSquared(float, float, float)}: {@code x * x + y * y + z * z}. */
+    public static float lengthSquared(float x, float y, float z) {
+        return x * x + y * y + z * z;
+    }
+
+    /** {@code Mth.length(float, float, float)}: {@code sqrt(lengthSquared(x, y, z))}. */
+    public static float length(float x, float y, float z) {
+        return sqrt(lengthSquared(x, y, z));
+    }
+
+    /** {@code Mth.floorDiv(int, int)}: {@code Math.floorDiv(a, b)}. */
+    public static int floorDiv(int a, int b) {
+        return Math.floorDiv(a, b);
+    }
+
+    /** {@code Mth.positiveCeilDiv(int, int)}: {@code -Math.floorDiv(-input, divisor)}. */
+    public static int positiveCeilDiv(int input, int divisor) {
+        return -Math.floorDiv(-input, divisor);
+    }
+
+    /** {@code Mth.roundToward(int, int)}: {@code positiveCeilDiv(input, multiple) * multiple}. */
+    public static int roundToward(int input, int multiple) {
+        return positiveCeilDiv(input, multiple) * multiple;
+    }
+
+    /**
+     * {@code Mth.binarySearch(int, int, IntPredicate)}: the first index in {@code [from, to)} for which the
+     * (monotonic) condition holds, or {@code to}.
+     */
+    public static int binarySearch(int from, int to, java.util.function.IntPredicate condition) {
+        int len = to - from;
+        while (len > 0) {
+            int half = len / 2;
+            int middle = from + half;
+            if (condition.test(middle)) {
+                len = half;
+            } else {
+                from = middle + 1;
+                len -= half + 1;
+            }
+        }
+        return from;
+    }
+
     /** {@code Mth.clampedLerp(double,double,double)}: {@code t < 0 -> a}, {@code t > 1 -> b}, else {@code lerp}. */
     public static double clampedLerp(double t, double a, double b) {
         if (t < 0.0) {
@@ -218,5 +282,55 @@ public final class Mth {
     /** {@code Mth.map(float...)}. */
     public static float map(float v, float fromMin, float fromMax, float toMin, float toMax) {
         return lerp(inverseLerp(v, fromMin, fromMax), toMin, toMax);
+    }
+
+    /** {@code Mth.SIN_SCALE}: 65536 / (2 pi) as the 26.3 constant pool stores it. */
+    private static final double SIN_SCALE = 10430.378350470453;
+
+    /** {@code Mth.SIN}: 65536 entries, {@code SIN[i] = (float) Math.sin(i / SIN_SCALE)} (static initialiser lambda). */
+    private static final float[] SIN = new float[65536];
+
+    static {
+        for (int i = 0; i < SIN.length; i++) {
+            SIN[i] = (float) Math.sin((double) i / SIN_SCALE);
+        }
+    }
+
+    /** {@code Mth.sin(double)}: table lookup {@code SIN[(int) ((long) (v * SIN_SCALE) & 65535)]}. */
+    public static float sin(double v) {
+        return SIN[(int) ((long) (v * SIN_SCALE) & 65535L)];
+    }
+
+    /** {@code Mth.cos(double)}: table lookup {@code SIN[(int) ((long) (v * SIN_SCALE + 16384.0) & 65535)]}. */
+    public static float cos(double v) {
+        return SIN[(int) ((long) (v * SIN_SCALE + 16384.0) & 65535L)];
+    }
+
+    /** {@code Mth.abs(float)}: {@code Math.abs(v)}. */
+    public static float abs(float v) {
+        return Math.abs(v);
+    }
+
+    /** {@code Mth.randomBetweenInclusive(RandomSource,int,int)}: {@code random.nextInt(max - min + 1) + min}. */
+    public static int randomBetweenInclusive(com.example.worldgen.random.RandomSource random, int min, int max) {
+        return random.nextInt(max - min + 1) + min;
+    }
+
+    /** {@code Mth.randomBetween(RandomSource,float,float)}: {@code random.nextFloat() * (max - min) + min}. */
+    public static float randomBetween(com.example.worldgen.random.RandomSource random, float min, float max) {
+        return random.nextFloat() * (max - min) + min;
+    }
+
+    /** {@code Mth.nextInt(RandomSource,int,int)}: {@code min >= max ? min : random.nextInt(max - min + 1) + min}. */
+    public static int nextInt(com.example.worldgen.random.RandomSource random, int min, int max) {
+        if (min >= max) {
+            return min;
+        }
+        return random.nextInt(max - min + 1) + min;
+    }
+
+    /** {@code Mth.normal(RandomSource,float,float)}: {@code mean + (float) random.nextGaussian() * deviation}. */
+    public static float normal(com.example.worldgen.random.RandomSource random, float mean, float deviation) {
+        return mean + (float) random.nextGaussian() * deviation;
     }
 }

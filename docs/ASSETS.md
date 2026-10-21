@@ -124,17 +124,25 @@ Not read by the game (documented in `docs/research/options-and-screens.md` but h
 - `birch_log_top.png`
 - `bookshelf.png`
 - `bricks.png`
+- `brown_terracotta.png`
+- `calcite.png`
 - `cherry_leaves.png`
 - `cherry_log.png`
 - `cherry_log_top.png`
+- `cinnabar.png`
 - `clay.png`
 - `coal_ore.png`
+- `coarse_dirt.png`
+- `cobbled_deepslate.png`
 - `cobblestone.png`
 - `crafting_table_side.png`
 - `crafting_table_top.png`
 - `dark_oak_leaves.png`
 - `dark_oak_log.png`
 - `dark_oak_log_top.png`
+- `deepslate.png`
+- `deepslate_iron_ore.png`
+- `deepslate_top.png`
 - `destroy_stage_0.png`
 - `destroy_stage_1.png`
 - `destroy_stage_2.png`
@@ -154,6 +162,7 @@ Not read by the game (documented in `docs/research/options-and-screens.md` but h
 - `glowstone.png`
 - `gold_block.png`
 - `gold_ore.png`
+- `granite.png`
 - `grass_block_side.png`
 - `grass_block_top.png`
 - `gravel.png`
@@ -163,6 +172,7 @@ Not read by the game (documented in `docs/research/options-and-screens.md` but h
 - `jungle_leaves.png`
 - `jungle_log.png`
 - `jungle_log_top.png`
+- `light_gray_terracotta.png`
 - `mangrove_leaves.png`
 - `mangrove_log.png`
 - `mangrove_log_top.png`
@@ -170,6 +180,8 @@ Not read by the game (documented in `docs/research/options-and-screens.md` but h
 - `mangrove_roots_top.png`
 - `mossy_cobblestone.png`
 - `mud.png`
+- `mycelium_side.png`
+- `mycelium_top.png`
 - `netherrack.png`
 - `oak_leaves.png`
 - `oak_log.png`
@@ -177,9 +189,20 @@ Not read by the game (documented in `docs/research/options-and-screens.md` but h
 - `oak_planks.png`
 - `oak_sapling.png`
 - `obsidian.png`
+- `orange_terracotta.png`
+- `packed_ice.png`
+- `podzol_side.png`
+- `podzol_top.png`
+- `powder_snow.png`
 - `pumpkin_side.png`
 - `pumpkin_top.png`
+- `raw_copper_block.png`
+- `raw_iron_block.png`
 - `red_sand.png`
+- `red_sandstone.png`
+- `red_sandstone_bottom.png`
+- `red_sandstone_top.png`
+- `red_terracotta.png`
 - `sand.png`
 - `sandstone.png`
 - `sandstone_bottom.png`
@@ -189,11 +212,15 @@ Not read by the game (documented in `docs/research/options-and-screens.md` but h
 - `spruce_log.png`
 - `spruce_log_top.png`
 - `stone.png`
+- `sulfur.png`
 - `terracotta.png`
 - `tnt_bottom.png`
 - `tnt_side.png`
 - `tnt_top.png`
+- `tuff.png`
 - `water_still.png`
+- `white_terracotta.png`
+- `yellow_terracotta.png`
 
 ### `textures/colormap/`
 

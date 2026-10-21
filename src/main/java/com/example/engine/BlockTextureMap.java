@@ -202,6 +202,32 @@ public class BlockTextureMap {
         uniform(BlockType.ARROW, Tile.ARROW);
         uniform(BlockType.STRING, Tile.STRING);
         uniform(BlockType.SPIDER_EYE, Tile.SPIDER_EYE);
+
+        // G28 terrain blocks, from their 26.3 models: cube_all, except deepslate (cube_column: end deepslate_top, side
+        // deepslate; only its axis=y unmirrored variant - the blockstate's random mirrored/rotated variants are not drawn),
+        // mycelium and podzol (cube_bottom_top over dirt; neither has a tintindex) and red sandstone (cube_bottom_top).
+        uniform(BlockType.CALCITE, Tile.CALCITE);
+        uniform(BlockType.CINNABAR, Tile.CINNABAR);
+        uniform(BlockType.COARSE_DIRT, Tile.COARSE_DIRT);
+        put(BlockType.DEEPSLATE, Tile.DEEPSLATE_TOP, Tile.DEEPSLATE, Tile.DEEPSLATE_TOP);
+        uniform(BlockType.COBBLED_DEEPSLATE, Tile.COBBLED_DEEPSLATE);
+        uniform(BlockType.DEEPSLATE_IRON_ORE, Tile.DEEPSLATE_IRON_ORE);
+        uniform(BlockType.GRANITE, Tile.GRANITE);
+        put(BlockType.MYCELIUM, Tile.MYCELIUM_TOP, Tile.MYCELIUM_SIDE, Tile.DIRT);
+        put(BlockType.PODZOL, Tile.PODZOL_TOP, Tile.PODZOL_SIDE, Tile.DIRT);
+        uniform(BlockType.POWDER_SNOW, Tile.POWDER_SNOW);
+        uniform(BlockType.PACKED_ICE, Tile.PACKED_ICE);
+        uniform(BlockType.RAW_COPPER_BLOCK, Tile.RAW_COPPER_BLOCK);
+        uniform(BlockType.RAW_IRON_BLOCK, Tile.RAW_IRON_BLOCK);
+        put(BlockType.RED_SANDSTONE, Tile.RED_SANDSTONE_TOP, Tile.RED_SANDSTONE_SIDE, Tile.RED_SANDSTONE_BOTTOM);
+        uniform(BlockType.SULFUR, Tile.SULFUR);
+        uniform(BlockType.TUFF, Tile.TUFF);
+        uniform(BlockType.WHITE_TERRACOTTA, Tile.WHITE_TERRACOTTA);
+        uniform(BlockType.ORANGE_TERRACOTTA, Tile.ORANGE_TERRACOTTA);
+        uniform(BlockType.YELLOW_TERRACOTTA, Tile.YELLOW_TERRACOTTA);
+        uniform(BlockType.BROWN_TERRACOTTA, Tile.BROWN_TERRACOTTA);
+        uniform(BlockType.RED_TERRACOTTA, Tile.RED_TERRACOTTA);
+        uniform(BlockType.LIGHT_GRAY_TERRACOTTA, Tile.LIGHT_GRAY_TERRACOTTA);
     }
 
     private void uniform(BlockType type, Tile tile) {

@@ -18,14 +18,17 @@ public final class LightProperties {
         for (BlockType t : BlockType.values()) {
             int d;
             if (t == BlockType.AIR) d = 0;
-            else if (t.isFluid() || t == BlockType.ICE || t == BlockType.MANGROVE_ROOTS || ChunkMeshBuilder.isAnyLeaves(t)) d = 1;
+            // powder snow: noOcclusion (not solid render), but its outline shape is a full block, so it does not propagate skylight: 1
+            else if (t.isFluid() || t == BlockType.ICE || t == BlockType.MANGROVE_ROOTS || t == BlockType.POWDER_SNOW
+                    || ChunkMeshBuilder.isAnyLeaves(t)) d = 1;
             else if (t == BlockType.CHEST) d = 0; // not a full block: light passes
             else if (BlockSupport.isFarmland(t)) d = 1; // not solid to rendering and no skylight passage: 1
             else d = t.isOpaqueCube() ? 15 : 0;
             DAMPENING[t.ordinal()] = (byte) d;
             boolean fullCollision = t.isSolidCollision() && t != BlockType.CHEST;
             boolean notFull = BlockSupport.isFarmland(t); // 15/16 high, so not a full collision shape
-            SHADE[t.ordinal()] = !fullCollision || notFull || t == BlockType.GLASS || t == BlockType.MUD ? 1.0f : 0.2f;
+            // powder snow's collision shape without an entity is empty (PowderSnowBlock.getCollisionShape), so 1.0
+            SHADE[t.ordinal()] = !fullCollision || notFull || t == BlockType.GLASS || t == BlockType.MUD || t == BlockType.POWDER_SNOW ? 1.0f : 0.2f;
         }
     }
 
