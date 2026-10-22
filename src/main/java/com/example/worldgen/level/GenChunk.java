@@ -37,8 +37,8 @@ public interface GenChunk {
     void setState(int x, int y, int z, StateRef state);
 
     /**
-     * Vanilla {@code ChunkAccess.getHeight(type, x, z)}: the Y of the first free cell above the highest block that counts for
-     * {@code type} in that column ({@link #minY()} when there is none).
+     * Vanilla {@code ChunkAccess.getHeight(type, x, z)} = {@code heightmap.getFirstAvailable(x & 15, z & 15) - 1}: the Y of the
+     * highest block that counts for {@code type} in that column ({@code minY() - 1} when there is none).
      */
     int getHeight(HeightmapType type, int x, int z);
 
