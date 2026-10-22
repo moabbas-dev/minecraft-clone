@@ -1,6 +1,5 @@
 package com.example.worldgen.material;
 
-import com.example.worldgen.DimensionType;
 import com.example.worldgen.density.DensityFunction;
 import com.example.worldgen.density.Holder;
 import com.example.worldgen.density.WorldgenRegistries;
@@ -25,6 +24,7 @@ import com.example.worldgen.material.rule.ConditionRule;
 import com.example.worldgen.material.rule.MaterialRule;
 import com.example.worldgen.material.rule.OreVeinRule;
 import com.example.worldgen.material.rule.SequenceRule;
+import com.example.worldgen.provider.VerticalAnchor;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -235,35 +235,9 @@ public final class MaterialRuleLoader {
         return new StateRef(name, properties);
     }
 
-    /** {@code VerticalAnchor.CODEC}. */
+    /** {@code VerticalAnchor.CODEC} ({@link VerticalAnchor#parse}; a value that does not decode is an {@link IllegalArgumentException}). */
     static VerticalAnchor anchor(Object json) {
-        Map<String, Object> m = object(json, "vertical anchor");
-        List<VerticalAnchor> matches = new ArrayList<>();
-        if (m.containsKey("absolute")) {
-            matches.add(new VerticalAnchor.Absolute(anchorValue(m.get("absolute"))));
-        }
-        if (m.containsKey("above_bottom")) {
-            matches.add(new VerticalAnchor.AboveBottom(anchorValue(m.get("above_bottom"))));
-        }
-        if (m.containsKey("below_top")) {
-            matches.add(new VerticalAnchor.BelowTop(anchorValue(m.get("below_top"))));
-        }
-        if (m.containsKey("relative_to_sea_level")) {
-            matches.add(new VerticalAnchor.RelativeToSeaLevel(anchorValue(m.get("relative_to_sea_level"))));
-        }
-        if (matches.size() != 1) {
-            throw new IllegalArgumentException("Vertical anchor needs exactly one of absolute/above_bottom/below_top/"
-                    + "relative_to_sea_level: " + m.keySet());
-        }
-        return matches.get(0);
-    }
-
-    private static int anchorValue(Object json) {
-        int v = number(json, "anchor").intValue();
-        if (v < DimensionType.MIN_Y || v > DimensionType.MAX_Y) {
-            throw new IllegalArgumentException("Value " + v + " outside of range [" + DimensionType.MIN_Y + ":" + DimensionType.MAX_Y + "]");
-        }
-        return v;
+        return VerticalAnchor.parse(json);
     }
 
     private static int multiplier(Object json) {

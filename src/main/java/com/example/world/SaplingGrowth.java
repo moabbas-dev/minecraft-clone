@@ -55,8 +55,8 @@ public class SaplingGrowth {
     private final Random random;
 
     public SaplingGrowth(long worldSeed) {
-        // Offset the same way every other per-world Random in this codebase is (Weather,
-        // TerrainGenerator's noise fields) so it never collides with any of their own streams.
+        // Offset the same way every other per-world Random in this codebase is (Weather)
+        // so it never collides with their streams.
         this.random = new Random(worldSeed ^ 0x5341504C47524F57L);
     }
 
@@ -142,7 +142,7 @@ public class SaplingGrowth {
 
     /**
      * Conservative space check + generation, entirely against live {@code World} state (the
-     * existing {@code TerrainGenerator.fitsAndIsSuitable}/{@code suitableColumn} are worldgen-
+     * former invented worldgen tree placement used worldgen-
      * time methods built around a precomputed heights[][] array for one in-progress chunk, not
      * something a running game can query live - this reuses their underlying concepts
      * (canopyRadius chunk-interior margin, max total height) against {@code World.getBlock}
@@ -160,7 +160,7 @@ public class SaplingGrowth {
 
         int lx = World.worldToLocal(x), lz = World.worldToLocal(z);
         int r = tree.canopyRadius;
-        // Same chunk-interior-margin principle TerrainGenerator.fitsAndIsSuitable already uses
+        // Chunk-interior margin, as the former worldgen-time tree placement used
         // for worldgen-time placement, re-applied here: a live-planted sapling has no such
         // guarantee from placement time, unlike a worldgen candidate.
         if (lx - r < 0 || lx + r >= Chunk.SIZE_X || lz - r < 0 || lz + r >= Chunk.SIZE_Z) return false;

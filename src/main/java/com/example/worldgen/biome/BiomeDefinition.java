@@ -1,5 +1,10 @@
 package com.example.worldgen.biome;
 
+import com.example.worldgen.noise.NoiseStack;
+import com.example.worldgen.noise.SimplexNoise;
+import com.example.worldgen.random.LegacyRandomSource;
+import com.example.worldgen.random.WorldgenRandom;
+
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -21,9 +26,9 @@ import java.util.Optional;
  * {@code effects}; they are kept here as raw parsed JSON in {@link #attributes()} (values are
  * {@code Map}/{@code List}/{@code String}/{@code Boolean}/number objects from the loader).
  *
- * <p>Not ported (they need the world or colour-map textures): {@code shouldFreeze}, {@code shouldSnow}
- * (block/light/fluid queries) and {@code getGrassColor}/{@code getFoliageColor} without an override
- * ({@code GrassColor.get}/{@code FoliageColor.get} sample the colormap images).
+ * <p>Not ported (they need the world): {@code shouldFreeze}, {@code shouldSnow} (block/light/fluid queries).
+ * {@code getGrassColor}/{@code getFoliageColor}/{@code getDryFoliageColor} take the colormap's pixels from the caller
+ * (vanilla keeps them in {@code GrassColor.pixels} etc., loaded from {@code textures/colormap/*.png}).
  * Vanilla's per-thread 1024-entry temperature cache in {@code getTemperature} is a pure memo of
  * {@code getHeightAdjustedTemperature} and is not reproduced.
  */
@@ -57,6 +62,19 @@ public record BiomeDefinition(String id, boolean hasPrecipitation, float tempera
      * The noise engine supplies these implementations.
      */
     public record Noises(Noise2D temperatureNoise, Noise2D frozenTemperatureNoise, Noise2D biomeInfoNoise) {
+
+        /** The three noises exactly as {@code Biome.<clinit>} builds them (see above). */
+        public static Noises vanilla() {
+            SimplexNoise temperatureNoise = new SimplexNoise(new WorldgenRandom(new LegacyRandomSource(1234L)), true);
+            WorldgenRandom frozenRandom = new WorldgenRandom(new LegacyRandomSource(3456L));
+            NoiseStack frozen = NoiseStack.builder()
+                    .add(new SimplexNoise(frozenRandom, true), 1.0, 0.14285715F)
+                    .add(new SimplexNoise(frozenRandom, true), 0.5, 0.2857143F)
+                    .add(new SimplexNoise(frozenRandom, true), 0.25, 0.5714286F)
+                    .build();
+            SimplexNoise biomeInfoNoise = new SimplexNoise(new WorldgenRandom(new LegacyRandomSource(2345L)), true);
+            return new Noises(temperatureNoise::get, frozen::get, biomeInfoNoise::get);
+        }
     }
 
     /** Vanilla {@code Biome.Precipitation}. */
@@ -197,6 +215,53 @@ public record BiomeDefinition(String id, boolean hasPrecipitation, float tempera
     /** Vanilla {@code getWaterColor}. */
     public int getWaterColor() {
         return this.effects.waterColor();
+    }
+
+    /** {@code GrassColor.get}'s default ({@code -65281}, the colour when the lookup falls outside the pixels). */
+    public static final int GRASS_COLOR_DEFAULT = -65281;
+    /** {@code FoliageColor.FOLIAGE_DEFAULT}. */
+    public static final int FOLIAGE_COLOR_DEFAULT = -12012264;
+    /** {@code DryFoliageColor.FOLIAGE_DRY_DEFAULT}. */
+    public static final int DRY_FOLIAGE_COLOR_DEFAULT = -10732494;
+
+    /**
+     * {@code ColorMapColorUtil.get(temperature, downfall, pixels, defaultColor)}: {@code downfall *= temperature},
+     * {@code x = (int) ((1 - temperature) * 255)}, {@code y = (int) ((1 - downfall) * 255)}, index {@code y << 8 | x};
+     * an index past the pixel array gives {@code defaultColor} (no other clamping).
+     */
+    public static int colorMapColor(double temperature, double downfall, int[] pixels, int defaultColor) {
+        downfall *= temperature;
+        int x = (int) ((1.0 - temperature) * 255.0);
+        int y = (int) ((1.0 - downfall) * 255.0);
+        int index = y << 8 | x;
+        return index >= pixels.length ? defaultColor : pixels[index];
+    }
+
+    /**
+     * Vanilla {@code getGrassColor(x, z)}: the {@code grass_color} override, else {@code GrassColor.get(clamp(temperature,
+     * 0, 1), clamp(downfall, 0, 1))}, then the {@code grass_color_modifier}.
+     */
+    public int getGrassColor(double x, double z, int[] grassPixels, Noises noises) {
+        int base = this.effects.grassColorOverride().orElseGet(() -> colorMapColor(
+                clamp01(this.temperature), clamp01(this.downfall), grassPixels, GRASS_COLOR_DEFAULT));
+        return this.effects.grassColorModifier().modifyColor(x, z, base, noises);
+    }
+
+    /** Vanilla {@code getFoliageColor()}: the {@code foliage_color} override, else {@code FoliageColor.get(clamp(t), clamp(d))}. */
+    public int getFoliageColor(int[] foliagePixels) {
+        return this.effects.foliageColorOverride().orElseGet(() -> colorMapColor(
+                clamp01(this.temperature), clamp01(this.downfall), foliagePixels, FOLIAGE_COLOR_DEFAULT));
+    }
+
+    /** Vanilla {@code getDryFoliageColor()}: the {@code dry_foliage_color} override, else {@code DryFoliageColor.get(...)}. */
+    public int getDryFoliageColor(int[] dryFoliagePixels) {
+        return this.effects.dryFoliageColorOverride().orElseGet(() -> colorMapColor(
+                clamp01(this.temperature), clamp01(this.downfall), dryFoliagePixels, DRY_FOLIAGE_COLOR_DEFAULT));
+    }
+
+    /** {@code (double) Mth.clamp(value, 0.0F, 1.0F)}. */
+    private static double clamp01(float value) {
+        return value < 0.0F ? 0.0F : Math.min(value, 1.0F);
     }
 
     /** Raw value of one environment attribute such as {@code minecraft:visual/sky_color}, if present. */

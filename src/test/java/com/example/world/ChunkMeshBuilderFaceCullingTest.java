@@ -151,8 +151,9 @@ class ChunkMeshBuilderFaceCullingTest {
             for (float channel : tint) {
                 assertTrue(channel >= 0f && channel <= 1f, leaf + " tint channel out of [0,1]: " + channel);
             }
-            // Must not be the neutral no-op tint - the entire bug being fixed is "no color at all."
-            assertFalse(tint[0] == 1f && tint[1] == 1f && tint[2] == 1f, leaf + " must not use the neutral (no-op) tint");
+            // Cherry leaves have no tint source in vanilla's BlockColors (the texture is pink); every other species is tinted.
+            boolean neutral = tint[0] == 1f && tint[1] == 1f && tint[2] == 1f;
+            assertEquals(leaf == BlockType.CHERRY_LEAVES, neutral, leaf + " neutral tint");
         }
     }
 

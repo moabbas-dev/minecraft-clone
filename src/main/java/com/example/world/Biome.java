@@ -8,7 +8,8 @@ package com.example.world;
  * placement. Selection is always nearest-match / weighted-distance in this space - never a
  * hard if/else threshold - so both the dominant biome and every other biome's *influence* at
  * a point are well-defined, which is what makes continuous blending possible in
- * {@link TerrainGenerator}.
+ * the removed invented generator. LEGACY: no world generates with this enum any more (vanilla worlds use the 26.3
+ * biomes, see worldgen/chunk/OverworldGenerator); it only survives for the atmosphere/F3 code, which gets null climate.
  *
  * The 5 selection-space fields ({@link #temperature}, {@link #humidity}, etc.) are hand-tuned
  * targets that only shape *where* this biome is placed - they are a different thing from
@@ -48,14 +49,14 @@ public enum Biome {
     //
     // Birch Forest: warmer/less humid than Forest (real vanilla's own def temp/downfall are
     // 0.6/0.6, cooler-toned than Forest's 0.7/0.8 - a paler colormap sample, matching "light or
-    // distinctive birch foliage"), gentler terrain, denser tree coverage via TerrainGenerator's
+    // distinctive birch foliage"), gentler terrain, denser tree coverage via the removed generator's
     // per-biome treeChance/clusterChance (see speciesFor/clusterChanceFor) rather than a new
     // species - it reuses the existing BIRCH species at a dedicated-biome density instead of
     // Forest's ~10-40% probabilistic roll.
     BIRCH_FOREST(0.5f, 0.15f, 0.15f, 0.35f, -0.3f, 69, 12, BlockType.GRASS_BLOCK, BlockType.DIRT, 22, 0.6f, 0.6f),
     // Dark Forest: same climate family as Forest but pushed to weirdness's positive extreme (an
     // axis Forest doesn't use at all) for a distinct, reachable niche. Very low treeChance (see
-    // TerrainGenerator) for the request's "45-75% coverage, dense vegetation, large canopies."
+    // the removed generator) for the request's "45-75% coverage, dense vegetation, large canopies."
     // defTemperature/defDownfall match Forest's own values (0.7/0.8) - already one of the
     // darker-sampling corners of the real foliage colormap - rather than inventing a fixed tint
     // the way Spruce/Cherry need to (see BiomeColors/ChunkMeshBuilder and TreeSpecies.DARK_OAK).

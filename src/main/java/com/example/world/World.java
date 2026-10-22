@@ -3,8 +3,11 @@ package com.example.world;
 import lombok.Getter;
 import lombok.Setter;
 
+import com.example.worldgen.terrain.BiomeManager;
+
 import java.io.File;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class World {
@@ -26,12 +29,49 @@ public class World {
     public World(long seed, WorldGenerator generator) {
         this.seed = seed;
         this.generator = generator;
+        this.biomeManager = new BiomeManager(this::noiseBiome, generator.biomeZoomSeed());
+    }
+
+    public WorldGenerator generator() {
+        return generator;
     }
 
     /** Climate at a world column for the debug overlay; null for generators with no climate model. */
     public ClimateSample climateAt(int worldX, int worldZ) {
         return generator.climateAt(worldX, worldZ);
     }
+
+    /** The level's {@code BiomeManager}: the fiddled zoom over {@link #noiseBiome}, seeded with {@code obfuscateSeed(seed)}. */
+    private final BiomeManager biomeManager;
+
+    /**
+     * {@code LevelReader.getNoiseBiome}: the quart biome stored in the chunk when it is loaded, otherwise what the generator's BIOMES
+     * status stores for that chunk; null for a generator without biomes.
+     */
+    public String noiseBiome(int quartX, int quartY, int quartZ) {
+        Chunk c = getChunk(quartX >> 2, quartZ >> 2);
+        if (c != null && c.hasBiomes()) return c.getNoiseBiome(quartX, quartY, quartZ);
+        return generator.noiseBiome(quartX, quartY, quartZ);
+    }
+
+    /** {@code Level.getBiome(pos)} ({@code BiomeManager.getBiome}): the vanilla biome id at a block, or null without a biome model (flat). */
+    public String getBiome(int x, int y, int z) {
+        return generator.hasBiomes() ? biomeManager.getBiome(x, y, z) : null;
+    }
+
+    /** The video option "Biome Blend" (vanilla {@code Options.biomeBlendRadius}, 0..7): the tint box radius in blocks. */
+    private int biomeBlendRadius = 2;
+
+    public int getBiomeBlendRadius() {
+        return biomeBlendRadius;
+    }
+
+    public void setBiomeBlendRadius(int radius) {
+        this.biomeBlendRadius = Math.max(0, Math.min(7, radius));
+    }
+
+    /** Post-processing marks of generated chunks waiting for their 3 x 3 neighbourhood (vanilla runs them when a chunk starts ticking). */
+    private final Map<Long, List<int[]>> pendingPostProcessing = new HashMap<>();
 
     public static int worldToChunk(int worldCoord) {
         return Math.floorDiv(worldCoord, Chunk.SIZE_X);
@@ -61,6 +101,15 @@ public class World {
 
     public void removeChunk(int cx, int cz) {
         chunks.remove(Chunk.key(cx, cz));
+        forgetPostProcessing(cx, cz);
+    }
+
+    /**
+     * Drops the post-processing marks of a chunk that is unloaded before its neighbourhood was complete: they are not saved, and a
+     * chunk restored from disk gets fluid ticks for every unsettled fluid anyway ({@link FluidSim#chunkRestored}).
+     */
+    public void forgetPostProcessing(int cx, int cz) {
+        pendingPostProcessing.remove(Chunk.key(cx, cz));
     }
 
     /** Blocks of trees that grew in a neighbouring chunk and fall into a chunk that is not generated yet, keyed by that chunk. */
@@ -116,15 +165,43 @@ public class World {
         } else {
             generator.generate(chunk, this);
             chunk.setFreshlyGenerated(true);
+            List<int[]> marks = generator.takePostProcessing(chunk);
+            if (!marks.isEmpty()) pendingPostProcessing.put(Chunk.key(chunk.chunkX, chunk.chunkZ), marks);
         }
         applyPendingSpill(chunk);
-        generator.computeTint(chunk); // not persisted, so this runs on both the load and generate paths
+        generator.computeBiomes(chunk); // biomes and tint are not persisted, so these run on both the load and generate paths
+        generator.computeTint(chunk, this);
         chunk.markGenerated();
         chunk.markMeshDirty();
         // Neighbors may have already been meshed while this chunk was still unloaded (their
         // border faces were drawn against "air"). Now that real terrain exists here, those
         // neighbor meshes are stale and must be rebuilt or they'll show phantom/z-fighting faces.
         markNeighborChunksDirty(chunk.chunkX, chunk.chunkZ);
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) runPostProcessingIfReady(chunk.chunkX + dx, chunk.chunkZ + dz);
+        }
+    }
+
+    /**
+     * {@code LevelChunk.postProcessGeneration}, run once the chunk and its eight neighbours are generated (vanilla runs it when the
+     * chunk becomes a ticking chunk, which needs its neighbours loaded): for every marked position, in mark order, a fluid there gets
+     * one fluid tick at once ({@code FluidState.tick}). The other branches (the liquid block's bubble-column tick,
+     * {@code Block.updateFromNeighbourShapes} for non-liquids) change nothing for the blocks the terrain stages mark: they only mark
+     * fluids, and this engine has no bubble columns.
+     */
+    private void runPostProcessingIfReady(int cx, int cz) {
+        List<int[]> marks = pendingPostProcessing.get(Chunk.key(cx, cz));
+        if (marks == null) return;
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                Chunk n = getChunk(cx + dx, cz + dz);
+                if (n == null || !n.isGenerated()) return;
+            }
+        }
+        pendingPostProcessing.remove(Chunk.key(cx, cz));
+        for (int[] p : marks) {
+            if (getBlock(p[0], p[1], p[2]).isFluid()) fluids.tickNow(this, p[0], p[1], p[2]);
+        }
     }
 
     /** Marks the 4 orthogonally-adjacent chunks (if loaded) mesh-dirty so their border faces get rebuilt. */

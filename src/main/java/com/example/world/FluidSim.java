@@ -184,6 +184,14 @@ public final class FluidSim {
         return ticks;
     }
 
+    /**
+     * One fluid tick at a cell right now ({@code FluidState.tick(level, pos, state)}), the way
+     * {@code LevelChunk.postProcessGeneration} runs it for every fluid a generated chunk marked for post-processing.
+     */
+    void tickNow(World world, int x, int y, int z) {
+        tickFluid(world, x, y, z);
+    }
+
     private static boolean loaded(World world, int x, int z) {
         Chunk c = world.getChunk(World.worldToChunk(x), World.worldToChunk(z));
         return c != null && c.isGenerated();

@@ -2,16 +2,13 @@ package com.example.worldgen.material;
 
 import com.example.worldgen.biome.BiomeDefinition;
 import com.example.worldgen.biome.BiomeDefinitionLoader;
-import com.example.worldgen.noise.NoiseStack;
-import com.example.worldgen.noise.SimplexNoise;
-import com.example.worldgen.random.LegacyRandomSource;
-import com.example.worldgen.random.WorldgenRandom;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 
 /**
  * The part of {@code net.minecraft.world.level.biome.Biome} (26.3) the material system reads from a biome holder's value:
@@ -43,22 +40,18 @@ public interface BiomeClimate {
      */
     static BiomeClimate vanilla(Path dataRoot) {
         BiomeDefinitionLoader loader = new BiomeDefinitionLoader(dataRoot);
-        SimplexNoise temperatureNoise = new SimplexNoise(new WorldgenRandom(new LegacyRandomSource(1234L)), true);
-        WorldgenRandom frozenRandom = new WorldgenRandom(new LegacyRandomSource(3456L));
-        NoiseStack frozen = NoiseStack.builder()
-                .add(new SimplexNoise(frozenRandom, true), 1.0, 0.14285715F)
-                .add(new SimplexNoise(frozenRandom, true), 0.5, 0.2857143F)
-                .add(new SimplexNoise(frozenRandom, true), 0.25, 0.5714286F)
-                .build();
-        SimplexNoise biomeInfoNoise = new SimplexNoise(new WorldgenRandom(new LegacyRandomSource(2345L)), true);
-        BiomeDefinition.Noises noises = new BiomeDefinition.Noises(temperatureNoise::get, frozen::get, biomeInfoNoise::get);
         Map<String, BiomeDefinition> definitions = new ConcurrentHashMap<>();
-        return (biome, x, y, z, seaLevel) -> definitions.computeIfAbsent(biome, id -> {
+        return vanilla(biome -> definitions.computeIfAbsent(biome, id -> {
             try {
                 return loader.load(id);
             } catch (IOException e) {
                 throw new UncheckedIOException("Cannot load biome " + id, e);
             }
-        }).getHeightAdjustedTemperature(x, y, z, seaLevel, noises);
+        }), BiomeDefinition.Noises.vanilla());
+    }
+
+    /** The same over a caller's biome definitions (by id) and {@code Biome}'s static noises. */
+    static BiomeClimate vanilla(Function<String, BiomeDefinition> definitions, BiomeDefinition.Noises noises) {
+        return (biome, x, y, z, seaLevel) -> definitions.apply(biome).getHeightAdjustedTemperature(x, y, z, seaLevel, noises);
     }
 }

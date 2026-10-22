@@ -9,7 +9,7 @@ import java.util.Random;
  *
  * <p>{@code canopyRadius} is only the spacing measure between trees (about how far a typical tree reaches sideways, trunk to leaf tip),
  * not a limit on the shape: the real extent comes from the plan, and a tree whose plan does not fit inside its chunk is simply not
- * placed ({@link TerrainGenerator}) - so a tree is never cut off at a chunk border. {@code maxTotalHeight} is how tall the tallest tree
+ * placed - so a tree is never cut off at a chunk border. {@code maxTotalHeight} is how tall the tallest tree
  * of the kind can get, used for the world-height check.
  *
  * <p>Trunk colour is the kind's own log texture. Foliage takes the per-column biome tint, except SPRUCE and CHERRY, which have fixed

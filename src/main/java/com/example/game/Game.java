@@ -475,10 +475,9 @@ public class Game implements GameAccess {
         for (ChunkRenderData rd : renderData.values()) rd.destroy();
         renderData.clear();
 
-        WorldGenerator generator = settings.type() == WorldSettings.WorldType.FLAT
-                ? new FlatWorldGenerator()
-                : new TerrainGenerator(seed);
+        WorldGenerator generator = createGenerator(settings.type(), seed);
         world = new World(seed, generator);
+        world.setBiomeBlendRadius(options.biomeBlendRadius);
         installWorldHooks();
 
         currentWorldFolder = uniqueFolderName(WorldIO.sanitizeFolderName(settings.name()));
@@ -489,29 +488,23 @@ public class Game implements GameAccess {
 
         saplingGrowth = new SaplingGrowth(seed);
         cookingStations = new CookingStationManager(); // fresh world: nothing to restore
-        Chunk spawnChunk = world.getOrCreateChunk(0, 0);
-        world.generateChunk(spawnChunk);
-        saplingGrowth.registerChunk(spawnChunk); // a no-op for a fresh world, kept for consistency with loadWorld
 
-        int spawnLocalX = 8, spawnLocalZ = 8;
-        int spawnY;
-        if (settings.type() == WorldSettings.WorldType.FLAT) {
-            spawnY = spawnChunk.getColumnHeight(spawnLocalX, spawnLocalZ) + 2;
+        Vector3f spawn;
+        if (generator instanceof VanillaChunkGenerator vanilla) {
+            // Vanilla's new-world spawn: NoiseSpawnFinder origin, the 11 x 11 chunk spiral, then PlayerSpawnFinder's random column
+            // within respawn_radius 10 (see OverworldSpawn).
+            double[] p = vanilla.findSpawn();
+            spawn = new Vector3f((float) p[0], (float) p[1], (float) p[2]);
         } else {
-            int bestHeight = -1;
-            for (int x = 2; x < Chunk.SIZE_X - 2; x++) {
-                for (int z = 2; z < Chunk.SIZE_Z - 2; z++) {
-                    int h = spawnChunk.getColumnHeight(x, z);
-                    if (h > TerrainGenerator.SEA_LEVEL && h > bestHeight) {
-                        bestHeight = h;
-                        spawnLocalX = x;
-                        spawnLocalZ = z;
-                    }
-                }
-            }
-            spawnY = (bestHeight > 0 ? bestHeight : spawnChunk.getColumnHeight(spawnLocalX, spawnLocalZ)) + 2;
+            // Flat: the centre of chunk (0, 0), two blocks above the ground.
+            Chunk flatChunk = world.getOrCreateChunk(0, 0);
+            world.generateChunk(flatChunk);
+            spawn = new Vector3f(8.5f, flatChunk.getColumnHeight(8, 8) + 2, 8.5f);
         }
-        player = new Player(new Vector3f(spawnLocalX + 0.5f, spawnY, spawnLocalZ + 0.5f));
+        Chunk spawnChunk = world.getOrCreateChunk(World.worldToChunk((int) Math.floor(spawn.x)), World.worldToChunk((int) Math.floor(spawn.z)));
+        if (!spawnChunk.isGenerated()) world.generateChunk(spawnChunk);
+        saplingGrowth.registerChunk(spawnChunk); // a no-op for a fresh world, kept for consistency with loadWorld
+        player = new Player(spawn);
         spawnPoint.set(player.position);
         player.setViewBobbing(options.viewBobbing);
 
@@ -526,6 +519,14 @@ public class Game implements GameAccess {
         saveWorld(); // write it to disk immediately so it shows up in the world list right away
     }
 
+    /**
+     * Flat worlds use the classic flat preset; every other world the vanilla 26.3 overworld generator, which needs the restored
+     * {@code data/} folder (its absence is an error naming the restore script - there is no fallback generator).
+     */
+    private static WorldGenerator createGenerator(WorldSettings.WorldType type, long seed) {
+        return type == WorldSettings.WorldType.FLAT ? new FlatWorldGenerator() : new VanillaChunkGenerator(seed);
+    }
+
     private void loadWorld(WorldIO.SavedWorld saved) {
         File dir = WorldIO.worldDir(saved.folderName());
         WorldIO.LoadedMeta meta = WorldIO.loadMeta(dir);
@@ -538,10 +539,9 @@ public class Game implements GameAccess {
         for (ChunkRenderData rd : renderData.values()) rd.destroy();
         renderData.clear();
 
-        WorldGenerator generator = meta.settings().type() == WorldSettings.WorldType.FLAT
-                ? new FlatWorldGenerator()
-                : new TerrainGenerator(meta.seed());
+        WorldGenerator generator = createGenerator(meta.settings().type(), meta.seed());
         world = new World(meta.seed(), generator);
+        world.setBiomeBlendRadius(options.biomeBlendRadius);
         installWorldHooks();
         world.setSaveDir(dir);
         currentWorldFolder = saved.folderName();
@@ -679,6 +679,7 @@ public class Game implements GameAccess {
     private void applyOptions() {
         options.clamp();
         renderDistance = options.renderDistance;
+        if (world != null) world.setBiomeBlendRadius(options.biomeBlendRadius);
         window.setVsync(options.vsync);
         window.setFullscreen(options.fullscreen);
         if (player != null) player.setViewBobbing(options.viewBobbing);
@@ -972,20 +973,40 @@ public class Game implements GameAccess {
         }
     }
 
+    private int[][] streamingOffsets;
+    private int streamingOffsetsRadius = -1;
+
+    /** Chunk offsets inside the render-distance circle, nearest first (cached per render distance). */
+    private int[][] streamingOffsets() {
+        if (streamingOffsetsRadius != renderDistance) {
+            java.util.List<int[]> list = new java.util.ArrayList<>();
+            for (int dx = -renderDistance; dx <= renderDistance; dx++) {
+                for (int dz = -renderDistance; dz <= renderDistance; dz++) {
+                    if (dx * dx + dz * dz <= renderDistance * renderDistance) list.add(new int[]{dx, dz});
+                }
+            }
+            list.sort(java.util.Comparator.comparingInt(o -> o[0] * o[0] + o[1] * o[1]));
+            streamingOffsets = list.toArray(new int[0][]);
+            streamingOffsetsRadius = renderDistance;
+        }
+        return streamingOffsets;
+    }
+
     private void updateChunkStreaming() {
         long deadline = System.nanoTime() + STREAMING_TIME_BUDGET_NANOS;
         int pcx = World.worldToChunk((int) Math.floor(player.position.x));
         int pcz = World.worldToChunk((int) Math.floor(player.position.z));
 
         int generated = 0;
+        // Nearest chunks first: a vanilla chunk costs ~15 ms, so the budget admits about one per frame and the order matters.
         generation:
-        for (int dx = -renderDistance; dx <= renderDistance; dx++) {
-            for (int dz = -renderDistance; dz <= renderDistance; dz++) {
-                if (dx * dx + dz * dz > renderDistance * renderDistance) continue;
+        for (int[] offset : streamingOffsets()) {
+            {
+                int dx = offset[0], dz = offset[1];
                 int cx = pcx + dx, cz = pcz + dz;
                 if (!world.hasChunk(cx, cz)) {
                     Chunk c = world.getOrCreateChunk(cx, cz);
-                    world.generateChunk(c); // biome climate sampling + height noise + block fill
+                    world.generateChunk(c); // vanilla biomes + terrain (fill, surface, carvers), or a restore from disk
                     saplingGrowth.registerChunk(c); // picks up any saplings this chunk had saved
                     if (c.isFreshlyGenerated() && mobSpawner.isEnabled()) {
                         com.example.entity.PassiveSpawner.spawnForNewChunk(world, mobs, c, gameplayRandom);
@@ -1014,6 +1035,7 @@ public class Game implements GameAccess {
                     WorldIO.saveChunk(world.getSaveDir(), c); // synchronous disk write
                 }
                 saplingGrowth.unregisterChunk(c.chunkX, c.chunkZ); // its saplings pause until reload
+                world.forgetPostProcessing(c.chunkX, c.chunkZ);
                 ChunkRenderData rd = renderData.remove(entry.getKey());
                 if (rd != null) rd.destroy();
                 unloaded++;
@@ -3603,7 +3625,9 @@ public class Game implements GameAccess {
         y += lineH;
 
         if (sample == null) {
-            font.drawText(uiRenderer, "no climate model (flat world)", x, y, scale, 0.8f, 0.8f, 0.8f, 1f);
+            // Vanilla's F3 line "Biome: <id>" at the player's block (Level.getBiome); flat worlds have no biome model here.
+            String biome = world.getBiome(wx, (int) Math.floor(player.position.y), wz);
+            font.drawText(uiRenderer, biome == null ? "no climate model (flat world)" : "Biome: " + biome, x, y, scale, 0.8f, 0.8f, 0.8f, 1f);
             return;
         }
 
@@ -3756,6 +3780,17 @@ public class Game implements GameAccess {
     @Override
     public void teleport(float x, float y, float z, Float yawDegrees, Float pitchDegrees) {
         if (player == null) throw new IllegalStateException("no active world");
+        // Generate the destination's chunk and its neighbours first: streaming would only reach them after some frames, and a
+        // player in an ungenerated chunk falls through (unloaded chunks read as air).
+        int tcx = World.worldToChunk((int) Math.floor(x)), tcz = World.worldToChunk((int) Math.floor(z));
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                if (world.hasChunk(tcx + dx, tcz + dz)) continue;
+                Chunk c = world.getOrCreateChunk(tcx + dx, tcz + dz);
+                world.generateChunk(c);
+                saplingGrowth.registerChunk(c);
+            }
+        }
         player.teleport(x, y, z);
         if (yawDegrees != null) player.setYaw((float) Math.toRadians(yawDegrees));
         if (pitchDegrees != null) player.setPitch((float) Math.toRadians(pitchDegrees));
@@ -4106,8 +4141,11 @@ public class Game implements GameAccess {
         // overlay's own "no climate model (flat world)" message) - climateAt returns null there,
         // same as every other climate consumer in this class (renderWorld's sky/fog/underwater-
         // fog blends) already has to handle; this just hadn't been made to handle it too.
+        int fx = (int) Math.floor(player.position.x), fy = (int) Math.floor(player.position.y), fz = (int) Math.floor(player.position.z);
+        sb.append("biome.vanilla=").append(world.getBiome(fx, fy, fz)).append('\n');
+        sb.append("block.feet=").append(world.getBlock(fx, fy, fz)).append(" below=").append(world.getBlock(fx, fy - 1, fz)).append('\n');
         if (climate == null) {
-            sb.append("biome.dominant=none (flat world)\n");
+            sb.append("biome.dominant=none (no climate model: flat or vanilla 26.3 world)\n");
         } else {
             sb.append("biome.dominant=").append(climate.dominant()).append('\n');
             StringBuilder weights = new StringBuilder();

@@ -23,7 +23,7 @@ public class FlatWorldGenerator implements WorldGenerator {
     }
 
     @Override
-    public void computeTint(Chunk chunk) {
+    public void computeTint(Chunk chunk, World world) {
         // A flat world is effectively single-biome (plains-like) - a fixed tint is correct
         // here rather than plumbing climate noise into a generator that otherwise has none.
         float[] grass = {0.62f, 0.75f, 0.38f};

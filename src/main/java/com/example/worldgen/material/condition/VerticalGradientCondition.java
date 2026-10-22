@@ -2,7 +2,7 @@ package com.example.worldgen.material.condition;
 
 import com.example.worldgen.Mth;
 import com.example.worldgen.material.MaterialRuleContext;
-import com.example.worldgen.material.VerticalAnchor;
+import com.example.worldgen.provider.VerticalAnchor;
 import com.example.worldgen.random.PositionalRandomFactory;
 import com.example.worldgen.random.RandomSource;
 

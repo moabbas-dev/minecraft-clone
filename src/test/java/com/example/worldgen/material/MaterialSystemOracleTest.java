@@ -10,6 +10,7 @@ import com.example.worldgen.levelgen.NoiseGeneratorSettings;
 import com.example.worldgen.levelgen.NoiseGeneratorSettingsLoader;
 import com.example.worldgen.levelgen.RandomState;
 import com.example.worldgen.material.rule.MaterialRule;
+import com.example.worldgen.provider.WorldGenerationContext;
 import org.junit.jupiter.api.Test;
 
 import java.io.BufferedReader;

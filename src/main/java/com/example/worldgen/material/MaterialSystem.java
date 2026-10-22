@@ -11,6 +11,7 @@ import com.example.worldgen.levelgen.RandomState;
 import com.example.worldgen.material.rule.MaterialRule;
 import com.example.worldgen.material.rule.RuleEvaluator;
 import com.example.worldgen.noise.Noise;
+import com.example.worldgen.provider.WorldGenerationContext;
 import com.example.worldgen.random.PositionalRandomFactory;
 import com.example.worldgen.random.RandomSource;
 

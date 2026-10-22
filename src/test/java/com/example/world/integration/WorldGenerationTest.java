@@ -1,118 +1,147 @@
 package com.example.world.integration;
 
-import com.example.world.*;
+import com.example.world.BlockType;
+import com.example.world.Chunk;
+import com.example.world.VanillaChunkGenerator;
+import com.example.world.World;
+import com.example.world.WorldIO;
+import com.example.worldgen.chunk.OverworldGenerator;
+import com.example.worldgen.chunk.OverworldSpawn;
+import com.example.worldgen.terrain.TerrainChunk;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
-import static org.junit.jupiter.api.Assertions.*;
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.HashSet;
+import java.util.Set;
+
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
- * Verifies the two properties the biome-blending round's plan explicitly required and checked
- * by hand with a throwaway harness: same-seed determinism, and chunk-boundary consistency (a
- * world coordinate must produce identical results no matter which chunk generates it). This
- * promotes that ad hoc check into a permanent regression test.
+ * The vanilla overworld generator inside the engine ({@link VanillaChunkGenerator}): determinism, independence from the order the
+ * chunks are generated in, biomes on both the generate and the load path, vanilla's bedrock floor, the engine heightmap, and the
+ * spawn search. Needs the restored {@code data/} folder (skipped without it).
  */
 class WorldGenerationTest {
 
-    @Test
-    void sameSeedProducesIdenticalChunkBlocksFromIndependentWorlds() {
-        World worldA = new World(555L, new TerrainGenerator(555L));
-        World worldB = new World(555L, new TerrainGenerator(555L));
+    @BeforeAll
+    static void needsData() {
+        assumeTrue(Files.isDirectory(VanillaChunkGenerator.DATA_ROOT.resolve("minecraft/worldgen/noise_settings")), "vanilla data/ not restored");
+        assumeTrue(new File("textures/colormap/grass.png").isFile(), "vanilla colormaps not present");
+    }
 
-        Chunk chunkA = worldA.getOrCreateChunk(3, -2);
-        worldA.generateChunk(chunkA);
-        Chunk chunkB = worldB.getOrCreateChunk(3, -2);
-        worldB.generateChunk(chunkB);
-
-        assertArrayEquals(chunkA.exportBlocks(), chunkB.exportBlocks(),
-                "identical seed must produce byte-identical chunk terrain");
+    private static Chunk generate(World world, int cx, int cz) {
+        Chunk chunk = world.getOrCreateChunk(cx, cz);
+        world.generateChunk(chunk);
+        return chunk;
     }
 
     @Test
-    void climateAtIsAPureFunctionOfWorldCoordinatesRegardlessOfChunkOrigin() {
-        // Reading climateAt never touches chunk state at all (see TerrainGenerator), so it must
-        // agree with itself no matter what chunks happen to be loaded around it - this directly
-        // checks the "no visible seam across chunk boundaries" requirement.
-        TerrainGenerator gen = new TerrainGenerator(777L);
-        for (int boundary = -3; boundary <= 3; boundary++) {
-            int worldX = boundary * Chunk.SIZE_X; // exact chunk boundary column
-            ClimateSample first = gen.climateAt(worldX, 50);
-            ClimateSample second = gen.climateAt(worldX, 50);
-            assertEquals(first.temperature(), second.temperature(), 0.0);
-            assertEquals(first.dominant(), second.dominant());
-            assertArrayEquals(first.grassColor(), second.grassColor());
-            assertArrayEquals(first.waterColor(), second.waterColor());
-            assertArrayEquals(first.fogColor(), second.fogColor());
-            assertArrayEquals(first.underwaterFogColor(), second.underwaterFogColor());
-        }
+    void sameSeedProducesIdenticalChunksInIndependentWorlds() {
+        World a = new World(555L, new VanillaChunkGenerator(555L));
+        World b = new World(555L, new VanillaChunkGenerator(555L));
+        assertArrayEquals(generate(a, 3, -2).exportBlocks(), generate(b, 3, -2).exportBlocks());
     }
 
     @Test
-    void bakedWaterTintMatchesTheLiveBlendedColorAtTheSameColumn() {
-        // Chunk.waterTint is baked once at generation time (TerrainGenerator.computeTint);
-        // TerrainGenerator.climateAt computes the same blend on demand for fog. They must never
-        // disagree, or a chunk's water mesh and the live fog color would visibly mismatch.
-        World world = new World(321L, new TerrainGenerator(321L));
-        Chunk chunk = world.getOrCreateChunk(2, -1);
-        world.generateChunk(chunk);
-        int originX = chunk.worldOriginX(), originZ = chunk.worldOriginZ();
-
-        for (int x = 0; x < Chunk.SIZE_X; x += 3) {
-            for (int z = 0; z < Chunk.SIZE_Z; z += 3) {
-                float[] baked = chunk.getWaterTint(x, z);
-                float[] live = world.climateAt(originX + x, originZ + z).waterColor();
-                assertArrayEquals(live, baked, "baked water tint must match the live blended color at (" + x + "," + z + ")");
-            }
-        }
+    void chunksDoNotDependOnTheOrderTheyAreGeneratedIn() {
+        World forward = new World(77L, new VanillaChunkGenerator(77L));
+        World backward = new World(77L, new VanillaChunkGenerator(77L));
+        short[][] f = new short[3][];
+        short[][] r = new short[3][];
+        for (int i = 0; i < 3; i++) f[i] = generate(forward, i - 1, 4).exportBlocks();
+        for (int i = 2; i >= 0; i--) r[i] = generate(backward, i - 1, 4).exportBlocks();
+        for (int i = 0; i < 3; i++) assertArrayEquals(f[i], r[i], "chunk " + (i - 1) + ",4");
+        // and a chunk generated alone, with no neighbour ever generated, is the same too
+        World alone = new World(77L, new VanillaChunkGenerator(77L));
+        assertArrayEquals(f[1], generate(alone, 0, 4).exportBlocks());
     }
 
     @Test
-    void generatingTheSameChunkTwiceIsIdempotent() {
-        World world = new World(9L, new TerrainGenerator(9L));
-        Chunk chunk = world.getOrCreateChunk(0, 0);
-        world.generateChunk(chunk);
-        short[] first = chunk.exportBlocks();
-
-        // generateChunk is only ever called once per chunk in real play (guarded by
-        // world.hasChunk in Game's streaming loop), but the generator itself should still be a
-        // pure function of the chunk's own coordinates - calling it again must not corrupt data.
-        // (saveDir is null here, so this always regenerates fresh rather than loading from disk.)
-        world.generateChunk(chunk);
-        short[] second = chunk.exportBlocks();
-        assertArrayEquals(first, second, "regenerating the same chunk coordinates must be deterministic");
-    }
-
-    @Test
-    void chunkHeightMapMatchesActualHighestNonAirBlock() {
-        World world = new World(42L, new TerrainGenerator(42L));
-        Chunk chunk = world.getOrCreateChunk(0, 0);
-        world.generateChunk(chunk);
-
-        for (int x = 0; x < Chunk.SIZE_X; x += 4) {
-            for (int z = 0; z < Chunk.SIZE_Z; z += 4) {
-                int reportedHeight = chunk.getColumnHeight(x, z);
-                int actualHighest = -1;
-                for (int y = Chunk.SIZE_Y - 1; y >= 0; y--) {
+    void theBottomLayerIsBedrockAndTheHeightMapMatchesTheBlocks() {
+        World world = new World(1234L, new VanillaChunkGenerator(1234L));
+        Chunk chunk = generate(world, 5, 5);
+        for (int x = 0; x < Chunk.SIZE_X; x++) {
+            for (int z = 0; z < Chunk.SIZE_Z; z++) {
+                // material_rule bedrock_floor: vertical_gradient true at and below above_bottom 0 -> always bedrock at y -64
+                assertEquals(BlockType.BEDROCK, chunk.getLocal(x, Chunk.MIN_Y, z), "y -64 at " + x + "," + z);
+                int highest = Chunk.MIN_Y - 1;
+                for (int y = Chunk.MAX_Y; y >= Chunk.MIN_Y; y--) {
                     if (!chunk.getLocal(x, y, z).isAir()) {
-                        actualHighest = y;
+                        highest = y;
                         break;
                     }
                 }
-                assertEquals(actualHighest, reportedHeight,
-                        "heightmap must match the real highest non-air block at (" + x + "," + z + ")");
+                assertEquals(highest, chunk.getColumnHeight(x, z), "engine heightmap at " + x + "," + z);
+            }
+        }
+        Set<BlockType> types = new HashSet<>();
+        for (int y = Chunk.MIN_Y; y <= Chunk.MAX_Y; y++) types.add(chunk.getLocal(8, y, 8));
+        assertTrue(types.contains(BlockType.DEEPSLATE) && types.contains(BlockType.STONE), "deepslate below stone: " + types);
+    }
+
+    @Test
+    void biomesAreSetWhenGeneratedAndRecomputedWhenLoadedFromDisk(@TempDir Path dir) {
+        World world = new World(42L, new VanillaChunkGenerator(42L));
+        world.setSaveDir(dir.toFile());
+        Chunk chunk = generate(world, -3, 7);
+        assertTrue(chunk.hasBiomes());
+        WorldIO.saveChunk(dir.toFile(), chunk);
+
+        World reloaded = new World(42L, new VanillaChunkGenerator(42L));
+        reloaded.setSaveDir(dir.toFile());
+        Chunk loaded = generate(reloaded, -3, 7);
+        assertTrue(loaded.hasBiomes());
+        assertArrayEquals(chunk.exportBlocks(), loaded.exportBlocks());
+        for (int qy = Chunk.MIN_Y >> 2; qy <= Chunk.MAX_Y >> 2; qy += 7) {
+            assertEquals(chunk.getNoiseBiome(-12, qy, 28), loaded.getNoiseBiome(-12, qy, 28));
+        }
+        for (int x = -48; x < -32; x += 5) {
+            assertEquals(world.getBiome(x, 64, 120), reloaded.getBiome(x, 64, 120));
+            assertTrue(world.getBiome(x, 64, 120).startsWith("minecraft:"));
+        }
+        for (int x = 0; x < Chunk.SIZE_X; x++) assertArrayEquals(chunk.getGrassTint(x, 3), loaded.getGrassTint(x, 3));
+    }
+
+    @Test
+    void theBiomeAtABlockDoesNotDependOnWhichChunksAreLoaded() {
+        World loaded = new World(9L, new VanillaChunkGenerator(9L));
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) generate(loaded, dx, dz);
+        }
+        World empty = new World(9L, new VanillaChunkGenerator(9L));
+        for (int x = -20; x < 36; x += 3) {
+            for (int z = -20; z < 36; z += 5) {
+                assertEquals(loaded.getBiome(x, 70, z), empty.getBiome(x, 70, z), x + "," + z);
             }
         }
     }
 
     @Test
-    void everyGeneratedColumnHasBedrockAtTheBottom() {
-        World world = new World(1234L, new TerrainGenerator(1234L));
-        Chunk chunk = world.getOrCreateChunk(5, 5);
-        world.generateChunk(chunk);
-        for (int x = 0; x < Chunk.SIZE_X; x++) {
-            for (int z = 0; z < Chunk.SIZE_Z; z++) {
-                assertEquals(BlockType.BEDROCK, chunk.getLocal(x, 0, z),
-                        "y=0 must always be bedrock at (" + x + "," + z + ")");
-            }
-        }
+    void theWorldSpawnStandsOnAFullBlockAndIsTheSameEveryTime() {
+        OverworldGenerator generator = new OverworldGenerator(VanillaChunkGenerator.DATA_ROOT, 4242L);
+        java.util.Map<Long, TerrainChunk> chunks = new java.util.HashMap<>();
+        OverworldSpawn.Chunks source = (cx, cz) -> chunks.computeIfAbsent(Chunk.key(cx, cz), k -> generator.generate(cx, cz));
+        OverworldSpawn.BlockPos spawn = OverworldSpawn.worldSpawn(generator, source);
+        assertEquals(spawn, OverworldSpawn.worldSpawn(generator, source));
+        assertNotNull(OverworldSpawn.levelRespawnPos(generator, source, spawn.x(), spawn.z()));
+        TerrainChunk chunk = source.get(spawn.x() >> 4, spawn.z() >> 4);
+        assertTrue(chunk.getState(spawn.x(), spawn.y() - 1, spawn.z()).id().startsWith("minecraft:"));
+        assertTrue(chunk.getState(spawn.x(), spawn.y(), spawn.z()).isAir(), "the spawn block is free");
+    }
+
+    @Test
+    void aMissingDataFolderIsAnErrorThatNamesTheRestoreScript(@TempDir Path dir) {
+        OverworldGenerator.MissingWorldgenDataException e = assertThrows(OverworldGenerator.MissingWorldgenDataException.class,
+                () -> new VanillaChunkGenerator(dir, 1L));
+        assertTrue(e.getMessage().contains(OverworldGenerator.RESTORE_HINT), e.getMessage());
     }
 }

@@ -1,7 +1,7 @@
 package com.example.worldgen.material.condition;
 
 import com.example.worldgen.material.MaterialRuleContext;
-import com.example.worldgen.material.VerticalAnchor;
+import com.example.worldgen.provider.VerticalAnchor;
 
 /**
  * Port of {@code net.minecraft.world.level.levelgen.material.condition.YCondition} (26.3, type {@code minecraft:y_above},

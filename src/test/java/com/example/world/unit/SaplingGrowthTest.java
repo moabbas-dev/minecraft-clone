@@ -18,9 +18,9 @@ class SaplingGrowthTest {
     private static final float FAR_PAST_ANY_DELAY = 100f;
 
     /** A flat all-grass chunk at y=70 with open air above - isolates growth/space-validation
-     *  logic from real terrain generation, same pattern TerrainGeneratorTreeTest already uses. */
+     *  logic from real terrain generation (the chunk is filled by hand, the generator is never run). */
     private World buildFlatWorld(long seed) {
-        World world = new World(seed, new TerrainGenerator(seed));
+        World world = new World(seed, new FlatWorldGenerator());
         Chunk chunk = world.getOrCreateChunk(0, 0);
         for (int x = 0; x < Chunk.SIZE_X; x++) {
             for (int z = 0; z < Chunk.SIZE_Z; z++) {
@@ -204,7 +204,7 @@ class SaplingGrowthTest {
 
     @Test
     void growthNearWorldHeightLimitFailsSafely() {
-        World world = new World(8L, new TerrainGenerator(8L));
+        World world = new World(8L, new FlatWorldGenerator());
         Chunk chunk = world.getOrCreateChunk(0, 0);
         for (int x = 0; x < Chunk.SIZE_X; x++) {
             for (int z = 0; z < Chunk.SIZE_Z; z++) {

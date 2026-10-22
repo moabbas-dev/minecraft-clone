@@ -44,6 +44,8 @@ public final class GameOptions {
     public boolean autoJump = false;
     /** 0..1: how much the sprint speed change widens the FOV (vanilla "FOV Effects"). */
     public float fovEffectScale = 1f;
+    /** Vanilla "Biome Blend" ({@code Options.biomeBlendRadius}: {@code IntRange(0, 7)}, default 2; key {@code biomeBlendRadius}). */
+    public int biomeBlendRadius = 2;
 
     public float masterVolume = 1f;
     public float musicVolume = 1f;
@@ -67,6 +69,7 @@ public final class GameOptions {
         maxFps = Math.max(10, Math.min(UNLIMITED_FPS, maxFps));
         attackIndicator = Math.max(0, Math.min(2, attackIndicator));
         fovEffectScale = c01(fovEffectScale);
+        biomeBlendRadius = Math.max(0, Math.min(7, biomeBlendRadius));
         masterVolume = c01(masterVolume);
         musicVolume = c01(musicVolume);
         recordVolume = c01(recordVolume);
@@ -126,6 +129,7 @@ public final class GameOptions {
         m.put("guiScale", Integer.toString(guiScale));
         m.put("maxFps", Integer.toString(maxFps));
         m.put("attackIndicator", Integer.toString(attackIndicator));
+        m.put("biomeBlendRadius", Integer.toString(biomeBlendRadius));
         m.put("soundCategory_master", Float.toString(masterVolume));
         m.put("soundCategory_music", Float.toString(musicVolume));
         m.put("soundCategory_record", Float.toString(recordVolume));
@@ -206,6 +210,7 @@ public final class GameOptions {
         o.toggleCrouch = b(m, "toggleCrouch", o.toggleCrouch);
         o.autoJump = b(m, "autoJump", o.autoJump);
         o.fovEffectScale = f(m, "fovEffectScale", o.fovEffectScale);
+        o.biomeBlendRadius = i(m, "biomeBlendRadius", o.biomeBlendRadius);
         o.masterVolume = f(m, "soundCategory_master", o.masterVolume);
         o.musicVolume = f(m, "soundCategory_music", o.musicVolume);
         o.recordVolume = f(m, "soundCategory_record", o.recordVolume);

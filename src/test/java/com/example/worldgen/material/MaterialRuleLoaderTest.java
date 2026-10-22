@@ -11,6 +11,7 @@ import com.example.worldgen.material.rule.BlockRule;
 import com.example.worldgen.material.rule.MaterialRule;
 import com.example.worldgen.material.rule.OreVeinRule;
 import com.example.worldgen.material.rule.SequenceRule;
+import com.example.worldgen.provider.VerticalAnchor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 

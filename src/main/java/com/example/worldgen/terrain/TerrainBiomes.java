@@ -37,13 +37,23 @@ public final class TerrainBiomes {
     }
 
     public static void doCreateBiomes(RandomState randomState, MultiNoiseBiomeSource source, TerrainChunk chunk) {
+        chunk.setQuartBiomes(createBiomeTable(randomState, source, chunk.chunkX(), chunk.chunkZ(), chunk.minY(), chunk.height()));
+    }
+
+    /**
+     * What {@link #doCreateBiomes} stores in a chunk at {@code (chunkX, chunkZ)} over {@code [minY, minY + height)}, as a
+     * quart biome table ({@link TerrainChunk#quartBiomesFromNoise} layout): lets the BIOMES status of a neighbouring chunk be
+     * computed (and cached) without building that chunk.
+     */
+    public static String[] createBiomeTable(RandomState randomState, MultiNoiseBiomeSource source, int chunkX, int chunkZ,
+                                            int minY, int height) {
         DensityBufferPool bufferPool = randomState.acquireDensityBufferPool();
         try {
             SamplerContext context = SamplerContext.builder().enableCaches().useBufferArena(bufferPool).build();
             DensitySamplerSet samplers = randomState.samplersWithContext(context);
-            BiomeResolver resolver = createResolverForChunk(source, randomState.router(), samplers, chunk.minBlockX() >> 2,
-                    chunk.minY() >> 2, chunk.minBlockZ() >> 2, 16 >> 2, chunk.height() >> 2, 16 >> 2);
-            chunk.fillBiomesFromNoise(resolver);
+            BiomeResolver resolver = createResolverForChunk(source, randomState.router(), samplers, (chunkX * 16) >> 2,
+                    minY >> 2, (chunkZ * 16) >> 2, 16 >> 2, height >> 2, 16 >> 2);
+            return TerrainChunk.quartBiomesFromNoise(resolver, chunkX, chunkZ, minY, height);
         } finally {
             randomState.releaseDensityBufferPool(bufferPool);
         }

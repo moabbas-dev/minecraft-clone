@@ -33,9 +33,8 @@ public class Chunk {
     /** Per column, the y of the highest block that dampens light ({@code MIN_Y - 1} for none): every cell above it is a sky light source. */
     private final int[] skyBlocker = new int[SIZE_X * SIZE_Z];
 
-    // Per-column grass/foliage tint (RGB), computed once by the world generator - either right
-    // after generating fresh terrain or right after loading saved blocks from disk, never
-    // per-frame or per-vertex. ChunkMeshBuilder reads these when baking grass-top/leaf faces.
+    // Per-column grass/foliage tint (RGB), computed by the world generator once the chunk's blocks exist (generated or
+    // loaded from disk), never per-frame or per-vertex. ChunkMeshBuilder reads these when baking grass-top/leaf faces.
     private final float[] grassTint = new float[SIZE_X * SIZE_Z * 3];
     private final float[] foliageTint = new float[SIZE_X * SIZE_Z * 3];
     /** Same idea as grassTint/foliageTint, but for water faces - see ChunkMeshBuilder. */
@@ -105,6 +104,29 @@ public class Chunk {
     public float[] getFoliageTint(int x, int z) {
         int i = (z * SIZE_X + x) * 3;
         return new float[]{foliageTint[i], foliageTint[i + 1], foliageTint[i + 2]};
+    }
+
+    /**
+     * The chunk's vanilla biomes, one id per quart cell (4 x 4 x 4 blocks), laid out {@code (quartYFromBottom * 4 + quartZ) * 4
+     * + quartX} like the BIOMES status stores them; null for a generator without biomes (flat). Not saved: the generator
+     * recomputes them from the seed when the chunk is loaded.
+     */
+    private String[] quartBiomes;
+
+    public void setQuartBiomes(String[] table) {
+        if (table != null && table.length != 16 * (SIZE_Y >> 2)) throw new IllegalArgumentException("biome table of " + table.length + " cells");
+        this.quartBiomes = table;
+    }
+
+    public boolean hasBiomes() {
+        return quartBiomes != null;
+    }
+
+    /** {@code ChunkAccess.getNoiseBiome(quartX, quartY, quartZ)}: quart Y clamped into the chunk, x and z taken {@code & 3}. */
+    public String getNoiseBiome(int quartX, int quartY, int quartZ) {
+        int quartMinY = MIN_Y >> 2;
+        int clamped = Math.max(quartMinY, Math.min(quartMinY + (SIZE_Y >> 2) - 1, quartY));
+        return quartBiomes[((clamped - quartMinY) * 4 + (quartZ & 3)) * 4 + (quartX & 3)];
     }
 
     public void setWaterTint(int x, int z, float r, float g, float b) {

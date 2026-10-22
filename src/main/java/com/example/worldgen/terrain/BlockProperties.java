@@ -57,6 +57,44 @@ public final class BlockProperties {
     public static final StateRef WATER = register("minecraft:water", false, Fluid.WATER, "level", "0");
     public static final StateRef LAVA = register("minecraft:lava", false, Fluid.LAVA, "level", "0");
 
+    // The blocks the overworld material rules (data/minecraft/worldgen/material_rule/**: result_state, ore_block,
+    // raw_ore_block, filler_block) and MaterialSystem's own constants (terracotta bands, packed_ice, snow_block) write.
+    // None holds a fluid (no LiquidBlock, no waterlogged property). Blocks.<clinit>: plain Block / ColoredFallingBlock /
+    // IceBlock / MudBlock / PowderSnowBlock without state properties, except: GRASS_BLOCK (GrassBlock), MYCELIUM
+    // (MyceliumBlock) and PODZOL (SnowyBlock) carry SnowyBlock.SNOWY, default false; DEEPSLATE is a RotatedPillarBlock,
+    // AXIS default y.
+    public static final StateRef GRASS_BLOCK = register("minecraft:grass_block", false, Fluid.NONE, "snowy", "false");
+    public static final StateRef MYCELIUM = register("minecraft:mycelium", false, Fluid.NONE, "snowy", "false");
+    public static final StateRef PODZOL = register("minecraft:podzol", false, Fluid.NONE, "snowy", "false");
+    public static final StateRef DEEPSLATE = register("minecraft:deepslate", false, Fluid.NONE, "axis", "y");
+    public static final StateRef DIRT = register("minecraft:dirt", false, Fluid.NONE);
+
+    static {
+        for (String id : new String[]{"bedrock", "calcite", "cinnabar", "coarse_dirt", "copper_ore", "deepslate_iron_ore",
+                "granite", "gravel", "ice", "mud", "packed_ice", "powder_snow", "raw_copper_block", "raw_iron_block", "red_sand",
+                "red_sandstone", "sand", "sandstone", "snow_block", "sulfur", "tuff", "terracotta", "white_terracotta",
+                "orange_terracotta", "yellow_terracotta", "brown_terracotta", "red_terracotta", "light_gray_terracotta"}) {
+            register("minecraft:" + id, false, Fluid.NONE);
+        }
+    }
+
+    // Blocks the ported features (worldgen/feature: ore, disk, spring_feature, underwater_magma) write and that are not
+    // registered above. Blocks.<clinit> (javap): COAL/IRON/GOLD/LAPIS/DIAMOND/EMERALD_ORE, their DEEPSLATE_ variants and
+    // DEEPSLATE_COPPER_ORE are lambdas p -> new DropExperienceBlock(...) (no state properties); CLAY, ANDESITE, DIORITE
+    // are plain Block; INFESTED_STONE is InfestedBlock (no properties); MAGMA_BLOCK is MagmaBlock (no properties);
+    // REDSTONE_ORE and DEEPSLATE_REDSTONE_ORE are RedStoneOreBlock (constructor: LIT default false);
+    // INFESTED_DEEPSLATE is InfestedRotatedPillarBlock (constructor: RotatedPillarBlock.AXIS default y).
+    static {
+        for (String id : new String[]{"coal_ore", "deepslate_coal_ore", "iron_ore", "gold_ore", "deepslate_gold_ore",
+                "lapis_ore", "deepslate_lapis_ore", "diamond_ore", "deepslate_diamond_ore", "emerald_ore", "deepslate_emerald_ore",
+                "deepslate_copper_ore", "clay", "andesite", "diorite", "infested_stone", "magma_block"}) {
+            register("minecraft:" + id, false, Fluid.NONE);
+        }
+        register("minecraft:redstone_ore", false, Fluid.NONE, "lit", "false");
+        register("minecraft:deepslate_redstone_ore", false, Fluid.NONE, "lit", "false");
+        register("minecraft:infested_deepslate", false, Fluid.NONE, "axis", "y");
+    }
+
     private BlockProperties() {
     }
 

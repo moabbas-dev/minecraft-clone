@@ -4,7 +4,7 @@ What the game expects on disk and where it loads it from. Derived from the sourc
 `scripts/restore-assets.py` re-derives the same lists from the source every time it runs.
 
 All paths are **relative to the working directory**, which is the repository root (the game is started with `mvn exec:java` from there).
-None of these files are committed: `textures/`, `texts/`, `sounds/`, `minecraft-sounds/` and `options.txt` are in `.gitignore`.
+None of these files are committed: `textures/`, `texts/`, `sounds/`, `minecraft-sounds/`, `data/` and `options.txt` are in `.gitignore`.
 
 ## Folder layout
 
@@ -36,7 +36,8 @@ None of these files are committed: `textures/`, `texts/`, `sounds/`, `minecraft-
 | `textures/environment/celestial/moon/<phase>.png` (eight phases) | `game/Game.renderSunAndMoon` | no | no moon |
 | `textures/item/leather_<piece>_overlay.png` | `engine/TextureAtlas.dyeLeather` | no | the leather icon without its overlay |
 | `textures/entity/chest/normal.png` | `engine/TextureAtlas.chestFace` | no | "missing texture" chest faces |
-| `textures/colormap/{grass,foliage}.png` | `world/TerrainGenerator` -> `world/Colormap` | no | fixed fallback tint |
+| `textures/colormap/{grass,foliage}.png` | `world/VanillaChunkGenerator.computeTint` (vanilla `GrassColor`/`FoliageColor` pixels) | **yes** for regular worlds | generating a regular world fails with a message naming the file (no stand-in tint) |
+| `data/minecraft/**` (worldgen: `noise_settings`, `density_function`, `noise`, `material_rule`, `material_condition`, `carver`, `biome`, `tags/block`, ...) | `worldgen/chunk/OverworldGenerator` via `world/VanillaChunkGenerator` | **yes** for regular worlds (flat worlds do not need it) | creating or loading a regular world throws `MissingWorldgenDataException` telling to run `python scripts/restore-worldgen-data.py` (it extracts `data/` from the 26.3 client jar); there is no fallback generator. `data/` is gitignored |
 | `textures/entity/**` | `game/Game` -> `engine/EntityTexture.load(path, w, h, fallbackRGB)` | no | flat colored placeholder skin |
 | `sounds/**.ogg` | `audio/SoundRegistry` (`SOUNDS_ROOT = new File("sounds")`) -> `audio/SoundBuffer` | no | variation dropped; a group with none is silent (one warning) |
 | `options.txt` | `ui/GameOptions` (`DEFAULT_FILE = new File("options.txt")`), `ui/KeyBindings` | no | all defaults |
@@ -58,6 +59,7 @@ Expected layout is the **Java Edition resource-pack layout** (`assets/minecraft/
 | `guiScale` | 0 | 0 Auto, 1-4 |
 | `fov` | 0.0 (stored; = 70 deg) | degrees = 70 + 40 x stored, clamped 30-110 |
 | `renderDistance` | 6 | 2-16 (vanilla default is 12; code default is 6) |
+| `biomeBlendRadius` | 2 | 0-7 (vanilla `Options.biomeBlendRadius`, default 2): the grass/foliage/water tint box radius; read when a world is created, loaded or the options are applied (already tinted chunks keep their tint) |
 | `bobView` | true |  |
 | `enableVsync` | true |  |
 | `fullscreen` | false |  |
@@ -108,7 +110,7 @@ Key bindings (`key_<id>` -> vanilla key name; default in brackets):
 - `key_key.hotbar.8:key.keyboard.8`
 - `key_key.hotbar.9:key.keyboard.9`
 
-Not read by the game (documented in `docs/research/options-and-screens.md` but have no field): `entityShadows`, `discrete_mouse_scroll`, `showSubtitles`, `directionalAudio`, `screenEffectScale`, `simulationDistance`, `entityDistanceScaling`, `particles`, `graphicsMode`, `ao`, `renderClouds`, `biomeBlendRadius`, `mipmapLevels`, chat/playerlist/command/perspective/swapOffhand key binds.
+Not read by the game (documented in `docs/research/options-and-screens.md` but have no field): `entityShadows`, `discrete_mouse_scroll`, `showSubtitles`, `directionalAudio`, `screenEffectScale`, `simulationDistance`, `entityDistanceScaling`, `particles`, `graphicsMode`, `ao`, `renderClouds`, `mipmapLevels`, chat/playerlist/command/perspective/swapOffhand key binds.
 
 ## Textures (187 files)
 

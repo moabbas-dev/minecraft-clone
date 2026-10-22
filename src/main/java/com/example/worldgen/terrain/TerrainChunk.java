@@ -3,6 +3,7 @@ package com.example.worldgen.terrain;
 import com.example.worldgen.Mth;
 import com.example.worldgen.level.GenChunk;
 import com.example.worldgen.level.StateRef;
+import com.example.worldgen.material.FluidPostProcessing;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -34,7 +35,7 @@ import java.util.Set;
  *     {@code ChunkAccess.getNoiseBiome} (quart Y clamped into the chunk).</li>
  * </ul>
  */
-public final class TerrainChunk implements GenChunk {
+public final class TerrainChunk implements GenChunk, FluidPostProcessing {
 
     /** {@code ChunkStatus} of 26.3 in order, with {@code heightmapsAfter()}. */
     public enum Status {
@@ -168,8 +169,14 @@ public final class TerrainChunk implements GenChunk {
         return idx;
     }
 
-    StateRef paletteState(int index) {
+    /** The state of a palette index ({@link #paletteIndexLocal}). */
+    public StateRef paletteState(int index) {
         return palette.get(index);
+    }
+
+    /** Number of distinct states written so far (palette indices are {@code 0 .. paletteSize() - 1}; 0 is air). */
+    public int paletteSize() {
+        return palette.size();
     }
 
     boolean opaque(HeightmapType type, int paletteIdx) {
@@ -187,7 +194,7 @@ public final class TerrainChunk implements GenChunk {
     }
 
     /** Palette index of what {@code ProtoChunk.getBlockState} returns inside the build height (local x, z). */
-    int paletteIndexLocal(int lx, int y, int lz) {
+    public int paletteIndexLocal(int lx, int y, int lz) {
         if (nonEmptyBlockCount[getSectionIndex(y)] == 0) return AIR_INDEX;
         return blocks[index(lx, y, lz)];
     }
@@ -270,6 +277,7 @@ public final class TerrainChunk implements GenChunk {
     // ------------------------------------------------------------------ post-processing
 
     /** {@code ProtoChunk.markPosForPostProcessing(pos)}. */
+    @Override
     public void markPosForPostProcessing(int x, int y, int z) {
         if (isOutsideBuildHeight(y)) return;
         int s = getSectionIndex(y);
@@ -299,8 +307,17 @@ public final class TerrainChunk implements GenChunk {
 
     /** {@code ChunkAccess.fillBiomesFromNoise}: sections bottom-up, then x, y, z in the section ({@code LevelChunkSection}). */
     public void fillBiomesFromNoise(BiomeResolver resolver) {
-        int quartMinX = minBlockX() >> 2;
-        int quartMinZ = minBlockZ() >> 2;
+        setQuartBiomes(quartBiomesFromNoise(resolver, chunkX, chunkZ, minY, height));
+    }
+
+    /**
+     * The quart biome table {@link #fillBiomesFromNoise} stores, without a chunk: the resolver is queried in the same order
+     * (sections bottom-up, then x, y, z), the result is indexed {@code (quartYFromBottom * 4 + quartZ) * 4 + quartX}.
+     */
+    public static String[] quartBiomesFromNoise(BiomeResolver resolver, int chunkX, int chunkZ, int minY, int height) {
+        String[] table = new String[16 * (height >> 2)];
+        int quartMinX = (chunkX * 16) >> 2;
+        int quartMinZ = (chunkZ * 16) >> 2;
         int minSection = minY >> 4;
         int maxSection = (minY + height - 1) >> 4;
         for (int sectionY = minSection; sectionY <= maxSection; ++sectionY) {
@@ -310,11 +327,29 @@ public final class TerrainChunk implements GenChunk {
                     for (int z = 0; z < 4; ++z) {
                         String biome = resolver.getNoiseBiome(quartMinX + x, quartMinY + y, quartMinZ + z);
                         int qy = (sectionY - minSection) * 4 + y;
-                        biomes[(qy * 4 + z) * 4 + x] = biomeIndexOf(biome);
+                        table[(qy * 4 + z) * 4 + x] = biome;
                     }
                 }
             }
         }
+        return table;
+    }
+
+    /** Stores a quart biome table laid out as {@link #quartBiomesFromNoise} returns it. */
+    public void setQuartBiomes(String[] table) {
+        if (table.length != biomes.length) throw new IllegalArgumentException("biome table of " + table.length + " cells, expected " + biomes.length);
+        for (int i = 0; i < table.length; i++) {
+            biomes[i] = biomeIndexOf(table[i]);
+        }
+    }
+
+    /** A copy of the quart biome table, laid out as {@link #quartBiomesFromNoise} returns it. */
+    public String[] quartBiomes() {
+        String[] table = new String[biomes.length];
+        for (int i = 0; i < table.length; i++) {
+            table[i] = biomePalette.get(biomes[i]);
+        }
+        return table;
     }
 
     private short biomeIndexOf(String biome) {

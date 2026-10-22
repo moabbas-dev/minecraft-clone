@@ -33,15 +33,12 @@ public class ChunkMeshBuilder {
     private static final float SHADE_EAST_WEST = 0.6f;
     /** No-op tint multiplier for every face except grass-top/leaves - reused to avoid allocating per face. */
     private static final float[] NEUTRAL_TINT = {1f, 1f, 1f};
-    /** Real vanilla spruce foliage is a fixed color, not colormap-sampled like oak/birch/jungle/
-     *  acacia - a genuine, long-standing vanilla special case (see TreeSpecies), not an invented one. */
-    private static final float[] SPRUCE_TINT = {0.38f, 0.50f, 0.38f};
-    /** Real vanilla cherry foliage is also a fixed color (pink), not colormap-sampled - same
-     *  special case as spruce, and the request's own explicit requirement ("do not incorrectly
-     *  replace cherry pink foliage with a generic biome color"). Adapted/artistic approximation
-     *  of cherry blossom pink - not independently verified against vanilla's exact source value
-     *  this session, same honesty convention as every other adapted color in this codebase. */
-    private static final float[] CHERRY_TINT = {0.97f, 0.75f, 0.84f};
+    /** {@code BlockColors.createDefault}: spruce leaves {@code BlockTintSources.constant(-10380959)} ({@code FoliageColor.FOLIAGE_EVERGREEN}, 0x619961). */
+    private static final float[] SPRUCE_TINT = unpackHex(0x619961);
+    /** {@code BlockColors.createDefault}: birch leaves {@code BlockTintSources.constant(-8345771)} ({@code FoliageColor.FOLIAGE_BIRCH}, 0x80A755). */
+    private static final float[] BIRCH_TINT = unpackHex(0x80A755);
+    /** Cherry leaves have no tint source in {@code BlockColors.createDefault}: the texture's own pink is drawn untinted. */
+    private static final float[] CHERRY_TINT = NEUTRAL_TINT;
     /** Slightly under a full block, matching a real young sapling's actual visual scale. */
     private static final float CROSS_PLANT_HEIGHT = 0.8f;
     /** Per-vertex wind-displacement weight for leaf faces (0=rigid, 1=full sway) - this project's
@@ -59,7 +56,8 @@ public class ChunkMeshBuilder {
     }
 
     private static boolean isBiomeTintedLeaves(BlockType type) {
-        return type == BlockType.OAK_LEAVES || type == BlockType.BIRCH_LEAVES
+        // BlockColors.createDefault: BlockTintSources.foliage() for oak, jungle, acacia, dark oak, vine, mangrove leaves
+        return type == BlockType.OAK_LEAVES
                 || type == BlockType.JUNGLE_LEAVES || type == BlockType.ACACIA_LEAVES
                 || type == BlockType.MANGROVE_LEAVES || type == BlockType.DARK_OAK_LEAVES;
     }
@@ -71,6 +69,7 @@ public class ChunkMeshBuilder {
     public static float[] leafIconTint(BlockType type) {
         if (type == BlockType.SPRUCE_LEAVES) return SPRUCE_TINT;
         if (type == BlockType.CHERRY_LEAVES) return CHERRY_TINT;
+        if (type == BlockType.BIRCH_LEAVES) return BIRCH_TINT;
         if (isBiomeTintedLeaves(type)) return DEFAULT_FOLIAGE_TINT;
         return null;
     }
@@ -84,7 +83,8 @@ public class ChunkMeshBuilder {
      *  spruce/cherry's fixed tint) applies to it - package-private so
      *  ChunkMeshBuilderFaceCullingTest-style pure-logic tests can exercise it directly. */
     static boolean isAnyLeaves(BlockType type) {
-        return isBiomeTintedLeaves(type) || type == BlockType.SPRUCE_LEAVES || type == BlockType.CHERRY_LEAVES;
+        return isBiomeTintedLeaves(type) || type == BlockType.SPRUCE_LEAVES || type == BlockType.CHERRY_LEAVES
+                || type == BlockType.BIRCH_LEAVES;
     }
 
     /** Wind-displacement weight for a cube-face block - LEAF_WIND_WEIGHT for any of the 8 leaf
@@ -155,17 +155,16 @@ public class ChunkMeshBuilder {
                     // Leaves are tinted on every face; grass only on its top face (the side/bottom
                     // textures are real, already-colored images - see TextureAtlas); water is
                     // tinted on every face, same as leaves, from the biome-blended color baked
-                    // per column in TerrainGenerator.computeTint (see Chunk.waterTint). Spruce is
-                    // the one species that does NOT use the biome-blended tint - see SPRUCE_TINT.
+                    // per column by the generator's computeTint (see Chunk.waterTint). Spruce and birch
+                    // leaves use vanilla's constant tints, cherry leaves none (see SPRUCE_TINT/BIRCH_TINT/CHERRY_TINT).
                     // Looked up once per block, not per face; everything else reuses NEUTRAL_TINT.
                     boolean isBiomeTintedLeaves = isBiomeTintedLeaves(type);
-                    boolean isSpruceLeaves = type == BlockType.SPRUCE_LEAVES;
-                    boolean isCherryLeaves = type == BlockType.CHERRY_LEAVES;
+                    boolean isFixedTintLeaves = type == BlockType.SPRUCE_LEAVES || type == BlockType.CHERRY_LEAVES
+                            || type == BlockType.BIRCH_LEAVES;
                     float[] sideTint = isBiomeTintedLeaves ? chunk.getFoliageTint(lx, lz)
-                            : isSpruceLeaves ? SPRUCE_TINT
-                            : isCherryLeaves ? CHERRY_TINT
+                            : isFixedTintLeaves ? leafIconTint(type)
                             : NEUTRAL_TINT;
-                    float[] topTint = isBiomeTintedLeaves || isSpruceLeaves || isCherryLeaves ? sideTint
+                    float[] topTint = isBiomeTintedLeaves || isFixedTintLeaves ? sideTint
                             : type == BlockType.GRASS_BLOCK ? chunk.getGrassTint(lx, lz) : NEUTRAL_TINT;
                     float windWeight = windWeightFor(type);
                     // Grass: the side's tintable fringe overlay (biome-colored, same tint as the top face).

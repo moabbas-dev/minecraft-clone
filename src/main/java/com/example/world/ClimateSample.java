@@ -3,7 +3,7 @@ package com.example.world;
 /**
  * A snapshot of the climate-*selection* axes at one world column plus the resulting biome
  * blend, for the debug overlay AND for the per-frame atmosphere colors in
- * {@code Game.renderWorld} - one call to {@link TerrainGenerator#climateAt} at the player's
+ * {@code Game.renderWorld} - one call to {@code WorldGenerator.climateAt} (null for every current generator: flat and vanilla 26.3) at the player's
  * position gives both, avoiding a second climate/weight computation for fog specifically.
  * {@code grassColor}/{@code foliageColor}/{@code waterColor}/{@code fogColor}/
  * {@code underwaterFogColor} are the already-blended sRGB tints (see {@link BiomeColors}) - not
