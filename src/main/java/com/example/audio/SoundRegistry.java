@@ -18,7 +18,7 @@ import java.util.Map;
  * A missing/corrupt file for one variation just drops that variation; a sound ID with zero
  * loadable variations is reported once (warn-level) and every future play() for it is a silent
  * no-op - never a crash, matching this project's established "missing asset -> safe fallback,
- * not a crash" convention (see Colormap/TextureAtlas).
+ * not a crash" convention (see TextureAtlas).
  */
 @Slf4j
 public class SoundRegistry {

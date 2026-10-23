@@ -6,7 +6,7 @@ import java.util.Set;
  * The reusable mapping between a plantable sapling and the tree it grows into - one entry per
  * species today (OAK only, per this round's explicit scope), extensible later by adding another
  * entry with its own 4 stage blocks, {@link TreeSpecies}, and valid-ground set, the same way
- * {@link TreeSpecies} and {@link Biome} already grow by adding enum entries in this codebase.
+ * {@link TreeSpecies} already grows by adding enum entries in this codebase.
  */
 public enum SaplingSpecies {
     OAK(BlockType.OAK_SAPLING_STAGE_0, BlockType.OAK_SAPLING_STAGE_1,

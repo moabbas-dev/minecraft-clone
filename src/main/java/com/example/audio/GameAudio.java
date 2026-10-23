@@ -76,11 +76,12 @@ public class GameAudio {
     /** Called once per in-game frame. Syncs the listener, then drives footsteps, cave ambience,
      *  and weather (rain loop + thunder) from real state - see each private method's own docs
      *  for the exact trigger condition and why. */
-    public void update(float dt, Player player, World world, Weather weather) {
+    /** @param rainNearby whether rain (not snow, not a dry biome) falls on a surface near the camera this tick */
+    public void update(float dt, Player player, World world, Weather weather, boolean rainNearby) {
         engine.setListener(player.eyePosition(), player.frontVector(), new Vector3f(0, 1, 0));
         updateFootsteps(dt, player, world);
         updateCaveAmbience(dt, player, world);
-        updateWeather(weather);
+        updateWeather(weather, rainNearby);
     }
 
     private void updateFootsteps(float dt, Player player, World world) {
@@ -211,10 +212,12 @@ public class GameAudio {
         engine.playOneShot(registry.definitionOf("ambient.cave"), registry.buffersFor("ambient.cave"), pos);
     }
 
-    private void updateWeather(Weather weather) {
+    private void updateWeather(Weather weather, boolean rainNearby) {
         if (weather == null) return;
 
-        if (weather.isRaining()) {
+        // ClientLevel.tickWeatherEffects plays rain sounds only at a position whose precipitation is RAIN (no sound in snow or in
+        // biomes without precipitation); the looped clip itself is this engine's stand-in for vanilla's one-shot weather.rain.
+        if (weather.isRaining() && rainNearby) {
             if (!engine.isRainLoopActive()) {
                 SoundBuffer[] variations = registry.buffersFor("ambient.rain");
                 if (variations.length > 0) {

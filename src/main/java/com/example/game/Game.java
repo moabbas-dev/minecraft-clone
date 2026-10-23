@@ -94,9 +94,6 @@ public class Game implements GameAccess {
     // Underwater fog (WaterFogEnvironment): from -8 to 96 blocks times max(0.25, water vision), the water vision growing with the time
     // spent underwater (LocalPlayer.getWaterVision); the default water fog colour is #050533. The fog switches at once when
     // the camera crosses the water plane, as in vanilla.
-    private static final float UNDERWATER_FOG_START = -8f;
-    private static final float UNDERWATER_FOG_END = 96f;
-    private static final Vector3f DEFAULT_UNDERWATER_FOG = new Vector3f(5 / 255f, 5 / 255f, 0x33 / 255f);
     /** Global wind-sway multiplier (see Shaders.CHUNK_VERTEX) - the one debug/tuning knob for
      *  this feature: set to 0f to disable wind entirely with no other code changes, per the
      *  request's own "simple configuration constant is acceptable" guidance. This project's own
@@ -140,6 +137,8 @@ public class Game implements GameAccess {
      *  accumulator below, completely independent of whether cookingMenu is open. */
     private CookingStationManager cookingStations = new CookingStationManager();
     private float tickAccumulator = 0f;
+    /** The camera's environment attribute probe (biome sky, fog and water fog), ticked at 20 Hz. */
+    private final AtmosphereProbe atmosphereProbe = new AtmosphereProbe();
     /** Real vanilla's own rate - 20 simulated ticks per second, independent of render FPS (see
      *  updateInGame's accumulator loop and CookingStationManager/CookingStationState). */
     private static final float TICK_SECONDS = 1f / 20f;
@@ -753,6 +752,7 @@ public class Game implements GameAccess {
         critParticles.clear();
         damageParticles.clear();
         rainSplashes.clear();
+        atmosphereProbe.reset();
         shownHeld = inventory.selected().isEmpty() ? null : inventory.selected().type();
         equipRaised = 0f; // the hand rises when the world opens, like a freshly equipped item
         shownOffhand = inventory.getOffhand().isEmpty() ? null : inventory.getOffhand().type();
@@ -938,7 +938,7 @@ public class Game implements GameAccess {
         saplingGrowth.update(world, dt);
         tickCookingStations(dt);
         windTime += dt;
-        gameAudio.update(dt, player, world, weather);
+        gameAudio.update(dt, player, world, weather, rainSplashes.rainPositionFound());
 
         updateHotbarSelection();
         if (hotbarLabelTimer > 0f) hotbarLabelTimer = Math.max(0f, hotbarLabelTimer - dt);
@@ -1809,6 +1809,8 @@ public class Game implements GameAccess {
         while (tickAccumulator >= TICK_SECONDS) {
             tickAccumulator -= TICK_SECONDS;
             lightFlicker = LightmapColors.nextFlicker(lightFlicker, lightFlickerRandom);
+            Vector3f probeAt = player.eyePosition();
+            atmosphereProbe.tick(world, probeAt.x, probeAt.y, probeAt.z); // Camera.tick -> EnvironmentAttributeProbe.tick
             cookingStations.tickAll(world);
             world.fluids().tick(world);
             if (player.isInLava() && survival.getHealth().isAlive()) {
@@ -1819,7 +1821,8 @@ public class Game implements GameAccess {
             if (survival.isBurning()) {
                 int fx = (int) Math.floor(player.position.x), fz = (int) Math.floor(player.position.z);
                 int fy = (int) Math.floor(player.position.y + 0.3f), hy = (int) Math.floor(player.eyePosition().y);
-                if (world.getBlock(fx, fy, fz).isWater() || (weather.isRaining() && world.getSkyLight(fx, hy, fz) >= 15)) survival.extinguish();
+                if (world.getBlock(fx, fy, fz).isWater() || (weather.isRaining() && world.getSkyLight(fx, hy, fz) >= 15
+                        && world.getPrecipitationAt(fx, hy, fz) == com.example.worldgen.biome.BiomeDefinition.Precipitation.RAIN)) survival.extinguish();
             }
             com.example.world.RandomTicks.tick(world, gameplayRandom, World.worldToChunk((int) Math.floor(player.position.x)),
                     World.worldToChunk((int) Math.floor(player.position.z)), RANDOM_TICK_RADIUS_CHUNKS,
@@ -2024,7 +2027,17 @@ public class Game implements GameAccess {
         particles.update(dt);
         critParticles.update(dt);
         damageParticles.update(dt);
-        rainSplashes.update(dt, weather.getStormIntensity(), player.renderEyePosition(), (sx, sz) -> world.getColumnHeightAt(sx, sz) + 1);
+        rainSplashes.update(dt, weather.getStormIntensity(), player.renderEyePosition(), new com.example.fx.RainSplashes.Surface() {
+            @Override
+            public int topY(int x, int z) {
+                return world.getColumnHeightAt(x, z) + 1;
+            }
+
+            @Override
+            public boolean rainsAt(int x, int y, int z) {
+                return world.getPrecipitationAt(x, y, z) == com.example.worldgen.biome.BiomeDefinition.Precipitation.RAIN;
+            }
+        });
     }
 
     /** Cached per-block-type UVs/tints for dropped items and particles (built once, on first use). */
@@ -2123,11 +2136,10 @@ public class Game implements GameAccess {
         float thunder = weather.isThundering() ? rain : 0f;
         Vector3f sunDir = sunDirection(dayTime);
 
-        // One climate sample per frame at the player's column. Null for generators with no climate model (flat worlds), which then
-        // use the overworld's own sky colour #78a7ff and fog colour #c0d8ff.
-        ClimateSample climate = world.climateAt((int) Math.floor(player.position.x), (int) Math.floor(player.position.z));
-        float[] biomeSky = climate != null ? climate.skyTint() : SkyColors.rgb(0x78A7FF);
-        float[] biomeFog = climate != null ? climate.fogColor() : SkyColors.rgb(SkyColors.OVERWORLD_FOG);
+        // The biome atmosphere attributes the camera's probe blended around the camera on the last two ticks (BiomeAttributes).
+        BiomeAttributes.Values atmosphere = atmosphereProbe.get(Math.min(1f, tickAccumulator / TICK_SECONDS));
+        float[] biomeSky = atmosphere.sky();
+        float[] biomeFog = atmosphere.fog();
 
         // The sky, fog, cloud and sunrise colours as the 26.3 client computes them (see SkyColors).
         Vector3f skyColor = SkyColors.sky(biomeSky, tick, rain, thunder, weather.isSkyFlashing());
@@ -2137,8 +2149,7 @@ public class Game implements GameAccess {
                 player.frontVector().x, renderDistance, rain, thunder);
 
         // Underwater fog: the biome's water fog colour, brightened by the water vision, from -8 to 96 x max(0.25, vision) blocks.
-        Vector3f underwaterFogColor = climate != null
-                ? new Vector3f(climate.underwaterFogColor()) : new Vector3f(DEFAULT_UNDERWATER_FOG);
+        Vector3f underwaterFogColor = new Vector3f(atmosphere.waterFog()[0], atmosphere.waterFog()[1], atmosphere.waterFog()[2]);
         boolean submerged = isEyeSubmerged();
         waterVisionSeconds = submerged ? waterVisionSeconds + dt : 0f;
         float vision = waterVision(waterVisionSeconds * 20f, submerged);
@@ -2149,29 +2160,22 @@ public class Game implements GameAccess {
         // rain adds a second, environmental fog from -160 to 768 blocks (strength eased, thinner without sky light or precipitation).
         float surfaceFogEnd = renderDistanceBlocks;
         float surfaceFogStart = surfaceFogEnd - Math.max(4f, Math.min(64f, surfaceFogEnd / 10f));
-        float eyeSky = world.getSkyLight((int) Math.floor(player.position.x), (int) Math.floor(player.eyePosition().y), (int) Math.floor(player.position.z));
-        boolean noPrecipitation = climate != null && (climate.dominant() == com.example.world.Biome.DESERT
-                || climate.dominant() == com.example.world.Biome.SAVANNA || climate.dominant() == com.example.world.Biome.BADLANDS);
-        float rainFogTarget = rain * Math.max(0f, Math.min(1f, (eyeSky - 8f) / 7f)) * (noPrecipitation ? 0.5f : 1f);
+        // updateRainFogState: at the camera's block, the sky light and whether the biome there has precipitation at all.
+        Vector3f camBlock = player.eyePosition();
+        int camBx = (int) Math.floor(camBlock.x), camBy = (int) Math.floor(camBlock.y), camBz = (int) Math.floor(camBlock.z);
+        float eyeSky = world.getSkyLight(camBx, camBy, camBz);
+        com.example.worldgen.biome.BiomeDefinition camBiome = world.getBiomeDefinition(camBx, camBy, camBz);
+        boolean rainsInBiome = camBiome == null || camBiome.hasPrecipitation();
+        float rainFogTarget = rain * Math.max(0f, Math.min(1f, (eyeSky - 8f) / 7f)) * (rainsInBiome ? 1f : 0.5f);
         rainFogMultiplier += (rainFogTarget - rainFogMultiplier) * Math.min(1f, dt * 20f * 0.2f);
         envFogStart = -160f * rainFogMultiplier;
         envFogEnd = Math.max(96f, 1024f - 256f * rainFogMultiplier);
         envFogStrength = 1f - underwaterBlend;
 
         Vector3f fogColor = new Vector3f(surfaceFogColor).lerp(underwaterFogColor, underwaterBlend);
-        // swamp and mangrove swamp: water_fog_end_distance multiplied by 0.85 (biome attributes), blended with the biome weights
-        float waterFogScale = 1f;
-        if (climate != null) {
-            float sum = 0f, closer = 0f;
-            float[] w = climate.weights();
-            for (int i = 0; i < w.length; i++) {
-                sum += w[i];
-                if (i == com.example.world.Biome.SWAMP.ordinal() || i == com.example.world.Biome.MANGROVE.ordinal()) closer += w[i];
-            }
-            if (sum > 0f) waterFogScale = 1f - 0.15f * closer / sum;
-        }
-        float underwaterEnd = UNDERWATER_FOG_END * waterFogScale * Math.max(0.25f, vision);
-        float fogStart = surfaceFogStart + (UNDERWATER_FOG_START - surfaceFogStart) * underwaterBlend;
+        // WaterFogEnvironment: the water fog distances are biome attributes (swamp and mangrove swamp multiply the end by 0.85)
+        float underwaterEnd = atmosphere.waterFogEnd() * Math.max(0.25f, vision);
+        float fogStart = surfaceFogStart + (atmosphere.waterFogStart() - surfaceFogStart) * underwaterBlend;
         float fogEnd = surfaceFogEnd + (underwaterEnd - surfaceFogEnd) * underwaterBlend;
         if (player.isHeadInLava()) { // LavaFogEnvironment: dark red, seen from 0.25 to 1 block
             fogColor.set(0x99 / 255f, 0x19 / 255f, 0f); // LavaFogEnvironment.COLOR (#991900 in the jar; the wiki rounds it to #991A00)
@@ -2207,8 +2211,8 @@ public class Game implements GameAccess {
         atlas.bind(0);
 
         renderSkyDisc(eye, skyColor, fogColor, skyFogEnd, sunrise, sunAngle,
-                // shouldRenderDarkDisc: the eye is below the horizon height (63, or the world's bottom in a flat world) and not under water
-                eye.y < (climate == null ? 0f : 63f) && !submerged);
+                // shouldRenderDarkDisc: the eye is below ClientLevelData.getHorizonHeight (63, or the world's min y in a flat world)
+                eye.y < (world.generator() instanceof FlatWorldGenerator ? (float) Chunk.MIN_Y : 63f) && !submerged);
         chunkShader.setUniform("uFogColor", fogColor.x, fogColor.y, fogColor.z);
         chunkShader.setUniform("uFogStart", fogStart);
         chunkShader.setUniform("uFogEnd", fogEnd);
@@ -3061,23 +3065,16 @@ public class Game implements GameAccess {
         return idx;
     }
 
-    /**
-     * Vanilla's rain: for every block column within {@link #RAIN_COLUMN_RADIUS} of the camera, one vertical quad (turned to
-     * face the camera) from the column's rain-proof surface up to the camera's height plus the radius, textured with the real
-     * {@code environment/rain.png}, one block wide with four blocks per texture height, and scrolled downwards at a rate that
-     * is randomised per column. Columns under a roof draw nothing because their quad would be empty.
-     */
     /** The shader has one alpha per draw, so the columns are drawn in this many alpha steps (nearest the camera first). */
     private static final int RAIN_ALPHA_STEPS = 6;
     private final float[][] rainBuckets = new float[RAIN_ALPHA_STEPS][(2 * RAIN_COLUMN_RADIUS + 1) * (2 * RAIN_COLUMN_RADIUS + 1) * 6 * 11];
 
     /**
-     * Vanilla's alpha for a rain column: ((1 - d^2) * 0.5 + 0.5) times the rain level, with d the column's distance from the
-     * camera as a fraction of the rain radius, so the streaks fade out towards the edge of the rain.
+     * {@code WeatherEffectRenderer.prepareInstances}: a column's alpha is {@code lerp(min(distSq / radiusSq, 1), maxAlpha, 0.5)}
+     * times the rain level ({@code maxAlpha} 1 for rain, 0.8 for snow), so the columns fade toward the edge of the radius.
      */
-    static float rainColumnAlpha(float distanceFraction, float rainLevel) {
-        float d = Math.min(1f, distanceFraction);
-        return ((1f - d * d) * 0.5f + 0.5f) * rainLevel;
+    static float weatherColumnAlpha(float distanceSqFraction, float maxAlpha, float intensity) {
+        return (maxAlpha + Math.min(distanceSqFraction, 1f) * (0.5f - maxAlpha)) * intensity;
     }
 
     /**
@@ -3167,59 +3164,102 @@ public class Game implements GameAccess {
         atlas.bind(0);
     }
 
+    /**
+     * WeatherEffectRenderer (26.3): for every column within the weather radius whose precipitation at the camera's height
+     * ({@code ClientLevel.getPrecipitationAt}) is not NONE, a camera-facing quad from {@code max(camY - r, h)} to
+     * {@code max(camY + r, h)} (h the MOTION_BLOCKING height), drawn with {@code rain.png} for RAIN and {@code snow.png} for SNOW.
+     * Each column's random is seeded with {@code x*x*3121 + x*45238971 ^ z*z*418711 + z*13761}; rain scrolls down at
+     * {@code 3 + nextFloat()} texture heights per 32 ticks with a per-column tick offset, snow drifts by
+     * {@code nextDouble() + t*0.01*nextGaussian()} sideways and {@code nextDouble() + t*nextGaussian()*0.001} plus
+     * {@code -(ticks & 511)/512} vertically, with its light raised to {@code (l*3 + 15)/4}. Alpha: {@code lerp(min(d^2/r^2, 1),
+     * max, 0.5) * intensity}, max 1 for rain and 0.8 for snow (drawn here in {@link #RAIN_ALPHA_STEPS} alpha steps).
+     */
     private void renderRain() {
-        float rainLevel = weather.getStormIntensity();
-        if (!weather.isRaining() && rainLevel < 0.01f) return;
-        com.example.engine.EntityTexture rain = realTexture("environment.rain", "textures/environment/rain.png", true);
-        if (rain == null) return;
-
+        float intensity = weather.getStormIntensity();
+        // the engine's eased storm intensity only approaches 0 (vanilla's rain level steps by 0.01 per tick and reaches it)
+        if (intensity <= 0f || (!weather.isRaining() && intensity < 0.01f)) return;
         Vector3f cam = player.renderEyePosition();
-        int cx = (int) Math.floor(cam.x), cy = (int) Math.floor(cam.y), cz = (int) Math.floor(cam.z);
         int ticks = (int) Math.floor(rainTime * 20f);
         float partial = rainTime * 20f - ticks;
-        int r = RAIN_COLUMN_RADIUS;
+        drawWeatherColumns(cam, ticks, partial, intensity, com.example.worldgen.biome.BiomeDefinition.Precipitation.RAIN);
+        drawWeatherColumns(cam, ticks, partial, intensity, com.example.worldgen.biome.BiomeDefinition.Precipitation.SNOW);
+    }
 
+    private void drawWeatherColumns(Vector3f cam, int ticks, float partial, float intensity,
+                                    com.example.worldgen.biome.BiomeDefinition.Precipitation kind) {
+        boolean snow = kind == com.example.worldgen.biome.BiomeDefinition.Precipitation.SNOW;
+        com.example.engine.EntityTexture texture = snow
+                ? realTexture("environment.snow", "textures/environment/snow.png", true)
+                : realTexture("environment.rain", "textures/environment/rain.png", true);
+        if (texture == null) return;
+        float maxAlpha = snow ? 0.8f : 1f;
+        int cx = (int) Math.floor(cam.x), cy = (int) Math.floor(cam.y), cz = (int) Math.floor(cam.z);
+        int r = RAIN_COLUMN_RADIUS;
+        float radiusSq = (float) (r * r);
+        int wrappedTicks = ticks & 131071;
+        com.example.worldgen.random.LegacyRandomSource random = new com.example.worldgen.random.LegacyRandomSource(0L);
         int[] counts = new int[RAIN_ALPHA_STEPS];
+        float[] alphaSums = new float[RAIN_ALPHA_STEPS];
+        int[] columns = new int[RAIN_ALPHA_STEPS];
         for (int z = cz - r; z <= cz + r; z++) {
             for (int x = cx - r; x <= cx + r; x++) {
-                int surface = world.getColumnHeightAt(x, z) + 1;
-                int bottom = Math.max(cy - r, surface), top = Math.max(cy + r, surface);
-                if (bottom == top) continue;
-                float dx = x - cx, dz = z - cz;
-                float len = (float) Math.sqrt(dx * dx + dz * dz);
-                float alpha = rainColumnAlpha(len / r, rainLevel);
-                int step = Math.min(RAIN_ALPHA_STEPS - 1, (int) (alpha * RAIN_ALPHA_STEPS));
-                if (len < 1e-4f) { dx = 0f; dz = 1f; len = 1f; }
-                float sx = -dz / len * 0.5f, sz = dx / len * 0.5f; // half the quad's width, sideways to the line of sight
-                int seed = x * x * 3121 + x * 45238971 + z * z * 418711 + z * 13761;
-                float jitter = new java.util.Random(seed).nextFloat();
-                float scroll = -(((ticks + seed) & 31) + partial) / 32f * (3f + jitter);
-                int lightY = Math.max(surface, cy);
-                float sky = world.getSkyLight(x, lightY, z) / 15f, blk = world.getBlockLight(x, lightY, z) / 15f;
-                float x0 = x - cam.x + 0.5f - sx, x1 = x - cam.x + 0.5f + sx;
-                float z0 = z - cam.z + 0.5f - sz, z1 = z - cam.z + 0.5f + sz;
-                float yTop = top - cam.y, yBot = bottom - cam.y;
-                float vTop = bottom * 0.25f + scroll, vBot = top * 0.25f + scroll;
+                int terrainHeight = world.getColumnHeightAt(x, z) + 1;
+                int bottom = Math.max(cy - r, terrainHeight), top = Math.max(cy + r, terrainHeight);
+                if (top - bottom == 0) continue;
+                if (world.getPrecipitationAt(x, cy, z) != kind) continue;
+                // columnSizeX/Z: the unit vector across the line from the camera's column; NaN (no quad) for the camera's own column
+                float tdx = x - cx, tdz = z - cz;
+                float tlen = (float) Math.sqrt(tdx * tdx + tdz * tdz);
+                if (tlen == 0f) continue;
+                random.setSeed((long) (x * x * 3121 + x * 45238971 ^ z * z * 418711 + z * 13761));
+                int lightY = Math.max(cy, terrainHeight);
+                int skyLevel = world.getSkyLight(x, lightY, z), blockLevel = world.getBlockLight(x, lightY, z);
+                float uOffset, vOffset;
+                if (snow) {
+                    float time = wrappedTicks + partial;
+                    uOffset = (float) (random.nextDouble() + (double) (time * 0.01f * (float) random.nextGaussian()));
+                    float v = (float) (random.nextDouble() + (double) (time * (float) random.nextGaussian() * 0.001f));
+                    vOffset = -((ticks & 511) + partial) / 512f + v;
+                    skyLevel = (skyLevel * 3 + 15) / 4;
+                    blockLevel = (blockLevel * 3 + 15) / 4;
+                } else {
+                    int tickOffset = x * x * 3121 + x * 45238971 + z * z * 418711 + z * 13761 & 255;
+                    float speed = 3f + random.nextFloat();
+                    float textureOffset = -((float) (wrappedTicks + tickOffset) + partial) / 32f * speed;
+                    uOffset = 0f;
+                    vOffset = textureOffset % 32f;
+                }
+                float relX = (float) ((double) x + 0.5 - cam.x), relZ = (float) ((double) z + 0.5 - cam.z);
+                float alpha = weatherColumnAlpha((relX * relX + relZ * relZ) / radiusSq, maxAlpha, intensity);
+                int step = Math.max(0, Math.min(RAIN_ALPHA_STEPS - 1, (int) (alpha * RAIN_ALPHA_STEPS)));
+                alphaSums[step] += alpha;
+                columns[step]++;
+                float hx = -tdz / tlen / 2f, hz = tdx / tlen / 2f;
+                float x0 = relX - hx, x1 = relX + hx, z0 = relZ - hz, z1 = relZ + hz;
+                float y1 = top - cam.y, y0 = bottom - cam.y;
+                float u0 = uOffset, u1 = uOffset + 1f;
+                float v0 = bottom * 0.25f + vOffset, v1 = top * 0.25f + vOffset;
+                float sky = skyLevel / 15f, blk = blockLevel / 15f;
                 float[] verts = rainBuckets[step];
                 int idx = counts[step];
-                idx = rainVertex(verts, idx, x0, yTop, z0, 0f, vTop, sky, blk);
-                idx = rainVertex(verts, idx, x1, yTop, z1, 1f, vTop, sky, blk);
-                idx = rainVertex(verts, idx, x1, yBot, z1, 1f, vBot, sky, blk);
-                idx = rainVertex(verts, idx, x0, yTop, z0, 0f, vTop, sky, blk);
-                idx = rainVertex(verts, idx, x1, yBot, z1, 1f, vBot, sky, blk);
-                idx = rainVertex(verts, idx, x0, yBot, z0, 0f, vBot, sky, blk);
+                idx = rainVertex(verts, idx, x0, y1, z0, u0, v0, sky, blk);
+                idx = rainVertex(verts, idx, x1, y1, z1, u1, v0, sky, blk);
+                idx = rainVertex(verts, idx, x1, y0, z1, u1, v1, sky, blk);
+                idx = rainVertex(verts, idx, x0, y1, z0, u0, v0, sky, blk);
+                idx = rainVertex(verts, idx, x1, y0, z1, u1, v1, sky, blk);
+                idx = rainVertex(verts, idx, x0, y0, z0, u0, v1, sky, blk);
                 counts[step] = idx;
             }
         }
         chunkShader.setUniform("uModel", new Matrix4f().translation(cam.x, cam.y, cam.z));
         chunkShader.setUniform("uFogStart", 1_000_000f);
         chunkShader.setUniform("uFogEnd", 2_000_000f);
-        rain.bind(0);
+        texture.bind(0);
         glDisable(GL_CULL_FACE);
         glDepthMask(false);
         for (int step = 0; step < RAIN_ALPHA_STEPS; step++) {
             if (counts[step] == 0) continue;
-            chunkShader.setUniform("uAlpha", (step + 0.5f) / RAIN_ALPHA_STEPS);
+            chunkShader.setUniform("uAlpha", alphaSums[step] / columns[step]); // the mean alpha of the step's columns
             rainMesh.upload(rainBuckets[step], counts[step]);
             rainMesh.draw();
         }
@@ -3601,93 +3641,33 @@ public class Game implements GameAccess {
     }
 
     /**
-     * F3-style overlay: the player's current column's raw climate values, every biome's
-     * blend weight there, and which one is dominant - lets you watch these change
-     * continuously as you cross a biome border instead of jumping, which is the actual
-     * thing "smooth transitions" needs to demonstrate.
+     * F3 overlay, the biome part of vanilla's debug screen: {@code DebugEntryBiome} ("Biome: " + the biome id at the feet's block,
+     * {@code Level.getBiome}) and the "chunk_generation" group of {@code DebugEntryChunkGeneration} (the density debug functions and
+     * the "Biome builder" climate line of a multi-noise world; nothing for a flat world).
      */
     private void renderDebugOverlay() {
         if (!debugOverlay) return;
-
-        int wx = (int) Math.floor(player.position.x);
-        int wz = (int) Math.floor(player.position.z);
-        ClimateSample sample = world.climateAt(wx, wz);
-
+        java.util.List<String> lines = biomeDebugLines();
         float scale = 1.0f;
         float lineH = font.lineHeight(scale) + 3f;
         float x = 10f, y = 10f;
-        int lineCount = sample == null ? 3 : (12 + Biome.values().length);
-        uiRenderer.drawColorQuad(4, 4, 430, lineCount * lineH + 10, 0f, 0f, 0f, 0.6f);
-
-        font.drawText(uiRenderer, "[F3] Climate / Biome Debug", x, y, scale, 1f, 1f, 0.4f, 1f);
-        y += lineH * 1.4f;
-        font.drawText(uiRenderer, String.format("column: %d, %d", wx, wz), x, y, scale, 0.8f, 0.8f, 0.8f, 1f);
-        y += lineH;
-
-        if (sample == null) {
-            // Vanilla's F3 line "Biome: <id>" at the player's block (Level.getBiome); flat worlds have no biome model here.
-            String biome = world.getBiome(wx, (int) Math.floor(player.position.y), wz);
-            font.drawText(uiRenderer, biome == null ? "no climate model (flat world)" : "Biome: " + biome, x, y, scale, 0.8f, 0.8f, 0.8f, 1f);
-            return;
-        }
-
-        // Local coords make crossing a chunk boundary visible in the overlay itself: the same
-        // world column must show identical climate/weights/colors regardless of which chunk it
-        // was generated by - watching (chunk, local) roll over while every other line stays
-        // continuous is the actual proof of "no seam at chunk borders."
-        int cx = World.worldToChunk(wx), cz = World.worldToChunk(wz);
-        int lx = World.worldToLocal(wx), lz = World.worldToLocal(wz);
-        font.drawText(uiRenderer, String.format("chunk: %d, %d   local: %d, %d", cx, cz, lx, lz), x, y, scale, 0.8f, 0.8f, 0.8f, 1f);
-        y += lineH * 1.4f;
-
-        font.drawText(uiRenderer, String.format("temperature:      % .3f", sample.temperature()), x, y, scale, 0.9f, 0.9f, 0.9f, 1f);
-        y += lineH;
-        font.drawText(uiRenderer, String.format("humidity:         % .3f", sample.humidity()), x, y, scale, 0.9f, 0.9f, 0.9f, 1f);
-        y += lineH;
-        font.drawText(uiRenderer, String.format("continentalness:  % .3f", sample.continentalness()), x, y, scale, 0.9f, 0.9f, 0.9f, 1f);
-        y += lineH;
-        font.drawText(uiRenderer, String.format("erosion:          % .3f", sample.erosion()), x, y, scale, 0.9f, 0.9f, 0.9f, 1f);
-        y += lineH;
-        font.drawText(uiRenderer, String.format("weirdness:        % .3f", sample.weirdness()), x, y, scale, 0.9f, 0.9f, 0.9f, 1f);
-        y += lineH;
-        // No fabricated value: vanilla's depth axis comes from a 3D density function this
-        // heightmap-based engine doesn't have, so it's labeled absent rather than invented.
-        font.drawText(uiRenderer, "depth:            n/a (heightmap terrain)", x, y, scale, 0.55f, 0.55f, 0.55f, 1f);
-        y += lineH * 1.4f;
-
-        font.drawText(uiRenderer, "dominant: " + sample.dominant().name(), x, y, scale, 0.6f, 1f, 0.6f, 1f);
-        y += lineH * 1.4f;
-
-        drawColorSwatchLine(x, y, lineH, "grass color:", sample.grassColor());
-        y += lineH;
-        drawColorSwatchLine(x, y, lineH, "foliage color:", sample.foliageColor());
-        y += lineH * 1.4f;
-
-        font.drawText(uiRenderer, "biome weights (influence on blended height/trees/color):", x, y, scale, 1f, 1f, 0.4f, 1f);
-        y += lineH;
-
-        Biome[] all = Biome.values();
-        float[] weights = sample.weights();
-        Integer[] order = new Integer[all.length];
-        for (int i = 0; i < all.length; i++) order[i] = i;
-        java.util.Arrays.sort(order, (a, b) -> Float.compare(weights[b], weights[a]));
-        for (int i : order) {
-            boolean isDominant = all[i] == sample.dominant();
-            float r = isDominant ? 0.6f : 0.85f, g = isDominant ? 1f : 0.85f, b = isDominant ? 0.6f : 0.85f;
-            font.drawText(uiRenderer, String.format("  %-14s %.3f", all[i].name(), weights[i]), x, y, scale, r, g, b, 1f);
+        float width = 0f;
+        for (String line : lines) width = Math.max(width, font.measureText(line, scale));
+        uiRenderer.drawColorQuad(4, 4, width + 12f, lines.size() * lineH + 10, 0f, 0f, 0f, 0.6f);
+        for (String line : lines) {
+            font.drawText(uiRenderer, line, x, y, scale, 0.88f, 0.88f, 0.88f, 1f);
             y += lineH;
         }
     }
 
-    /** A small filled swatch plus its hex code, for the F3 overlay's blended grass/foliage rows. */
-    private void drawColorSwatchLine(float x, float y, float lineH, String label, float[] rgb) {
-        float scale = 1.0f;
-        font.drawText(uiRenderer, label, x, y, scale, 0.9f, 0.9f, 0.9f, 1f);
-        float swatchX = x + 150f;
-        float swatchSize = lineH - 4f;
-        uiRenderer.drawColorQuad(swatchX, y, swatchSize, swatchSize, rgb[0], rgb[1], rgb[2], 1f);
-        int r = Math.round(rgb[0] * 255f), g = Math.round(rgb[1] * 255f), b = Math.round(rgb[2] * 255f);
-        font.drawText(uiRenderer, String.format("#%02X%02X%02X", r, g, b), swatchX + swatchSize + 6f, y, scale, 0.9f, 0.9f, 0.9f, 1f);
+    /** The F3 biome lines at the player's feet ({@code entity.blockPosition()}). */
+    private java.util.List<String> biomeDebugLines() {
+        int fx = (int) Math.floor(player.position.x), fy = (int) Math.floor(player.position.y), fz = (int) Math.floor(player.position.z);
+        java.util.List<String> lines = new java.util.ArrayList<>();
+        if (fy < Chunk.MIN_Y || fy > Chunk.MAX_Y) return lines; // isInsideBuildHeight
+        lines.add("Biome: " + world.getBiome(fx, fy, fz));
+        lines.addAll(world.generator().chunkGenerationDebugLines(fx, fy, fz));
+        return lines;
     }
 
     private static final float ISO_COS30 = 0.8660254f;
@@ -4134,36 +4114,24 @@ public class Game implements GameAccess {
         sb.append("player.headSubmerged=").append(player.isHeadSubmerged()).append('\n');
         sb.append("player.flying=").append(player.isFlying()).append('\n');
 
-        // These are the biome-side tint values from ClimateSample, i.e. before the time-of-day/
-        // storm blending renderWorld applies - not the exact final on-screen pixel color.
-        ClimateSample climate = world.climateAt((int) Math.floor(player.position.x), (int) Math.floor(player.position.z));
-        // A flat world's generator has no climate model at all (see FlatWorldGenerator/the F3
-        // overlay's own "no climate model (flat world)" message) - climateAt returns null there,
-        // same as every other climate consumer in this class (renderWorld's sky/fog/underwater-
-        // fog blends) already has to handle; this just hadn't been made to handle it too.
         int fx = (int) Math.floor(player.position.x), fy = (int) Math.floor(player.position.y), fz = (int) Math.floor(player.position.z);
         sb.append("biome.vanilla=").append(world.getBiome(fx, fy, fz)).append('\n');
         sb.append("block.feet=").append(world.getBlock(fx, fy, fz)).append(" below=").append(world.getBlock(fx, fy - 1, fz)).append('\n');
-        if (climate == null) {
-            sb.append("biome.dominant=none (no climate model: flat or vanilla 26.3 world)\n");
-        } else {
-            sb.append("biome.dominant=").append(climate.dominant()).append('\n');
-            StringBuilder weights = new StringBuilder();
-            Biome[] biomes = Biome.values();
-            float[] w = climate.weights();
-            for (int i = 0; i < biomes.length; i++) {
-                if (w[i] < 0.01f) continue;
-                if (weights.length() > 0) weights.append(',');
-                weights.append(biomes[i].name()).append(':').append(String.format("%.2f", w[i]));
-            }
-            sb.append("biome.weights=").append(weights).append('\n');
-            sb.append("biome.grassColor=").append(toHex(climate.grassColor())).append('\n');
-            sb.append("biome.foliageColor=").append(toHex(climate.foliageColor())).append('\n');
-            sb.append("biome.waterColor=").append(toHex(climate.waterColor())).append('\n');
-            sb.append("biome.fogColor=").append(toHex(climate.fogColor())).append('\n');
-            sb.append("biome.underwaterFogColor=").append(toHex(climate.underwaterFogColor())).append('\n');
-            sb.append("biome.skyTint=").append(toHex(climate.skyTint())).append('\n');
+        com.example.worldgen.biome.BiomeDefinition feetBiome = world.getBiomeDefinition(fx, fy, fz);
+        if (feetBiome != null) {
+            sb.append("biome.temperature=").append(String.format("%.4f", feetBiome.getHeightAdjustedTemperature(fx, fy, fz,
+                    world.generator().seaLevel(), world.generator().biomeNoises()))).append('\n');
+            sb.append("biome.downfall=").append(feetBiome.downfall()).append('\n');
+            sb.append("biome.hasPrecipitation=").append(feetBiome.hasPrecipitation()).append('\n');
         }
+        sb.append("biome.precipitation=").append(world.getPrecipitationAt(fx, fy, fz)).append('\n');
+        for (String line : world.generator().chunkGenerationDebugLines(fx, fy, fz)) sb.append("chunkgen=").append(line).append('\n');
+        // The probe's biome-blended atmosphere attributes (before the timeline and weather layers).
+        BiomeAttributes.Values atmosphere = atmosphereProbe.get(Math.min(1f, tickAccumulator / TICK_SECONDS));
+        sb.append("atmosphere.skyColor=").append(toHex(atmosphere.sky())).append('\n');
+        sb.append("atmosphere.fogColor=").append(toHex(atmosphere.fog())).append('\n');
+        sb.append("atmosphere.waterFogColor=").append(toHex(atmosphere.waterFog())).append('\n');
+        sb.append("atmosphere.waterFogEnd=").append(String.format("%.2f", atmosphere.waterFogEnd())).append('\n');
 
         sb.append("weather.state=").append(weather.getState()).append('\n');
         sb.append("weather.stormIntensity=").append(String.format("%.2f", weather.getStormIntensity())).append('\n');

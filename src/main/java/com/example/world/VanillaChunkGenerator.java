@@ -7,11 +7,12 @@ import com.example.worldgen.level.StateRef;
 import com.example.worldgen.random.RandomSource;
 import com.example.worldgen.terrain.TerrainChunk;
 
-import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
-import java.io.File;
-import java.io.IOException;
-import java.io.UncheckedIOException;
+import com.example.worldgen.biome.Climate;
+import com.example.worldgen.biome.OverworldBiomeBuilder;
+import com.example.worldgen.density.DensitySamplerSet;
+import com.example.worldgen.density.SamplerContext;
+import com.example.worldgen.levelgen.NoiseGeneratorSettings;
+
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
@@ -27,7 +28,7 @@ import java.util.Map;
  *     <li>biomes: the chunk's quart biome table, recomputed from the seed for chunks loaded from disk;</li>
  *     <li>post-processing: the positions the aquifer and the surface rules marked are handed to {@link World} (fluid ticks once the
  *     chunk's neighbours exist, see {@code World.runPostProcessingIfReady});</li>
- *     <li>tint: vanilla's block tint ({@code ClientLevel.calculateBlockTint}) per column, see {@link #computeTint};</li>
+ *     <li>tint: vanilla's block tint ({@code ClientLevel.calculateBlockTint}) per column, see {@link BiomeTints};</li>
  *     <li>spawn: {@link #findSpawn} ({@link OverworldSpawn}).</li>
  * </ul>
  * One instance per world, used from the game thread.
@@ -36,17 +37,14 @@ public final class VanillaChunkGenerator implements WorldGenerator {
 
     /** The worldgen data folder (gitignored, restored from the user's client jar by {@code scripts/restore-worldgen-data.py}). */
     public static final Path DATA_ROOT = Path.of("data");
-    private static final File GRASS_COLORMAP = new File("textures/colormap/grass.png");
-    private static final File FOLIAGE_COLORMAP = new File("textures/colormap/foliage.png");
 
     private final OverworldGenerator overworld;
     /** Generated terrain chunks not copied into the engine yet (the spawn search generates a few before the world streams them). */
     private final Map<Long, TerrainChunk> generatedAhead = new HashMap<>();
     private final Map<Long, List<int[]>> postProcessing = new HashMap<>();
     private final Map<StateRef, BlockType> blockTypes = new HashMap<>();
-    private final Map<String, BiomeTint> biomeTints = new HashMap<>();
-    private int[] grassPixels;
-    private int[] foliagePixels;
+    private final BiomeTints tints;
+    private final OverworldBiomeBuilder debugBiomeBuilder = new OverworldBiomeBuilder();
 
     public VanillaChunkGenerator(long seed) {
         this(DATA_ROOT, seed);
@@ -55,6 +53,7 @@ public final class VanillaChunkGenerator implements WorldGenerator {
     /** @throws OverworldGenerator.MissingWorldgenDataException when the data folder is missing (the message names the restore script) */
     public VanillaChunkGenerator(Path dataRoot, long seed) {
         this.overworld = new OverworldGenerator(dataRoot, seed);
+        this.tints = new BiomeTints(overworld::biome, overworld.biomeNoises());
     }
 
     public OverworldGenerator overworld() {
@@ -62,6 +61,7 @@ public final class VanillaChunkGenerator implements WorldGenerator {
     }
 
     /** {@code noise_settings.sea_level} of the overworld settings (63). */
+    @Override
     public int seaLevel() {
         return overworld.seaLevel();
     }
@@ -147,78 +147,63 @@ public final class VanillaChunkGenerator implements WorldGenerator {
 
     // ------------------------------------------------------------------ tint
 
-    /** The three colour resolvers of a biome ({@code BiomeColors.GRASS/FOLIAGE/WATER_COLOR_RESOLVER}) with their constant parts. */
-    private record BiomeTint(BiomeDefinition biome, int grassBase, boolean grassVaries, int foliage, int water) {
+    /** Vanilla's block tint (see {@link BiomeTints#computeTint}) from this generator's biome files. */
+    @Override
+    public void computeTint(Chunk chunk, World world) {
+        tints.computeTint(chunk, world);
     }
 
-    private BiomeTint colors(String biomeId) {
-        BiomeTint c = biomeTints.get(biomeId);
-        if (c != null) return c;
-        if (grassPixels == null) {
-            grassPixels = colormapPixels(GRASS_COLORMAP);
-            foliagePixels = colormapPixels(FOLIAGE_COLORMAP);
-        }
-        BiomeDefinition biome = overworld.biome(biomeId);
-        boolean varies = biome.effects().grassColorModifier() == BiomeDefinition.GrassColorModifier.SWAMP;
-        int grass = biome.getGrassColor(0.0, 0.0, grassPixels, overworld.biomeNoises());
-        c = new BiomeTint(biome, grass, varies, biome.getFoliageColor(foliagePixels), biome.getWaterColor());
-        biomeTints.put(biomeId, c);
-        return c;
+    // ------------------------------------------------------------------ biome data
+
+    @Override
+    public BiomeDefinition biomeDefinition(String biomeId) {
+        return overworld.biome(biomeId);
     }
 
-    /** {@code LegacyStuffWrapper.getPixels}: the colormap image's ARGB pixels, row by row ({@code NativeImage.makePixelArray}). */
-    private static int[] colormapPixels(File file) {
-        try {
-            BufferedImage image = ImageIO.read(file);
-            if (image == null) throw new IOException("not an image");
-            return image.getRGB(0, 0, image.getWidth(), image.getHeight(), null, 0, image.getWidth());
-        } catch (IOException e) {
-            throw new UncheckedIOException("cannot read the vanilla colormap " + file.getAbsolutePath()
-                    + " (copy textures/colormap from your 26.3 client jar, see docs/ASSETS.md)", e);
-        }
+    @Override
+    public BiomeDefinition.Noises biomeNoises() {
+        return overworld.biomeNoises();
     }
 
     /**
-     * {@code ClientLevel.calculateBlockTint(pos, resolver)} for grass, foliage and water, evaluated once per column at the column's
-     * top block (the engine keeps one tint per column, not per block): with blend radius {@code r = 0} the resolver at the block's
-     * own biome; otherwise the integer average of the red, green and blue of the resolver over the {@code (2r + 1)^2} blocks
-     * {@code x - r .. x + r, z - r .. z + r} at the same y ({@code Cursor3D}), each biome taken from the level's
-     * {@code BiomeManager} ({@link World#getBiome}: loaded chunks' stored biomes, else the generator's BIOMES table). The resolvers
-     * are {@code Biome.getGrassColor(x, z)}, {@code getFoliageColor()} and {@code getWaterColor()}.
+     * The F3 "chunk_generation" group of {@code DebugEntryChunkGeneration} at the feet: {@code NoiseBasedChunkGenerator.addDebugScreenInfo}
+     * ("Density " + each {@code debug_functions} entry of the noise settings as {@code label: value}, formatted {@code "0.000"} in
+     * {@code Locale.ROOT}) and {@code MultiNoiseBiomeSource.addDebugInfo} (the climate at the feet's quart cell, unquantized, through
+     * {@code OverworldBiomeBuilder}'s debug strings).
      */
     @Override
-    public void computeTint(Chunk chunk, World world) {
-        int r = world.getBiomeBlendRadius();
-        int cells = (r * 2 + 1) * (r * 2 + 1);
-        for (int lx = 0; lx < Chunk.SIZE_X; lx++) {
-            for (int lz = 0; lz < Chunk.SIZE_Z; lz++) {
-                int x = chunk.worldOriginX() + lx;
-                int z = chunk.worldOriginZ() + lz;
-                int y = Math.max(Chunk.MIN_Y, chunk.getColumnHeight(lx, lz));
-                int[] grass = new int[3];
-                int[] foliage = new int[3];
-                int[] water = new int[3];
-                for (int bx = x - r; bx <= x + r; bx++) {
-                    for (int bz = z - r; bz <= z + r; bz++) {
-                        BiomeTint c = colors(world.getBiome(bx, y, bz));
-                        int g = c.grassVaries() ? c.biome().getGrassColor(bx, bz, grassPixels, overworld.biomeNoises()) : c.grassBase();
-                        add(grass, g);
-                        add(foliage, c.foliage());
-                        add(water, c.water());
-                    }
-                }
-                chunk.setGrassTint(lx, lz, grass[0] / cells / 255f, grass[1] / cells / 255f, grass[2] / cells / 255f);
-                chunk.setFoliageTint(lx, lz, foliage[0] / cells / 255f, foliage[1] / cells / 255f, foliage[2] / cells / 255f);
-                chunk.setWaterTint(lx, lz, water[0] / cells / 255f, water[1] / cells / 255f, water[2] / cells / 255f);
+    public List<String> chunkGenerationDebugLines(int x, int y, int z) {
+        SamplerContext context = SamplerContext.EMPTY_UNCACHED;
+        java.util.ArrayList<String> lines = new java.util.ArrayList<>();
+        List<NoiseGeneratorSettings.DebugFunctionEntry> functions = overworld.settings().debugFunctions();
+        if (!functions.isEmpty()) {
+            DensitySamplerSet samplers = overworld.randomState().samplersWithContext(context);
+            StringBuilder builder = new StringBuilder("Density ");
+            java.text.DecimalFormat format = new java.text.DecimalFormat("0.000",
+                    java.text.DecimalFormatSymbols.getInstance(java.util.Locale.ROOT));
+            for (NoiseGeneratorSettings.DebugFunctionEntry entry : functions) {
+                builder.append(entry.label()).append(": ");
+                builder.append(format.format((double) samplers.sampleValue(entry.function(), x, y, z)));
+                builder.append(' ');
             }
+            builder.deleteCharAt(builder.length() - 1);
+            lines.add(builder.toString());
         }
-    }
-
-    /** {@code ARGB.red/green/blue}. */
-    private static void add(int[] sum, int argb) {
-        sum[0] += argb >> 16 & 0xFF;
-        sum[1] += argb >> 8 & 0xFF;
-        sum[2] += argb & 0xFF;
+        Climate.Sampler sampler = overworld.randomState().createClimateSampler(context);
+        Climate.TargetPoint p = sampler.sample(x >> 2, y >> 2, z >> 2);
+        float continentalness = Climate.unquantizeCoord(p.continentalness());
+        float erosion = Climate.unquantizeCoord(p.erosion());
+        float temperature = Climate.unquantizeCoord(p.temperature());
+        float humidity = Climate.unquantizeCoord(p.humidity());
+        float weirdness = Climate.unquantizeCoord(p.weirdness());
+        double peaksAndValleys = OverworldBiomeBuilder.peaksAndValleys(weirdness); // NoiseRouterData.peaksAndValleys
+        OverworldBiomeBuilder builder = debugBiomeBuilder;
+        lines.add("Biome builder PV: " + OverworldBiomeBuilder.getDebugStringForPeaksAndValleys(peaksAndValleys)
+                + " C: " + builder.getDebugStringForContinentalness(continentalness)
+                + " E: " + builder.getDebugStringForErosion(erosion)
+                + " T: " + builder.getDebugStringForTemperature(temperature)
+                + " H: " + builder.getDebugStringForHumidity(humidity));
+        return lines;
     }
 
     // ------------------------------------------------------------------ spawn

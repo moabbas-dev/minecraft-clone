@@ -1,5 +1,7 @@
 package com.example.world;
 
+import com.example.worldgen.biome.BiomeDefinition;
+
 import java.util.List;
 
 /** Fills a single chunk's blocks. Implementations: the vanilla overworld ({@link VanillaChunkGenerator}), superflat. */
@@ -45,8 +47,21 @@ public interface WorldGenerator {
         return List.of();
     }
 
-    /** Climate at one world column, for the debug overlay - null if this generator has no climate model (flat and vanilla worlds). */
-    default ClimateSample climateAt(int worldX, int worldZ) {
+    /** The biome file of a biome id this generator places ({@code data/minecraft/worldgen/biome/<id>.json}); null without biomes. */
+    default BiomeDefinition biomeDefinition(String biomeId) {
         return null;
+    }
+
+    /** {@code Biome}'s static temperature/info noises ({@link BiomeDefinition.Noises#vanilla}). */
+    default BiomeDefinition.Noises biomeNoises() {
+        return null;
+    }
+
+    /** {@code ChunkGenerator.getSeaLevel()} (the level's sea level, used by {@code Biome.getTemperature}). */
+    int seaLevel();
+
+    /** The lines of vanilla's F3 "chunk_generation" group at a block ({@code DebugEntryChunkGeneration}); empty when it has none. */
+    default List<String> chunkGenerationDebugLines(int x, int y, int z) {
+        return List.of();
     }
 }

@@ -8,10 +8,19 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class RainAndStackTest {
     @Test
     void rainIsFullStrengthAtTheCameraAndHalfAtTheEdge() {
-        assertEquals(1f, Game.rainColumnAlpha(0f, 1f), 1e-6f);
-        assertEquals(0.5f, Game.rainColumnAlpha(1f, 1f), 1e-6f);
-        assertEquals(0.5f, Game.rainColumnAlpha(0f, 0.5f), 1e-6f, "scaled by the rain level");
-        assertTrue(Game.rainColumnAlpha(0.3f, 1f) > Game.rainColumnAlpha(0.7f, 1f));
+        assertEquals(1f, Game.weatherColumnAlpha(0f, 1f, 1f), 1e-6f);
+        assertEquals(0.5f, Game.weatherColumnAlpha(1f, 1f, 1f), 1e-6f);
+        assertEquals(0.5f, Game.weatherColumnAlpha(4f, 1f, 1f), 1e-6f, "clamped beyond the radius");
+        assertEquals(0.5f, Game.weatherColumnAlpha(0f, 1f, 0.5f), 1e-6f, "scaled by the rain level");
+        assertTrue(Game.weatherColumnAlpha(0.09f, 1f, 1f) > Game.weatherColumnAlpha(0.49f, 1f, 1f));
+    }
+
+    @Test
+    void snowColumnsStartAtEightyPercentAndFadeToHalf() {
+        // WeatherEffectRenderer.prepare: prepareInstances(snowColumns, ..., 0.8F, ...)
+        assertEquals(0.8f, Game.weatherColumnAlpha(0f, 0.8f, 1f), 1e-6f);
+        assertEquals(0.65f, Game.weatherColumnAlpha(0.5f, 0.8f, 1f), 1e-6f);
+        assertEquals(0.5f, Game.weatherColumnAlpha(1f, 0.8f, 1f), 1e-6f);
     }
 
     @Test

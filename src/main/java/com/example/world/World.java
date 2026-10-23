@@ -3,6 +3,7 @@ package com.example.world;
 import lombok.Getter;
 import lombok.Setter;
 
+import com.example.worldgen.biome.BiomeDefinition;
 import com.example.worldgen.terrain.BiomeManager;
 
 import java.io.File;
@@ -36,11 +37,6 @@ public class World {
         return generator;
     }
 
-    /** Climate at a world column for the debug overlay; null for generators with no climate model. */
-    public ClimateSample climateAt(int worldX, int worldZ) {
-        return generator.climateAt(worldX, worldZ);
-    }
-
     /** The level's {@code BiomeManager}: the fiddled zoom over {@link #noiseBiome}, seeded with {@code obfuscateSeed(seed)}. */
     private final BiomeManager biomeManager;
 
@@ -57,6 +53,39 @@ public class World {
     /** {@code Level.getBiome(pos)} ({@code BiomeManager.getBiome}): the vanilla biome id at a block, or null without a biome model (flat). */
     public String getBiome(int x, int y, int z) {
         return generator.hasBiomes() ? biomeManager.getBiome(x, y, z) : null;
+    }
+
+    /** The biome file of the biome at a block ({@code Level.getBiome(pos).value()}); null without a biome model. */
+    public BiomeDefinition getBiomeDefinition(int x, int y, int z) {
+        String id = getBiome(x, y, z);
+        return id == null ? null : generator.biomeDefinition(id);
+    }
+
+    /**
+     * {@code ClientLevel.getPrecipitationAt(pos)}: NONE where the column's chunk is not loaded, else the biome's
+     * {@code getPrecipitationAt(pos, seaLevel)} (no precipitation without {@code has_precipitation}; snow below the temperature
+     * 0.15 after the frozen modifier and the height adjustment above sea level + 17, rain otherwise).
+     */
+    public BiomeDefinition.Precipitation getPrecipitationAt(int x, int y, int z) {
+        if (!hasChunk(worldToChunk(x), worldToChunk(z))) return BiomeDefinition.Precipitation.NONE;
+        BiomeDefinition biome = getBiomeDefinition(x, y, z);
+        if (biome == null) return BiomeDefinition.Precipitation.NONE;
+        return biome.getPrecipitationAt(x, y, z, generator.seaLevel(), generator.biomeNoises());
+    }
+
+    /** The biome atmosphere attributes the camera probe reads at a position ({@link BiomeAttributes#sample}). */
+    public BiomeAttributes.Values atmosphereAt(double x, double y, double z) {
+        if (!generator.hasBiomes()) return BiomeAttributes.Values.overworld();
+        return BiomeAttributes.sample(x, y, z, this::clientNoiseBiome, generator::biomeDefinition);
+    }
+
+    /**
+     * The client level's {@code getNoiseBiome}: a loaded chunk's stored quart biome, otherwise
+     * {@code ClientLevel.getUncachedNoiseBiome}, which is always plains.
+     */
+    private String clientNoiseBiome(int quartX, int quartY, int quartZ) {
+        Chunk c = getChunk(quartX >> 2, quartZ >> 2);
+        return c != null && c.hasBiomes() ? c.getNoiseBiome(quartX, quartY, quartZ) : com.example.worldgen.biome.Biomes.PLAINS;
     }
 
     /** The video option "Biome Blend" (vanilla {@code Options.biomeBlendRadius}, 0..7): the tint box radius in blocks. */

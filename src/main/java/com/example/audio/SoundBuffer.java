@@ -19,7 +19,7 @@ import static org.lwjgl.openal.AL10.*;
  * matter for long music tracks, which this milestone doesn't have (Phase 3's own "determine
  * whether streaming is required based on the actual assets" - it isn't, here).
  *
- * Mirrors {@code Colormap.load}'s graceful-fallback pattern: a missing/corrupt/unsupported file
+ * Graceful fallback: a missing/corrupt/unsupported file
  * never crashes the game, {@link #load} just returns null and the caller treats that ID as
  * silently unavailable (see {@code SoundRegistry}).
  */

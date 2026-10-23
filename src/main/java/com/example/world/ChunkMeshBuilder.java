@@ -45,11 +45,12 @@ public class ChunkMeshBuilder {
      *  own tuning (see Shaders.CHUNK_VERTEX's wind formula), not an official Minecraft value.
      *  Every non-leaf, non-plant face gets 0.0. */
     private static final float LEAF_WIND_WEIGHT = 0.7f;
-    /** The same "no colormap file available" fallback constants BiomeColors already passes to
-     *  Colormap.load - reused here (not reinvented) as the representative tint for hotbar icons,
-     *  which have no world column to sample a real per-biome blend from. */
-    private static final float[] DEFAULT_GRASS_TINT = unpackHex(0x7CBD6B);
-    private static final float[] DEFAULT_FOLIAGE_TINT = unpackHex(0x59AE30);
+    /** The item tint of oak, jungle, acacia and dark oak leaves ({@code items/*_leaves.json}: {@code constant -12012264}, #48B518). */
+    private static final float[] FOLIAGE_ITEM_TINT = unpackHex(-12012264);
+    /** The item tint of mangrove leaves ({@code items/mangrove_leaves.json}: {@code constant -7158200}, #92C648). */
+    private static final float[] MANGROVE_ITEM_TINT = unpackHex(-7158200);
+    /** The grass item tint ({@code items/grass_block.json}: {@code minecraft:grass} at temperature 0.5, downfall 1.0), read lazily. */
+    private static float[] grassItemTint;
 
     private static float[] unpackHex(int rgb) {
         return new float[]{((rgb >> 16) & 0xFF) / 255f, ((rgb >> 8) & 0xFF) / 255f, (rgb & 0xFF) / 255f};
@@ -62,21 +63,34 @@ public class ChunkMeshBuilder {
                 || type == BlockType.MANGROVE_LEAVES || type == BlockType.DARK_OAK_LEAVES;
     }
 
-    /** The tint a leaf-family block's icon should use, or {@code null} if {@code type} isn't
-     *  one - a representative default (see DEFAULT_FOLIAGE_TINT) for the biome-blended species,
-     *  since an icon has no world column to blend a real one from; the exact fixed tint for
-     *  spruce/cherry, since those never blend with biome color in the first place. */
+    /** The tint a leaf-family block's icon uses (the item model's tint source), or {@code null} if {@code type} isn't one. */
     public static float[] leafIconTint(BlockType type) {
         if (type == BlockType.SPRUCE_LEAVES) return SPRUCE_TINT;
         if (type == BlockType.CHERRY_LEAVES) return CHERRY_TINT;
         if (type == BlockType.BIRCH_LEAVES) return BIRCH_TINT;
-        if (isBiomeTintedLeaves(type)) return DEFAULT_FOLIAGE_TINT;
+        if (type == BlockType.MANGROVE_LEAVES) return MANGROVE_ITEM_TINT;
+        if (isBiomeTintedLeaves(type)) return FOLIAGE_ITEM_TINT;
         return null;
     }
 
-    /** The representative grass-top tint for icons - see DEFAULT_GRASS_TINT. */
-    public static float[] grassIconTint() {
-        return DEFAULT_GRASS_TINT;
+    /**
+     * The grass item tint ({@code GrassColorSource(0.5, 1.0)}: {@code GrassColor.get(0.5, 1.0)}, the colormap pixel at
+     * {@code ColorMapColorUtil.get}'s index for that temperature and downfall); {@code GrassColor}'s default (-65281) when the
+     * colormap image is missing, as vanilla's empty pixel array gives.
+     */
+    public static synchronized float[] grassIconTint() {
+        if (grassItemTint == null) {
+            int[] pixels = new int[0];
+            try {
+                java.awt.image.BufferedImage image = javax.imageio.ImageIO.read(new java.io.File("textures/colormap/grass.png"));
+                if (image != null) pixels = image.getRGB(0, 0, image.getWidth(), image.getHeight(), null, 0, image.getWidth());
+            } catch (java.io.IOException e) {
+                pixels = new int[0];
+            }
+            grassItemTint = unpackHex(com.example.worldgen.biome.BiomeDefinition.colorMapColor(0.5, 1.0, pixels,
+                    com.example.worldgen.biome.BiomeDefinition.GRASS_COLOR_DEFAULT));
+        }
+        return grassItemTint;
     }
 
     /** True for any of the 8 leaf species, regardless of which tint rule (biome-blended vs.

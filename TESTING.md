@@ -6,7 +6,7 @@
 mvn -o test                                          # full suite
 mvn -o test -Dtest=RaycastTest                       # one class
 mvn -o test -Dtest=RaycastTest#straightDownHitsGroundAtExpectedCoordinateAndFace  # one method
-mvn -o test -Dtest="WeatherTest,BiomeTest"            # several classes
+mvn -o test -Dtest="WeatherTest,BiomeAttributesTest"            # several classes
 ```
 
 (`-o` = offline; drop it if you need Maven to re-resolve anything for the first time.)
@@ -21,7 +21,7 @@ or downgrades a failing assertion.
 
 | Package | What it covers | Needs a window? |
 |---|---|---|
-| `com.example.world.unit` | `SimplexNoise`, `Biome` selection/weights, `World` coordinate conversion, `BlockType` properties, `Raycast`/DDA, `WorldIO.sanitizeFolderName` | No |
+| `com.example.world.unit` | biome atmosphere attributes and precipitation from the real biome files (`BiomeAttributesTest`), `World` coordinate conversion, `BlockType` properties, `Raycast`/DDA, `WorldIO.sanitizeFolderName` | No |
 | `com.example.physics.gameplay` | Real `Player.update` driven by a fixed timestep + a `FakeInputState` - walking, sprinting, jumping/landing, wall collision | No |
 | `com.example.world.integration` | `WorldIO` save/load round-trips (`@TempDir`, never touches the real `saves/`), world-generation determinism and chunk-boundary consistency, `Weather` state cycling | No |
 | `com.example.game` (`DayNightTest`) | `Game`'s pure day/night helpers (`sunDirection`, `computeDaylightFactor`, `computeSkyColor`) | No |
@@ -53,7 +53,7 @@ or downgrades a failing assertion.
 | `com.example.testctl` (`CommandsTest` additions) | `openCookingScreen`/`advanceSimulationTicks` parsing, validation, and error dispatch | No |
 
 None of the above needs LWJGL/GLFW/OpenGL. That's not an accident of test design - `Player`,
-`World`/`Chunk`, `Raycast`, `Weather`, `TerrainGenerator`/`Biome`/`BiomeColors`, `SimplexNoise`,
+`World`/`Chunk`, `Raycast`, `Weather`, `BiomeAttributes`,
 and `WorldIO` were already implemented with no rendering dependency; this suite just exercises
 that existing separation.
 

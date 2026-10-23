@@ -23,7 +23,7 @@ None of these files are committed: `textures/`, `texts/`, `sounds/`, `minecraft-
 | `textures/environment/clouds.png` | `game/Game.renderClouds` (`game/SkyDetails`) | no | no clouds |
 | `textures/particle/splash_{0,1,2,3}.png` | `game/Game.drawRainSplashes` (`fx/RainSplashes`) | no | no rain splashes |
 | `textures/particle/{critical_hit,damage}.png` | `game/Game` -> `fx/SpriteParticles` | no | those particles are not drawn |
-| `textures/environment/{rain.png,celestial/sun.png,celestial/moon/full_moon.png}` | `game/Game` (`renderRain`, `renderSunAndMoon`) | no | no rain streaks / sun / moon |
+| `textures/environment/{rain.png,snow.png,celestial/sun.png,celestial/moon/full_moon.png}` | `game/Game` (`renderRain` / `drawWeatherColumns`, `renderSunAndMoon`) | no | no rain or snow columns / sun / moon |
 | `textures/entity/player/wide/steve.png` | `game/Game.renderHeldItem` (bare hand), `renderPlayerPreview` | no | the bare hand and the inventory player preview are not drawn |
 | `textures/entity/equipment/{humanoid,humanoid_leggings}/<material>.png` (+ `leather_overlay.png`) | `game/Game.renderPlayerPreview` | no | that armor layer is not drawn in the inventory preview |
 | `textures/gui/sprites/hud/hotbar_offhand_left.png` | `game/Game.renderRealHud` | no | the offhand item is drawn without its slot frame |
@@ -36,7 +36,7 @@ None of these files are committed: `textures/`, `texts/`, `sounds/`, `minecraft-
 | `textures/environment/celestial/moon/<phase>.png` (eight phases) | `game/Game.renderSunAndMoon` | no | no moon |
 | `textures/item/leather_<piece>_overlay.png` | `engine/TextureAtlas.dyeLeather` | no | the leather icon without its overlay |
 | `textures/entity/chest/normal.png` | `engine/TextureAtlas.chestFace` | no | "missing texture" chest faces |
-| `textures/colormap/{grass,foliage}.png` | `world/VanillaChunkGenerator.computeTint` (vanilla `GrassColor`/`FoliageColor` pixels) | **yes** for regular worlds | generating a regular world fails with a message naming the file (no stand-in tint) |
+| `textures/colormap/{grass,foliage}.png` | `world/BiomeTints.computeTint` (vanilla `GrassColor`/`FoliageColor` pixels, regular and flat worlds), `ChunkMeshBuilder.grassIconTint` | **yes** for every world | generating a world fails with a message naming the file (no stand-in tint); grass icons get `GrassColor`'s default |
 | `data/minecraft/**` (worldgen: `noise_settings`, `density_function`, `noise`, `material_rule`, `material_condition`, `carver`, `biome`, `tags/block`, ...) | `worldgen/chunk/OverworldGenerator` via `world/VanillaChunkGenerator` | **yes** for regular worlds (flat worlds do not need it) | creating or loading a regular world throws `MissingWorldgenDataException` telling to run `python scripts/restore-worldgen-data.py` (it extracts `data/` from the 26.3 client jar); there is no fallback generator. `data/` is gitignored |
 | `textures/entity/**` | `game/Game` -> `engine/EntityTexture.load(path, w, h, fallbackRGB)` | no | flat colored placeholder skin |
 | `sounds/**.ogg` | `audio/SoundRegistry` (`SOUNDS_ROOT = new File("sounds")`) -> `audio/SoundBuffer` | no | variation dropped; a group with none is silent (one warning) |

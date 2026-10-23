@@ -7,7 +7,8 @@ import java.util.Random;
 /**
  * The drops that hop off the ground in the rain: vanilla's {@code ClientLevel.tickWeatherEffects} spawning and
  * {@code WaterDropParticle} (rules read from the 26.3 client). Every tick, (int)(0.225 * (2R+1)^2 * rain^2) tries pick a random column
- * within R = 10 blocks of the camera whose surface is within 10 blocks of the camera's height, and put a drop on that surface at a
+ * within R = 10 blocks of the camera whose surface is within 10 blocks of the camera's block height and where the biome's precipitation
+ * there is rain (not snow, not none), and put a drop on that surface at a
  * random spot of the block. A drop starts moving up at 0.1-0.3 blocks per tick, falls with gravity 0.06 and 2% drag, lives
  * 8 / (0.2..1.0) ticks, and once it is on the ground has a 50% chance of vanishing each tick (it also slides, x0.7, but it has no
  * sideways speed). It is drawn as a camera-facing quad of half-size 0.1-0.2 blocks with one of the four splash sprites.
@@ -18,6 +19,11 @@ public final class RainSplashes {
     public interface Surface {
         /** The y of the top of the highest block that stops rain in column (x, z). */
         int topY(int x, int z);
+
+        /** {@code getPrecipitationAt(heightmapPos) == RAIN}: whether it rains (not snows, not dry) at that surface position. */
+        default boolean rainsAt(int x, int y, int z) {
+            return true;
+        }
     }
 
     public static final int CAPACITY = 2048;
@@ -33,6 +39,8 @@ public final class RainSplashes {
     private final boolean[] onGround = new boolean[CAPACITY];
     private int count;
     private float accumulator;
+    /** Whether the last tick found a rain position ({@code rainParticlePosition != null}, the condition for any rain sound). */
+    private boolean rainPositionFound;
 
     public RainSplashes(Random random) {
         this.random = random;
@@ -61,17 +69,25 @@ public final class RainSplashes {
             accumulator -= TICK_SECONDS;
             tickParticles();
             if (rainLevel > 0f) spawnTick(rainLevel, camera, surface);
+            else rainPositionFound = false;
         }
         if (accumulator > TICK_SECONDS) accumulator = TICK_SECONDS;
     }
 
+    /** Whether the last spawn tick found a column where it rains near the camera (vanilla only plays rain sounds then). */
+    public boolean rainPositionFound() {
+        return rainPositionFound;
+    }
+
     void spawnTick(float rainLevel, Vector3f camera, Surface surface) {
-        int cx = (int) Math.floor(camera.x), cz = (int) Math.floor(camera.z);
+        rainPositionFound = false;
+        int cx = (int) Math.floor(camera.x), cy = (int) Math.floor(camera.y), cz = (int) Math.floor(camera.z);
         int tries = triesPerTick(rainLevel);
         for (int i = 0; i < tries; i++) {
             int bx = cx + random.nextInt(2 * RADIUS + 1) - RADIUS, bz = cz + random.nextInt(2 * RADIUS + 1) - RADIUS;
             int top = surface.topY(bx, bz);
-            if (Math.abs(top - camera.y) > 10f) continue;
+            if (top > cy + 10 || top < cy - 10 || !surface.rainsAt(bx, top, bz)) continue;
+            rainPositionFound = true;
             spawn(bx + random.nextFloat(), top, bz + random.nextFloat());
         }
     }

@@ -14,7 +14,7 @@ import java.util.Map;
  * {@code LazilyParsedNumber.floatValue()} does for vanilla's {@code Codec.FLOAT}).
  * It exists because no shared project JSON reader was present when this package was written.
  */
-final class BiomeJson {
+public final class BiomeJson {
     /** The JSON {@code null} literal. */
     static final Object NULL = new Object() {
         @Override
@@ -24,12 +24,12 @@ final class BiomeJson {
     };
 
     /** A JSON number kept as its literal text. */
-    record Num(String text) {
-        float floatValue() {
+    public record Num(String text) {
+        public float floatValue() {
             return Float.parseFloat(this.text);
         }
 
-        double doubleValue() {
+        public double doubleValue() {
             return Double.parseDouble(this.text);
         }
 

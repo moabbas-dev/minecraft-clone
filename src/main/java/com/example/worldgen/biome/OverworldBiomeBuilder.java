@@ -559,7 +559,7 @@ public final class OverworldBiomeBuilder {
      * Vanilla {@code TerrainProvider.peaksAndValleys(float)} (called through {@code NoiseRouterData}):
      * {@code -(|(|w| - 0.6666667F)| - 0.33333334F) * 3.0F}, all in float.
      */
-    static float peaksAndValleys(float weirdness) {
+    public static float peaksAndValleys(float weirdness) {
         return -(Math.abs(Math.abs(weirdness) - 0.6666667F) - 0.33333334F) * 3.0F;
     }
 
