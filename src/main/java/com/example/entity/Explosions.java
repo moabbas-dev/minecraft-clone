@@ -32,7 +32,11 @@ public final class Explosions {
                     LIGHT_GRAY_TERRACOTTA -> 4.2f;
             // G28 (26.3 Blocks static initializer, strength(destroyTime, resistance)); the rest of them equal their hardness
             case CINNABAR, DEEPSLATE, COBBLED_DEEPSLATE, GRANITE, RAW_COPPER_BLOCK, RAW_IRON_BLOCK, SULFUR, TUFF -> 6f;
-            case DEEPSLATE_IRON_ORE -> 3f;
+            case DEEPSLATE_IRON_ORE, DEEPSLATE_COAL_ORE, DEEPSLATE_COPPER_ORE, DEEPSLATE_DIAMOND_ORE, DEEPSLATE_EMERALD_ORE,
+                    DEEPSLATE_GOLD_ORE, DEEPSLATE_LAPIS_ORE, DEEPSLATE_REDSTONE_ORE -> 3f;
+            // C1: andesite and diorite strength(1.5, 6); InfestedBlock explosionResistance(0.75)
+            case ANDESITE, DIORITE -> 6f;
+            case INFESTED_STONE, INFESTED_DEEPSLATE -> 0.75f;
             case OAK_PLANKS -> 3f;
             case SANDSTONE -> 0.8f;
             case ICE -> 0.5f;

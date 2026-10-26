@@ -15,6 +15,10 @@ import java.util.List;
  * outputs in reverse order (so the first output is processed next, depth first); otherwise place the feature at every
  * output in order and OR the results. With no modifiers the feature is placed once at the origin. One placer is used per
  * chunk; its lists are reused.
+ *
+ * <p>Not vanilla (the {@link UnportedFeature} mechanism): in a top-level placement ({@link #placeWithBiomeCheck}) a
+ * {@link UnportedFeature.Reached} thrown by the feature stops every further feature call of that top-level placed
+ * feature, while its placement modifiers keep running to the end; nested placements let it propagate to the top level.
  */
 public final class FeaturePlacer {
 
@@ -42,9 +46,15 @@ public final class FeaturePlacer {
         Feature feature = placedFeature.feature();
         List<PlacementModifier> placement = placedFeature.placement();
         if (placement.isEmpty()) {
-            return feature.place(level, random, origin);
+            if (!biomeCheck) return feature.place(level, generator, random, origin);
+            try {
+                return feature.place(level, generator, random, origin);
+            } catch (UnportedFeature.Reached e) {
+                return false;
+            }
         }
         boolean placedAny = false;
+        boolean stopped = false;
         positions.add(origin);
         modifierIndices.add(0);
         while (!positions.isEmpty()) {
@@ -59,7 +69,15 @@ public final class FeaturePlacer {
                 }
             } else {
                 for (Pos nextPos : modifiedPositions) {
-                    placedAny |= feature.place(level, random, nextPos);
+                    if (!biomeCheck) {
+                        placedAny |= feature.place(level, generator, random, nextPos);
+                    } else if (!stopped) {
+                        try {
+                            placedAny |= feature.place(level, generator, random, nextPos);
+                        } catch (UnportedFeature.Reached e) {
+                            stopped = true;
+                        }
+                    }
                 }
             }
             modifiedPositions.clear();

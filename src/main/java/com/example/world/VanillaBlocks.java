@@ -72,9 +72,18 @@ public final class VanillaBlocks {
                 BlockType.CALCITE, BlockType.CINNABAR, BlockType.COARSE_DIRT, BlockType.COBBLED_DEEPSLATE, BlockType.DEEPSLATE_IRON_ORE,
                 BlockType.GRANITE, BlockType.POWDER_SNOW, BlockType.PACKED_ICE, BlockType.RAW_COPPER_BLOCK, BlockType.RAW_IRON_BLOCK,
                 BlockType.RED_SANDSTONE, BlockType.SULFUR, BlockType.TUFF, BlockType.WHITE_TERRACOTTA, BlockType.ORANGE_TERRACOTTA,
-                BlockType.YELLOW_TERRACOTTA, BlockType.BROWN_TERRACOTTA, BlockType.RED_TERRACOTTA, BlockType.LIGHT_GRAY_TERRACOTTA}) {
+                BlockType.YELLOW_TERRACOTTA, BlockType.BROWN_TERRACOTTA, BlockType.RED_TERRACOTTA, BlockType.LIGHT_GRAY_TERRACOTTA,
+                BlockType.ANDESITE, BlockType.DIORITE, BlockType.DEEPSLATE_COAL_ORE, BlockType.DEEPSLATE_COPPER_ORE,
+                BlockType.DEEPSLATE_DIAMOND_ORE, BlockType.DEEPSLATE_EMERALD_ORE, BlockType.DEEPSLATE_GOLD_ORE,
+                BlockType.DEEPSLATE_LAPIS_ORE, BlockType.EMERALD_ORE, BlockType.LAPIS_ORE, BlockType.INFESTED_STONE,
+                BlockType.MAGMA_BLOCK}) {
             simple(t, t.name().toLowerCase(java.util.Locale.ROOT));
         }
+        // RedStoneOreBlock: lit=false is the only state here (touching or stepping on it does not light it in this engine).
+        onlyDefaults(BlockType.REDSTONE_ORE, "redstone_ore", props("lit", BOOL_FALSE_FIRST));
+        onlyDefaults(BlockType.DEEPSLATE_REDSTONE_ORE, "deepslate_redstone_ore", props("lit", BOOL_FALSE_FIRST));
+        // InfestedRotatedPillarBlock: axis=y only, like deepslate.
+        onlyDefaults(BlockType.INFESTED_DEEPSLATE, "infested_deepslate", props("axis", List.of("y", "x", "z")));
 
         // SnowyBlock: snowy=true swaps the model for grass_block_snow, which the engine does not draw.
         for (BlockType t : new BlockType[]{BlockType.GRASS_BLOCK, BlockType.MYCELIUM, BlockType.PODZOL}) {

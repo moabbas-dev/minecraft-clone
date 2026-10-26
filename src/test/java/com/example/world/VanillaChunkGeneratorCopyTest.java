@@ -43,7 +43,7 @@ class VanillaChunkGeneratorCopyTest {
                 reference = new OverworldGenerator(DATA, seed);
             }
             Chunk chunk = new Chunk(cx, cz);
-            engine.generate(chunk, null);
+            engine.copyTerrainOnly(chunk);
             TerrainChunk terrain = reference.generate(cx, cz);
             String where = "seed " + seed + " chunk " + cx + "," + cz;
             for (int z = 0; z < 16; z++) {

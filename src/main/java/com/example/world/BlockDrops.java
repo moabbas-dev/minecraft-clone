@@ -107,6 +107,22 @@ public final class BlockDrops {
         OVERRIDES.put(BlockType.PODZOL, List.of(Drop.of(BlockType.DIRT)));
         OVERRIDES.put(BlockType.PACKED_ICE, NOTHING); // its only pool needs minecraft:tool/can_silk_touch
         OVERRIDES.put(BlockType.POWDER_SNOW, NOTHING); // its loot table has no pools
+
+        // C1 feature blocks, from the 26.3 loot tables without Silk Touch and Fortune (the ores' set_count ranges are uniform
+        // integer ranges). Andesite, diorite and magma drop themselves (survives_explosion only).
+        OVERRIDES.put(BlockType.DEEPSLATE_COAL_ORE, List.of(Drop.of(BlockType.COAL)));
+        OVERRIDES.put(BlockType.DEEPSLATE_COPPER_ORE, List.of(new Drop(BlockType.RAW_COPPER, 2, 5)));
+        OVERRIDES.put(BlockType.DEEPSLATE_DIAMOND_ORE, List.of(Drop.of(BlockType.DIAMOND)));
+        OVERRIDES.put(BlockType.DEEPSLATE_GOLD_ORE, List.of(Drop.of(BlockType.RAW_GOLD)));
+        OVERRIDES.put(BlockType.EMERALD_ORE, List.of(Drop.of(BlockType.EMERALD)));
+        OVERRIDES.put(BlockType.DEEPSLATE_EMERALD_ORE, List.of(Drop.of(BlockType.EMERALD)));
+        OVERRIDES.put(BlockType.LAPIS_ORE, List.of(new Drop(BlockType.LAPIS_LAZULI, 4, 9)));
+        OVERRIDES.put(BlockType.DEEPSLATE_LAPIS_ORE, List.of(new Drop(BlockType.LAPIS_LAZULI, 4, 9)));
+        OVERRIDES.put(BlockType.REDSTONE_ORE, List.of(new Drop(BlockType.REDSTONE, 4, 5)));
+        OVERRIDES.put(BlockType.DEEPSLATE_REDSTONE_ORE, List.of(new Drop(BlockType.REDSTONE, 4, 5)));
+        // Infested blocks: the only pool needs minecraft:tool/can_silk_touch (and breaking one spawns a silverfish, not implemented).
+        OVERRIDES.put(BlockType.INFESTED_STONE, NOTHING);
+        OVERRIDES.put(BlockType.INFESTED_DEEPSLATE, NOTHING);
     }
 
     /** The drop definitions for a block (empty = drops nothing). Never null. */

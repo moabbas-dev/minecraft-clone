@@ -7,14 +7,15 @@ import com.example.worldgen.random.RandomSource;
 /**
  * Port of {@code net.minecraft.world.level.levelgen.feature.Feature} (26.3): a decoded feature body (the flat
  * {@code worldgen/feature/*.json} object, there is no {@code ConfiguredFeature} wrapper in 26.3) that places itself at a
- * position. The {@code ChunkGenerator} parameter of vanilla's {@code place} is not used by any ported feature and is left out.
+ * position: {@code place(WorldGenLevel, ChunkGenerator, RandomSource, BlockPos)}. The generator is needed by the
+ * composition features ({@code PlacedFeature.place} / {@code new FeaturePlacer(level, generator)} of nested features).
  */
 public interface Feature {
 
     /** The {@code FeatureTypes} registry id ({@code minecraft:ore}, ...). */
     String type();
 
-    boolean place(GenRegion level, RandomSource random, Pos origin);
+    boolean place(GenRegion level, DecorationGenerator generator, RandomSource random, Pos origin);
 
     /** Whether the feature body is ported ({@link UnportedFeature} is not). */
     default boolean isPorted() {

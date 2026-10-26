@@ -198,6 +198,11 @@ public final class OverworldGenerator {
         return tags;
     }
 
+    /** {@code biomeSource.possibleBiomes()} in its order (the parameter-list order of the overworld preset). */
+    public List<String> possibleBiomes() {
+        return List.copyOf(biomeSource.possibleBiomes());
+    }
+
     public BiomeDefinition.Noises biomeNoises() {
         return biomeNoises;
     }

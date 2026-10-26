@@ -431,7 +431,8 @@ public class ChunkMeshBuilder {
             BlockType.LEATHER, BlockType.FEATHER, BlockType.EGG, BlockType.LEATHER_HELMET, BlockType.LEATHER_CHESTPLATE, BlockType.LEATHER_LEGGINGS, BlockType.LEATHER_BOOTS, BlockType.IRON_HELMET, BlockType.IRON_CHESTPLATE, BlockType.IRON_LEGGINGS, BlockType.IRON_BOOTS, BlockType.GOLD_HELMET, BlockType.GOLD_CHESTPLATE, BlockType.GOLD_LEGGINGS, BlockType.GOLD_BOOTS,
             BlockType.DIAMOND, BlockType.DIAMOND_SWORD, BlockType.DIAMOND_AXE, BlockType.DIAMOND_PICKAXE, BlockType.DIAMOND_SHOVEL, BlockType.DIAMOND_HELMET, BlockType.DIAMOND_CHESTPLATE, BlockType.DIAMOND_LEGGINGS, BlockType.DIAMOND_BOOTS,
             BlockType.FLINT, BlockType.CLAY_BALL, BlockType.SNOWBALL, BlockType.GLOWSTONE_DUST, BlockType.BOOK,
-            BlockType.GUNPOWDER, BlockType.BONE, BlockType.ARROW, BlockType.STRING, BlockType.SPIDER_EYE);
+            BlockType.GUNPOWDER, BlockType.BONE, BlockType.ARROW, BlockType.STRING, BlockType.SPIDER_EYE,
+            BlockType.LAPIS_LAZULI, BlockType.REDSTONE, BlockType.EMERALD);
 
     public static boolean isFlatIconItem(BlockType type) {
         return isCrossShapedPlant(type) || type == BlockType.TORCH || type == BlockType.GOLDEN_APPLE || type == BlockType.BUCKET || type == BlockType.WATER_BUCKET || type == BlockType.LAVA_BUCKET || type == BlockType.WHEAT || type == BlockType.WHEAT_SEEDS

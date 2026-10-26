@@ -9,7 +9,6 @@ import com.example.worldgen.feature.level.GenRegion;
 import com.example.worldgen.feature.level.TerrainFeatureChunk;
 import com.example.worldgen.feature.placement.PlacementModifier;
 import com.example.worldgen.feature.placement.PlacementModifiers;
-import com.example.worldgen.feature.predicate.BlockPredicates;
 import com.example.worldgen.json.Json;
 import com.example.worldgen.level.StateRef;
 import com.example.worldgen.random.RandomSource;
@@ -52,10 +51,20 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  *     providers) through the real {@code FeaturePlacer.place}, logging positions and draw counts;</li>
  *     <li>{@code MODE A}: the whole decoration loop with every top-level placed feature's real modifier chain feeding a logging
  *     feature (features whose chain needs the unported {@code would_survive} are skipped on both sides);</li>
- *     <li>{@code MODE B}: the loop with the real ported features writing blocks (every other feature skipped on both sides);
- *     every {@code setBlock}, section write, post-processing mark and fluid tick is compared in order, plus the random draw
- *     count at each feature start and at the end.</li>
+ *     <li>{@code MODE B}: the loop with the real ported features writing blocks (every other top-level feature skipped on both
+ *     sides; a nested unported feature, a light read or a region-random read throws on both sides and stops further feature
+ *     calls of that top-level placed feature, see {@link UnportedFeature}); every {@code setBlock}, section write,
+ *     post-processing mark, fluid tick and block tick is compared in order, plus the random draw count at each feature start
+ *     and at the end;</li>
+ *     <li>{@code SURV}: the real block classes' {@code canSurvive} (FlowerBlock, SaplingBlock, DoublePlantBlock, CactusBlock,
+ *     SugarCaneBlock, coral, ... allocated without constructors) for every ported block over supports and contexts;</li>
+ *     <li>{@code PROV}: every block state provider type at fixed positions (states and draw counts);</li>
+ *     <li>{@code FEAT}: every named configured feature of the ported types placed directly at fixed positions over fresh
+ *     terrain of 12 regions.</li>
  * </ul>
+ * Real vanilla in these sections: the feature, provider, predicate, placement and block classes. Harness (shared with the
+ * port): block-state shape / fluid facts ({@code BlockStateFacts}), state definitions ({@code BlockStateDefinitions}), tag
+ * contents, the terrain chunks.
  */
 class FeatureOracleTest {
 
@@ -105,7 +114,7 @@ class FeatureOracleTest {
         }
 
         @Override
-        public boolean place(GenRegion level, RandomSource random, Pos origin) {
+        public boolean place(GenRegion level, DecorationGenerator generator, RandomSource random, Pos origin) {
             out.add("P " + origin.x() + " " + origin.y() + " " + origin.z() + " " + ((WorldgenRandom) random).getCount());
             return true;
         }
@@ -119,7 +128,7 @@ class FeatureOracleTest {
         }
     }
 
-    /** Mode A placed features: the real chain into a logging feature, or skipped when the chain needs would_survive. */
+    /** Mode A placed features: the real modifier chain into a logging feature. */
     static java.util.function.Function<String, PlacedFeature> positionsLibrary(List<String> out) {
         Map<String, PlacedFeature> cache = new HashMap<>();
         Map<String, Feature> features = new HashMap<>();
@@ -127,9 +136,6 @@ class FeatureOracleTest {
             @SuppressWarnings("unchecked")
             Map<String, Object> m = (Map<String, Object>) json("minecraft/worldgen/placed_feature/" + k.substring(10) + ".json");
             Object placement = m.get("placement");
-            if (BlockPredicates.usesUnportedType(placement)) {
-                return new PlacedFeature(k, new UnportedFeature("would_survive chain", placement), List.of(), placement);
-            }
             Object f = m.get("feature");
             Feature feature = f instanceof String s ? features.computeIfAbsent(s, x -> new Logging(out)) : new Logging(out);
             List<PlacementModifier> mods = PlacementModifiers.list(placement, tags, noises);
@@ -172,6 +178,11 @@ class FeatureOracleTest {
             @Override
             public void fluidTick(int x, int y, int z, String fluid) {
                 out.add("T " + x + " " + y + " " + z + " " + fluid);
+            }
+
+            @Override
+            public void blockTick(int x, int y, int z, String block, int delay) {
+                out.add("K " + x + " " + y + " " + z + " " + block + " " + delay);
             }
         });
         return r;
@@ -227,6 +238,11 @@ class FeatureOracleTest {
         long bEvents = 0;
         long writes = 0;
         long nanos = 0;
+        int survivalVectors = 0;
+        int providerVectors = 0;
+        int featCases = 0;
+        long featureEvents = 0;
+        long featureWrites = 0;
         Map<Long, OverworldGenerator> terrains = new HashMap<>();
         try (InputStream in = getClass().getResourceAsStream("features_golden.txt.gz")) {
             assertNotNull(in, "golden resource");
@@ -294,7 +310,7 @@ class FeatureOracleTest {
                     }
                     List<String> expectedB = new ArrayList<>();
                     line = reader.readLine();
-                    while (!line.startsWith("CASE") && !line.equals("END")) {
+                    while (!line.startsWith("CASE") && !line.startsWith("FEATCASE") && !line.equals("END")) {
                         expectedB.add(line);
                         line = reader.readLine();
                     }
@@ -311,6 +327,52 @@ class FeatureOracleTest {
                     bEvents += compare(expectedB, outB, "mode B " + label);
                     writes += outB.stream().filter(s -> s.startsWith("S ") || s.startsWith("B ")).count();
                     cases++;
+                } else if (p[0].equals("SURVSPEC")) {
+                    List<String> states = List.of(p).subList(1, p.length);
+                    String[] sup = reader.readLine().split(" ");
+                    String[] ctx = reader.readLine().split(" ");
+                    List<String> supports = List.of(sup).subList(1, sup.length);
+                    List<String> contexts = List.of(ctx).subList(1, ctx.length);
+                    line = reader.readLine();
+                    while (line.startsWith("V ")) {
+                        String[] v = line.split(" ");
+                        String state = states.get(Integer.parseInt(v[1]));
+                        String support = supports.get(Integer.parseInt(v[2]));
+                        assertEquals(v[3], VegetationVectors.survival(tags, state, support, contexts),
+                                "canSurvive of " + state + " on " + support + " in " + contexts);
+                        survivalVectors += v[3].length();
+                        line = reader.readLine();
+                    }
+                } else if (p[0].equals("PROVSPEC")) {
+                    int k = Integer.parseInt(p[1]);
+                    List<String> expected = new ArrayList<>();
+                    line = reader.readLine();
+                    while (line.startsWith("Q ")) {
+                        expected.add(line);
+                        line = reader.readLine();
+                    }
+                    List<String> out = new ArrayList<>();
+                    VegetationVectors.provider(loader.providers(), tags, k, p[2], out);
+                    compare(expected, out, "provider " + p[2]);
+                    providerVectors += out.size();
+                } else if (p[0].equals("FEATCASE")) {
+                    long seed = Long.parseLong(p[1]);
+                    int cx = Integer.parseInt(p[2]);
+                    int cz = Integer.parseInt(p[3]);
+                    List<String> ids = List.of(p[4].split(","));
+                    List<String> expected = new ArrayList<>();
+                    line = reader.readLine();
+                    while (!line.startsWith("FEATCASE") && !line.equals("END")) {
+                        expected.add(line);
+                        line = reader.readLine();
+                    }
+                    List<String> out = new ArrayList<>();
+                    GenRegion region = genRegion(seed, cx, cz,
+                            region(terrains.computeIfAbsent(seed, s -> new OverworldGenerator(DATA, s)), cx, cz), out);
+                    VegetationVectors.features(loader, ids, region, seed, cx, cz, out);
+                    featureEvents += compare(expected, out, "features seed " + seed + " chunk " + cx + "," + cz);
+                    featureWrites += out.stream().filter(s -> s.startsWith("S ")).count();
+                    featCases++;
                 } else {
                     throw new AssertionError("unexpected golden line " + line);
                 }
@@ -320,7 +382,12 @@ class FeatureOracleTest {
         assertEquals(40, synth);
         assertTrue(cases >= 20);
         assertTrue(writes > 10000, "block writes compared: " + writes);
+        assertTrue(survivalVectors > 10000, "survival vectors: " + survivalVectors);
+        assertTrue(providerVectors >= 48 * 20, "provider vectors: " + providerVectors);
+        assertTrue(featCases >= 12 && featureWrites > 5000, "feature vectors: " + featCases + " cases, " + featureWrites + " writes");
         System.out.printf("feature oracle: %d sorter steps, %d synthetic chains, %d cases, %d mode-A events, %d mode-B events (%d block writes); "
-                + "decoration %.2f ms/chunk%n", steps, synth, cases, aEvents, bEvents, writes, nanos / 1e6 / cases);
+                + "decoration %.2f ms/chunk; %d canSurvive vectors, %d provider samples, %d feature cases (%d events, %d block writes)%n",
+                steps, synth, cases, aEvents, bEvents, writes, nanos / 1e6 / cases, survivalVectors, providerVectors, featCases,
+                featureEvents, featureWrites);
     }
 }

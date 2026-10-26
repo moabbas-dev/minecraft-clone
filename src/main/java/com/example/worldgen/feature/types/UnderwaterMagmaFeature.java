@@ -36,7 +36,7 @@ public record UnderwaterMagmaFeature(int floorSearchRange, int placementRadiusAr
     }
 
     @Override
-    public boolean place(GenRegion level, RandomSource random, Pos origin) {
+    public boolean place(GenRegion level, com.example.worldgen.feature.DecorationGenerator generator, RandomSource random, Pos origin) {
         Integer floorY = getFloorY(level, origin);
         if (floorY == null) return false;
         int r = placementRadiusAroundFloor;

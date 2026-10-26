@@ -24,7 +24,12 @@ public final class TerrainFeatureChunk implements FeatureChunk {
     }
 
     private final TerrainChunk chunk;
+    /** One scheduled block tick: the block id, the position and the delay. */
+    public record BlockTick(String block, int x, int y, int z, int delay) {
+    }
+
     private final List<FluidTick> fluidTicks = new ArrayList<>();
+    private final List<BlockTick> blockTicks = new ArrayList<>();
     private final Set<FluidTick> fluidTickSet = new HashSet<>();
 
     public TerrainFeatureChunk(TerrainChunk chunk) {
@@ -87,6 +92,16 @@ public final class TerrainFeatureChunk implements FeatureChunk {
     public void scheduleFluidTick(int x, int y, int z, String fluid) {
         FluidTick tick = new FluidTick(fluid, x, y, z);
         if (fluidTickSet.add(tick)) fluidTicks.add(tick);
+    }
+
+    /** The block ticks scheduled during decoration, in scheduling order. */
+    public List<BlockTick> blockTicks() {
+        return Collections.unmodifiableList(blockTicks);
+    }
+
+    @Override
+    public void scheduleBlockTick(int x, int y, int z, String block, int delay) {
+        blockTicks.add(new BlockTick(block, x, y, z, delay));
     }
 
     @Override

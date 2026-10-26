@@ -58,7 +58,7 @@ public final class OreFeature implements Feature {
     }
 
     @Override
-    public boolean place(GenRegion level, RandomSource random, Pos origin) {
+    public boolean place(GenRegion level, com.example.worldgen.feature.DecorationGenerator generator, RandomSource random, Pos origin) {
         float dir = random.nextFloat() * (float) Math.PI;
         float spreadXY = (float) size / 8.0F;
         int maxRadius = (int) Math.ceil((double) (((float) size / 16.0F * 2.0F + 1.0F) / 2.0F));

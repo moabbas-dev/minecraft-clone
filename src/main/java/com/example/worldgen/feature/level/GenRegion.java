@@ -60,6 +60,9 @@ public final class GenRegion {
 
         default void fluidTick(int x, int y, int z, String fluid) {
         }
+
+        default void blockTick(int x, int y, int z, String block, int delay) {
+        }
     }
 
     private final long seed;
@@ -222,6 +225,35 @@ public final class GenRegion {
     public void scheduleFluidTick(int x, int y, int z, String fluid) {
         getChunkAt(x, z).scheduleFluidTick(x, y, z, fluid);
         listener.fluidTick(x, y, z, fluid);
+    }
+
+    /**
+     * {@code LevelAccessor.scheduleTick(pos, block, delay)} = {@code getBlockTicks().schedule(createTick(pos, block, delay))}
+     * ({@code WorldGenRegion.blockTicks} forwards to the chunk's block ticks). {@code createTick} also stamps the tick with
+     * {@code getGameTime() + delay} and {@code nextSubTickCount()}, server state that is not modelled; the block, the
+     * position and the delay are recorded.
+     */
+    public void scheduleBlockTick(int x, int y, int z, String block, int delay) {
+        getChunkAt(x, z).scheduleBlockTick(x, y, z, block, delay);
+        listener.blockTick(x, y, z, block, delay);
+    }
+
+    /**
+     * {@code WorldGenRegion.getRandom()}: the region's own random, {@code randomState.getOrCreateRandomFactory(
+     * "worldgen_region_random").at(centre)}, which every user in the chunk shares; its state at a given call depends on all
+     * earlier users, including unported features, so it is not modelled ({@link UnportedFeature.Reached}).
+     */
+    public com.example.worldgen.random.RandomSource getRandom() {
+        throw new com.example.worldgen.feature.UnportedFeature.Reached("WorldGenRegion.getRandom (region random) is not modelled");
+    }
+
+    /**
+     * {@code LevelReader.getRawBrightness(pos, amount)} = {@code getLightEngine().getRawBrightness(pos, amount)};
+     * {@code WorldGenRegion.getLightEngine()} returns the server level's light engine, whose state for a chunk at the
+     * FEATURES status depends on the server (sky light sections of neighbouring, possibly lit chunks), so it is not modelled.
+     */
+    public int getRawBrightness(Pos pos, int amount) {
+        throw new com.example.worldgen.feature.UnportedFeature.Reached("light (getRawBrightness) during FEATURES is not modelled");
     }
 
     /** {@code getHeight(type, x, z)}: the first free Y above the column's highest {@code type} block. */

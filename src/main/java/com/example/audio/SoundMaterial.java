@@ -81,6 +81,11 @@ public enum SoundMaterial {
         BY_BLOCK.put(BlockType.PODZOL, GRAVEL);
         BY_BLOCK.put(BlockType.MYCELIUM, GRASS);
         BY_BLOCK.put(BlockType.PACKED_ICE, GLASS);
+        // C1 feature blocks without a .sound(...) call: SoundType.STONE.
+        for (BlockType b : new BlockType[]{BlockType.ANDESITE, BlockType.DIORITE, BlockType.EMERALD_ORE, BlockType.LAPIS_ORE,
+                BlockType.REDSTONE_ORE, BlockType.INFESTED_STONE, BlockType.MAGMA_BLOCK}) {
+            BY_BLOCK.put(b, STONE);
+        }
         // AIR, WATER, and every tool/STICK/food item (see ToolEffectiveness/FoodRegistry): never targeted for
         // break/place, and never solid-collision ground for footsteps either - deliberately
         // left unmapped, materialFor() returns null for all of them.
@@ -93,7 +98,10 @@ public enum SoundMaterial {
      */
     public static final java.util.Set<BlockType> MISSING_VANILLA_SOUND = java.util.EnumSet.of(
             BlockType.CALCITE, BlockType.CINNABAR, BlockType.DEEPSLATE, BlockType.COBBLED_DEEPSLATE,
-            BlockType.DEEPSLATE_IRON_ORE, BlockType.SULFUR, BlockType.TUFF, BlockType.POWDER_SNOW);
+            BlockType.DEEPSLATE_IRON_ORE, BlockType.SULFUR, BlockType.TUFF, BlockType.POWDER_SNOW,
+            // C1: SoundType.DEEPSLATE
+            BlockType.DEEPSLATE_COAL_ORE, BlockType.DEEPSLATE_COPPER_ORE, BlockType.DEEPSLATE_DIAMOND_ORE, BlockType.DEEPSLATE_EMERALD_ORE,
+            BlockType.DEEPSLATE_GOLD_ORE, BlockType.DEEPSLATE_LAPIS_ORE, BlockType.DEEPSLATE_REDSTONE_ORE, BlockType.INFESTED_DEEPSLATE);
 
     /** Null for AIR/WATER/anything never solid-collision-walkable or player-breakable, and for {@link #MISSING_VANILLA_SOUND}. */
     public static SoundMaterial materialFor(BlockType type) {

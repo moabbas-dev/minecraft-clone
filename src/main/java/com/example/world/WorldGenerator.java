@@ -47,6 +47,37 @@ public interface WorldGenerator {
         return List.of();
     }
 
+    /** Fluid ticks (world x, y, z, delay 0) the last {@link #generate} of {@code chunk} scheduled in it, handed over once. */
+    default List<int[]> takeFluidTicks(Chunk chunk) {
+        return List.of();
+    }
+
+    /**
+     * The chessboard radius of the chunks that must be at least TERRAIN before {@link #generate} can make a chunk FULL (the 5 x 5
+     * rule of the vanilla generator: 2); 0 for a generator that needs no neighbours (flat).
+     */
+    default int dependencyRadius() {
+        return 0;
+    }
+
+    /** Whether chunk (cx, cz) is held at status TERRAIN by this generator. */
+    default boolean hasTerrain(int cx, int cz) {
+        return false;
+    }
+
+    /** Generates chunk (cx, cz) to status TERRAIN unless it is held already; true when it did that work. */
+    default boolean ensureTerrain(int cx, int cz, java.io.File saveDir) {
+        return false;
+    }
+
+    /** Drops the TERRAIN chunks farther than {@code radius} (chessboard) from the given chunk, keeping what must be kept. */
+    default void evictTerrain(int centerX, int centerZ, int radius, java.io.File saveDir) {
+    }
+
+    /** Writes what the generator must keep across a save (the journals of TERRAIN chunks that received decoration writes). */
+    default void saveGenerationState(java.io.File saveDir) {
+    }
+
     /** The biome file of a biome id this generator places ({@code data/minecraft/worldgen/biome/<id>.json}); null without biomes. */
     default BiomeDefinition biomeDefinition(String biomeId) {
         return null;

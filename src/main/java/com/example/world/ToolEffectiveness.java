@@ -109,7 +109,12 @@ public final class ToolEffectiveness {
             BlockType.CALCITE, BlockType.CINNABAR, BlockType.DEEPSLATE, BlockType.COBBLED_DEEPSLATE, BlockType.DEEPSLATE_IRON_ORE,
             BlockType.GRANITE, BlockType.PACKED_ICE, BlockType.RAW_COPPER_BLOCK, BlockType.RAW_IRON_BLOCK, BlockType.RED_SANDSTONE,
             BlockType.SULFUR, BlockType.TUFF, BlockType.WHITE_TERRACOTTA, BlockType.ORANGE_TERRACOTTA, BlockType.YELLOW_TERRACOTTA,
-            BlockType.BROWN_TERRACOTTA, BlockType.RED_TERRACOTTA, BlockType.LIGHT_GRAY_TERRACOTTA);
+            BlockType.BROWN_TERRACOTTA, BlockType.RED_TERRACOTTA, BlockType.LIGHT_GRAY_TERRACOTTA,
+            // C1 feature blocks: tags/block/mineable/pickaxe.json in the 26.3 jar.
+            BlockType.ANDESITE, BlockType.DIORITE, BlockType.DEEPSLATE_COAL_ORE, BlockType.DEEPSLATE_COPPER_ORE,
+            BlockType.DEEPSLATE_DIAMOND_ORE, BlockType.DEEPSLATE_EMERALD_ORE, BlockType.DEEPSLATE_GOLD_ORE, BlockType.DEEPSLATE_LAPIS_ORE,
+            BlockType.DEEPSLATE_REDSTONE_ORE, BlockType.EMERALD_ORE, BlockType.LAPIS_ORE, BlockType.REDSTONE_ORE,
+            BlockType.INFESTED_STONE, BlockType.INFESTED_DEEPSLATE, BlockType.MAGMA_BLOCK);
 
     /** Blocks an axe speeds up: every log species, planks, and the wood-family furniture blocks. */
     private static final Set<BlockType> AXE_BLOCKS = EnumSet.of(
@@ -148,6 +153,17 @@ public final class ToolEffectiveness {
         m.put(BlockType.RAW_COPPER_BLOCK, Tier.STONE.harvestLevel);
         m.put(BlockType.RAW_IRON_BLOCK, Tier.STONE.harvestLevel);
         m.remove(BlockType.PACKED_ICE);
+        // C1: tags/block/needs_stone_tool.json and needs_iron_tool.json; the infested blocks' Properties have no
+        // requiresCorrectToolForDrops (their loot needs Silk Touch anyway).
+        for (BlockType b : new BlockType[]{BlockType.DEEPSLATE_COPPER_ORE, BlockType.LAPIS_ORE, BlockType.DEEPSLATE_LAPIS_ORE}) {
+            m.put(b, Tier.STONE.harvestLevel);
+        }
+        for (BlockType b : new BlockType[]{BlockType.DEEPSLATE_GOLD_ORE, BlockType.DEEPSLATE_DIAMOND_ORE, BlockType.EMERALD_ORE,
+                BlockType.DEEPSLATE_EMERALD_ORE, BlockType.REDSTONE_ORE, BlockType.DEEPSLATE_REDSTONE_ORE}) {
+            m.put(b, Tier.IRON.harvestLevel);
+        }
+        m.remove(BlockType.INFESTED_STONE);
+        m.remove(BlockType.INFESTED_DEEPSLATE);
         return m;
     }
 

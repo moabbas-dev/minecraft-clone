@@ -228,6 +228,27 @@ public class BlockTextureMap {
         uniform(BlockType.BROWN_TERRACOTTA, Tile.BROWN_TERRACOTTA);
         uniform(BlockType.RED_TERRACOTTA, Tile.RED_TERRACOTTA);
         uniform(BlockType.LIGHT_GRAY_TERRACOTTA, Tile.LIGHT_GRAY_TERRACOTTA);
+
+        // C1 feature blocks: cube_all models; infested stone and infested deepslate use the stone and deepslate models (their
+        // blockstates' random mirrored/rotated variants are not drawn, as for stone and deepslate).
+        uniform(BlockType.ANDESITE, Tile.ANDESITE);
+        uniform(BlockType.DIORITE, Tile.DIORITE);
+        uniform(BlockType.DEEPSLATE_COAL_ORE, Tile.DEEPSLATE_COAL_ORE);
+        uniform(BlockType.DEEPSLATE_COPPER_ORE, Tile.DEEPSLATE_COPPER_ORE);
+        uniform(BlockType.DEEPSLATE_DIAMOND_ORE, Tile.DEEPSLATE_DIAMOND_ORE);
+        uniform(BlockType.DEEPSLATE_EMERALD_ORE, Tile.DEEPSLATE_EMERALD_ORE);
+        uniform(BlockType.DEEPSLATE_GOLD_ORE, Tile.DEEPSLATE_GOLD_ORE);
+        uniform(BlockType.DEEPSLATE_LAPIS_ORE, Tile.DEEPSLATE_LAPIS_ORE);
+        uniform(BlockType.DEEPSLATE_REDSTONE_ORE, Tile.DEEPSLATE_REDSTONE_ORE);
+        uniform(BlockType.EMERALD_ORE, Tile.EMERALD_ORE);
+        uniform(BlockType.LAPIS_ORE, Tile.LAPIS_ORE);
+        uniform(BlockType.REDSTONE_ORE, Tile.REDSTONE_ORE);
+        uniform(BlockType.INFESTED_STONE, Tile.STONE);
+        put(BlockType.INFESTED_DEEPSLATE, Tile.DEEPSLATE_TOP, Tile.DEEPSLATE, Tile.DEEPSLATE_TOP);
+        uniform(BlockType.MAGMA_BLOCK, Tile.MAGMA);
+        uniform(BlockType.LAPIS_LAZULI, Tile.LAPIS_LAZULI);
+        uniform(BlockType.REDSTONE, Tile.REDSTONE);
+        uniform(BlockType.EMERALD, Tile.EMERALD);
     }
 
     private void uniform(BlockType type, Tile tile) {

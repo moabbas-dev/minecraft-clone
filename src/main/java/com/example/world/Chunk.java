@@ -122,6 +122,12 @@ public class Chunk {
         return quartBiomes != null;
     }
 
+    /** Every quart biome of the chunk (with repeats), for {@code FeatureChunk.forEachStoredBiome}. */
+    public void forEachQuartBiome(java.util.function.Consumer<String> consumer) {
+        if (quartBiomes == null) throw new IllegalStateException("chunk " + chunkX + "," + chunkZ + " has no biomes");
+        for (String b : quartBiomes) consumer.accept(b);
+    }
+
     /** {@code ChunkAccess.getNoiseBiome(quartX, quartY, quartZ)}: quart Y clamped into the chunk, x and z taken {@code & 3}. */
     public String getNoiseBiome(int quartX, int quartY, int quartZ) {
         int quartMinY = MIN_Y >> 2;

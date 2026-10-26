@@ -5,7 +5,14 @@ import com.example.worldgen.feature.placement.PlacementModifiers;
 import com.example.worldgen.feature.predicate.BlockPredicates;
 import com.example.worldgen.feature.predicate.RuleTest;
 import com.example.worldgen.feature.stateprovider.BlockStateProviders;
+import com.example.worldgen.feature.level.BlockSurvival;
+import com.example.worldgen.feature.types.BambooFeature;
+import com.example.worldgen.feature.types.BlockColumnFeature;
+import com.example.worldgen.feature.types.CompositeFeatures;
 import com.example.worldgen.feature.types.DiskFeature;
+import com.example.worldgen.feature.types.SimpleBlockFeature;
+import com.example.worldgen.feature.types.VinesFeature;
+import com.example.worldgen.provider.WeightedList;
 import com.example.worldgen.feature.types.OreFeature;
 import com.example.worldgen.feature.types.SpringFeature;
 import com.example.worldgen.feature.types.UnderwaterMagmaFeature;
@@ -36,7 +43,8 @@ import java.util.Set;
  * {@code BiomeFilter} work on these objects). Decode errors throw.
  *
  * <p>Feature types: all 58 ids of {@code FeatureTypes.bootstrap} are known ({@link #REGISTERED_TYPES}); the ported ones
- * ({@link #PORTED_TYPES}) decode to their classes, every other one to an {@link UnportedFeature}.
+ * ({@link #PORTED_TYPES}) decode to their classes, every other one to an {@link UnportedFeature}. Placement modifiers are
+ * decoded for every placed feature (a nested unported feature still runs its modifiers before it is reached).
  */
 public final class FeatureLoader {
 
@@ -53,12 +61,15 @@ public final class FeatureLoader {
             "weighted_random_selector");
 
     /** The feature types ported so far. */
-    public static final Set<String> PORTED_TYPES = Set.of("ore", "disk", "spring_feature", "underwater_magma", "no_op");
+    public static final Set<String> PORTED_TYPES = Set.of("ore", "disk", "spring_feature", "underwater_magma", "no_op",
+            "simple_block", "block_column", "bamboo", "vines", "random_selector", "simple_random_selector",
+            "weighted_random_selector", "random_boolean_selector", "sequence", "overlay");
 
     private final Path dataRoot;
     private final BlockTags tags;
     private final BiomeDefinition.Noises noises;
     private final BlockStateProviders providers;
+    private final BlockSurvival survival;
     private final Map<String, Feature> features = new HashMap<>();
     private final Map<String, PlacedFeature> placedFeatures = new HashMap<>();
 
@@ -67,6 +78,15 @@ public final class FeatureLoader {
         this.tags = tags;
         this.noises = noises;
         this.providers = new BlockStateProviders(dataRoot, tags);
+        this.survival = BlockSurvival.of(tags);
+    }
+
+    public BlockSurvival survival() {
+        return survival;
+    }
+
+    public BlockStateProviders providers() {
+        return providers;
     }
 
     public BlockTags tags() {
@@ -114,7 +134,6 @@ public final class FeatureLoader {
         Feature feature = featureHolder(CodecJson.field(m, "feature"));
         Object placement = CodecJson.field(m, "placement");
         CodecJson.list(placement, "placement");
-        if (!feature.isPorted()) return new PlacedFeature(id, feature, List.of(), placement);
         return new PlacedFeature(id, feature, PlacementModifiers.list(placement, tags, noises), placement);
     }
 
@@ -177,9 +196,64 @@ public final class FeatureLoader {
                                 "placement_probability_per_valid_position"));
             case "no_op":
                 return NoOpFeature.INSTANCE;
+            case "simple_block": {
+                Object st = m.get("schedule_tick");
+                return new SimpleBlockFeature(providers.parse(CodecJson.field(m, "to_place")),
+                        st != null && CodecJson.boolValue(st, "schedule_tick"), survival);
+            }
+            case "block_column": {
+                List<BlockColumnFeature.Layer> layers = new ArrayList<>();
+                for (Object l : CodecJson.list(CodecJson.field(m, "layers"), "layers")) {
+                    Map<String, Object> lm = CodecJson.object(l, "layer");
+                    layers.add(new BlockColumnFeature.Layer(IntProvider.parseNonNegative(CodecJson.field(lm, "height")),
+                            providers.parse(CodecJson.field(lm, "provider"))));
+                }
+                return new BlockColumnFeature(List.copyOf(layers), Direction.parse(CodecJson.field(m, "direction")),
+                        BlockPredicates.parse(CodecJson.field(m, "allowed_placement"), tags),
+                        CodecJson.boolValue(CodecJson.field(m, "prioritize_tip"), "prioritize_tip"));
+            }
+            case "bamboo":
+                return new BambooFeature(CodecJson.floatInRange(CodecJson.field(m, "probability"), 0.0F, 1.0F, "probability"), survival);
+            case "vines":
+                return new VinesFeature();
+            case "random_selector": {
+                List<CompositeFeatures.WeightedPlacedFeature> entries = new ArrayList<>();
+                for (Object e : CodecJson.list(CodecJson.field(m, "features"), "features")) {
+                    Map<String, Object> em = CodecJson.object(e, "weighted placed feature");
+                    entries.add(new CompositeFeatures.WeightedPlacedFeature(placedFeatureHolder(CodecJson.field(em, "feature")),
+                            CodecJson.floatInRange(CodecJson.field(em, "chance"), 0.0F, 1.0F, "chance")));
+                }
+                return new CompositeFeatures.RandomSelector(List.copyOf(entries), placedFeatureHolder(CodecJson.field(m, "default")));
+            }
+            case "simple_random_selector":
+                return new CompositeFeatures.SimpleRandomSelector(nonEmptyPlacedList(CodecJson.field(m, "features")));
+            case "weighted_random_selector": {
+                List<WeightedList.Weighted<PlacedFeature>> entries = new ArrayList<>();
+                for (Object e : CodecJson.list(CodecJson.field(m, "features"), "features")) {
+                    Map<String, Object> em = CodecJson.object(e, "weighted entry");
+                    entries.add(new WeightedList.Weighted<>(placedFeatureHolder(CodecJson.field(em, "data")),
+                            CodecJson.intInRange(CodecJson.field(em, "weight"), 0, Integer.MAX_VALUE, "weight")));
+                }
+                return new CompositeFeatures.WeightedRandomSelector(WeightedList.of(entries));
+            }
+            case "random_boolean_selector":
+                return new CompositeFeatures.RandomBooleanSelector(placedFeatureHolder(CodecJson.field(m, "feature_true")),
+                        placedFeatureHolder(CodecJson.field(m, "feature_false")));
+            case "sequence":
+                return new CompositeFeatures.Sequence(nonEmptyPlacedList(CodecJson.field(m, "features")));
+            case "overlay":
+                return new CompositeFeatures.Overlay(nonEmptyPlacedList(CodecJson.field(m, "features")));
             default:
                 return new UnportedFeature("minecraft:" + type, json);
         }
+    }
+
+    /** {@code ExtraCodecs.nonEmptyHolderSet(PlacedFeature.LIST_CODEC)}: a non-empty list of placed feature holders, in order. */
+    private List<PlacedFeature> nonEmptyPlacedList(Object json) {
+        List<PlacedFeature> out = new ArrayList<>();
+        for (Object o : CodecJson.list(json, "placed features")) out.add(placedFeatureHolder(o));
+        if (out.isEmpty()) throw new CodecJson.CodecException("Holder set must not be empty");
+        return List.copyOf(out);
     }
 
     /**
@@ -214,7 +288,7 @@ public final class FeatureLoader {
         }
 
         @Override
-        public boolean place(com.example.worldgen.feature.level.GenRegion level, RandomSource random, Pos origin) {
+        public boolean place(com.example.worldgen.feature.level.GenRegion level, DecorationGenerator generator, RandomSource random, Pos origin) {
             return true;
         }
     }

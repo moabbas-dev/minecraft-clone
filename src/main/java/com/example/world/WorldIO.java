@@ -202,6 +202,7 @@ public class WorldIO {
             out.writeInt(CHUNK_FORMAT_VERSION);
             out.writeInt(Chunk.MIN_Y);
             out.writeInt(Chunk.SIZE_Y);
+            out.writeUTF(CHUNK_STATUS_FULL);
             java.nio.ByteBuffer buffer = java.nio.ByteBuffer.allocate(blocks.length * 2);
             buffer.asShortBuffer().put(blocks);
             out.write(buffer.array());
@@ -251,22 +252,28 @@ public class WorldIO {
         return chunkFile(dir, cx, cz).isFile();
     }
 
-    /** Magic number and format version at the start of every chunk file: min_y, height and 16-bit block ids follow. */
+    /**
+     * Magic number and format version at the start of every chunk file; min_y, height, the chunk status (UTF) and the 16-bit block
+     * ids follow. Version 3 added the status: only FULL chunks (decorated, {@code VanillaChunkGenerator}) are ever saved; a chunk
+     * at TERRAIN is recomputed from the seed (plus its decoration journal) instead.
+     */
     private static final int CHUNK_MAGIC = 0x4D434B32; // "MCK2"
-    private static final int CHUNK_FORMAT_VERSION = 2;
+    static final int CHUNK_FORMAT_VERSION = 3;
+    /** The status every saved chunk has. */
+    static final String CHUNK_STATUS_FULL = "minecraft:full";
     private static boolean legacyWarned;
 
     /**
      * The blocks of a saved chunk, or null if there is none. A file without the header (the 256-high, 8-bit format written before the
-     * vanilla world height) or with another range is a legacy chunk: it cannot be converted - it holds terrain of the old invented
-     * generator at heights that do not exist any more - so it is reported once and the chunk is generated afresh instead of being
-     * misread as the new format.
+     * vanilla world height), with another range, or of format version 2 (vanilla terrain without feature decoration) is a legacy
+     * chunk: old generations are not migrated, so it is reported once and the chunk is generated afresh instead of being misread.
      */
     public static short[] loadChunk(File dir, int cx, int cz) {
         File file = chunkFile(dir, cx, cz);
         if (!file.isFile()) return null;
         try (DataInputStream in = new DataInputStream(new BufferedInputStream(new FileInputStream(file)))) {
-            if (in.readInt() != CHUNK_MAGIC || in.readInt() != CHUNK_FORMAT_VERSION || in.readInt() != Chunk.MIN_Y || in.readInt() != Chunk.SIZE_Y) {
+            if (in.readInt() != CHUNK_MAGIC || in.readInt() != CHUNK_FORMAT_VERSION || in.readInt() != Chunk.MIN_Y || in.readInt() != Chunk.SIZE_Y
+                    || !CHUNK_STATUS_FULL.equals(in.readUTF())) {
                 warnLegacy(dir);
                 return null;
             }
@@ -287,7 +294,42 @@ public class WorldIO {
     private static void warnLegacy(File dir) {
         if (legacyWarned) return;
         legacyWarned = true;
-        System.err.println("World " + dir + " holds chunks in the legacy format (256 high, 8-bit ids, invented terrain); they cannot be read and are generated again.");
+        System.err.println("World " + dir + " holds chunks in a legacy format (an older generation: 256 high and invented terrain, or"
+                + " vanilla terrain without feature decoration); they are not migrated and are generated again.");
+    }
+
+    private static File journalFile(File dir, int cx, int cz) {
+        return new File(new File(dir, "decoration"), cx + "_" + cz + ".journal");
+    }
+
+    /**
+     * Writes (replacing) the decoration journal of a chunk held at TERRAIN: the writes the decoration of its neighbours made into it,
+     * one line each, in order ({@code TerrainProto}). Deleted when the chunk becomes FULL.
+     */
+    public static void writeDecorationJournal(File dir, int cx, int cz, java.util.List<String> lines) {
+        File file = journalFile(dir, cx, cz);
+        file.getParentFile().mkdirs();
+        try {
+            java.nio.file.Files.write(file.toPath(), lines, java.nio.charset.StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new java.io.UncheckedIOException("cannot save the decoration journal of chunk " + cx + "," + cz, e);
+        }
+    }
+
+    /** The decoration journal of a chunk, or null when it has none. */
+    public static java.util.List<String> readDecorationJournal(File dir, int cx, int cz) {
+        File file = journalFile(dir, cx, cz);
+        if (!file.isFile()) return null;
+        try {
+            return java.nio.file.Files.readAllLines(file.toPath(), java.nio.charset.StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new java.io.UncheckedIOException("cannot read the decoration journal of chunk " + cx + "," + cz, e);
+        }
+    }
+
+    public static void deleteDecorationJournal(File dir, int cx, int cz) {
+        File file = journalFile(dir, cx, cz);
+        if (file.isFile() && !file.delete()) System.err.println("Could not delete " + file);
     }
 
     private static File chunkFile(File dir, int cx, int cz) {

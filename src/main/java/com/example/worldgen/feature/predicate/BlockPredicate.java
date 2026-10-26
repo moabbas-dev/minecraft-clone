@@ -13,9 +13,7 @@ import java.util.List;
 
 /**
  * Port of {@code net.minecraft.world.level.levelgen.blockpredicates.BlockPredicate} (26.3) and the types of
- * {@code BlockPredicateType} (bytecode of each class). {@code would_survive} is the one registered type that is not ported:
- * it needs {@code BlockState.canSurvive} of the tested block, which no ported feature uses
- * ({@link BlockPredicates#parse} rejects it with a {@link BlockPredicates.UnportedPredicateException}).
+ * {@code BlockPredicateType} (bytecode of each class), all 16 registered types.
  */
 public interface BlockPredicate {
 
@@ -117,7 +115,15 @@ public interface BlockPredicate {
         }
     }
 
-    /** {@code matching_biomes}: {@code biomes.contains(level.getBiome(pos))}. */
+    /** {@code would_survive} ({@code WouldSurvivePredicate.test}): {@code state.canSurvive(level, pos.offset(offset))}. */
+    record WouldSurvive(Pos offset, StateRef state, com.example.worldgen.feature.level.BlockSurvival survival) implements BlockPredicate {
+        @Override
+        public boolean test(GenRegion level, Pos pos) {
+            return survival.canSurvive(state, level, pos.offset(offset.x(), offset.y(), offset.z()));
+        }
+    }
+
+    /** {@code matching_biomes}:{@code biomes.contains(level.getBiome(pos))}. */
     record MatchingBiomes(List<String> biomes) implements BlockPredicate {
         @Override
         public boolean test(GenRegion level, Pos pos) {

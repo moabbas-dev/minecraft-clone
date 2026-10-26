@@ -54,6 +54,7 @@ public class TextureAtlas {
         ANIMATED.put(Tile.LAVA_FLOW, new int[]{0, 0});
         ANIMATED.put(Tile.LAVA_FLOW_TOP, new int[]{8, 8});
         ANIMATED.put(Tile.FIRE_1, new int[]{0, 0});
+        ANIMATED.put(Tile.MAGMA, new int[]{0, 0}); // magma.png.mcmeta: 3 frames, frametime 8, interpolated
     }
 
     private final Map<Tile, TextureAnimation> animations = new EnumMap<>(Tile.class);
@@ -86,7 +87,8 @@ public class TextureAtlas {
             Tile.FLINT, Tile.CLAY_BALL, Tile.SNOWBALL, Tile.GLOWSTONE_DUST, Tile.BOOK,
             Tile.GUNPOWDER, Tile.BONE, Tile.ARROW, Tile.STRING, Tile.SPIDER_EYE,
             Tile.GOLD_SWORD, Tile.GOLD_AXE, Tile.GOLD_PICKAXE, Tile.GOLD_SHOVEL, Tile.WOODEN_HOE, Tile.STONE_HOE, Tile.IRON_HOE, Tile.GOLD_HOE, Tile.DIAMOND_HOE,
-            Tile.TORCH, Tile.GOLDEN_APPLE, Tile.BOW, Tile.BOW_PULLING_0, Tile.BOW_PULLING_1, Tile.BOW_PULLING_2, Tile.WHEAT, Tile.BUCKET, Tile.WATER_BUCKET, Tile.LAVA_BUCKET, Tile.WHEAT_SEEDS, Tile.CARROT, Tile.BEETROOT, Tile.BEETROOT_SEEDS, Tile.COPPER_SWORD, Tile.COPPER_AXE, Tile.COPPER_PICKAXE, Tile.COPPER_SHOVEL, Tile.COPPER_HOE, Tile.WOODEN_SPEAR, Tile.STONE_SPEAR, Tile.COPPER_SPEAR, Tile.IRON_SPEAR, Tile.GOLD_SPEAR, Tile.DIAMOND_SPEAR);
+            Tile.TORCH, Tile.GOLDEN_APPLE, Tile.BOW, Tile.BOW_PULLING_0, Tile.BOW_PULLING_1, Tile.BOW_PULLING_2, Tile.WHEAT, Tile.BUCKET, Tile.WATER_BUCKET, Tile.LAVA_BUCKET, Tile.WHEAT_SEEDS, Tile.CARROT, Tile.BEETROOT, Tile.BEETROOT_SEEDS, Tile.COPPER_SWORD, Tile.COPPER_AXE, Tile.COPPER_PICKAXE, Tile.COPPER_SHOVEL, Tile.COPPER_HOE, Tile.WOODEN_SPEAR, Tile.STONE_SPEAR, Tile.COPPER_SPEAR, Tile.IRON_SPEAR, Tile.GOLD_SPEAR, Tile.DIAMOND_SPEAR,
+            Tile.LAPIS_LAZULI, Tile.REDSTONE, Tile.EMERALD);
 
     static {
         REAL_TEXTURE_PATHS.put(Tile.STONE, "textures/block/stone.png");
@@ -192,6 +194,15 @@ public class TextureAtlas {
         REAL_TEXTURE_PATHS.put(Tile.BROWN_TERRACOTTA, "textures/block/brown_terracotta.png");
         REAL_TEXTURE_PATHS.put(Tile.RED_TERRACOTTA, "textures/block/red_terracotta.png");
         REAL_TEXTURE_PATHS.put(Tile.LIGHT_GRAY_TERRACOTTA, "textures/block/light_gray_terracotta.png");
+        // C1 feature blocks (models/block/<name>.json: cube_all; magma_block's texture is block/magma, animated) and drop items.
+        for (Tile t : new Tile[]{Tile.ANDESITE, Tile.DIORITE, Tile.DEEPSLATE_COAL_ORE, Tile.DEEPSLATE_COPPER_ORE, Tile.DEEPSLATE_DIAMOND_ORE,
+                Tile.DEEPSLATE_EMERALD_ORE, Tile.DEEPSLATE_GOLD_ORE, Tile.DEEPSLATE_LAPIS_ORE, Tile.DEEPSLATE_REDSTONE_ORE, Tile.EMERALD_ORE,
+                Tile.LAPIS_ORE, Tile.REDSTONE_ORE, Tile.MAGMA}) {
+            REAL_TEXTURE_PATHS.put(t, "textures/block/" + t.name().toLowerCase(java.util.Locale.ROOT) + ".png");
+        }
+        REAL_TEXTURE_PATHS.put(Tile.LAPIS_LAZULI, "textures/item/lapis_lazuli.png");
+        REAL_TEXTURE_PATHS.put(Tile.REDSTONE, "textures/item/redstone.png");
+        REAL_TEXTURE_PATHS.put(Tile.EMERALD, "textures/item/emerald.png");
         // CHEST, SUN, MOON, RAIN: no real block-texture equivalent, always procedural.
         REAL_TEXTURE_PATHS.put(Tile.WOODEN_SWORD, "textures/item/wooden_sword.png");
         REAL_TEXTURE_PATHS.put(Tile.STONE_SWORD, "textures/item/stone_sword.png");

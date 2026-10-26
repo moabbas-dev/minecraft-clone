@@ -27,7 +27,7 @@ public record SpringFeature(String fluid, StateRef legacyBlock, boolean requires
     }
 
     @Override
-    public boolean place(GenRegion level, RandomSource random, Pos origin) {
+    public boolean place(GenRegion level, com.example.worldgen.feature.DecorationGenerator generator, RandomSource random, Pos origin) {
         if (!validBlocks.contains(level.getBlockState(origin.above()))) return false;
         if (requiresBlockBelow && !validBlocks.contains(level.getBlockState(origin.below()))) return false;
         StateRef currentState = level.getBlockState(origin);

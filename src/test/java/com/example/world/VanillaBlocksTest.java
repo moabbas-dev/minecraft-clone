@@ -79,7 +79,9 @@ class VanillaBlocksTest {
         assertThrows(UnsupportedBlockStateException.class, () -> VanillaBlocks.byVanilla("minecraft:furnace", Map.of("facing", "east")));
         assertThrows(UnsupportedBlockStateException.class, () -> VanillaBlocks.byVanilla("minecraft:oak_sapling", Map.of("stage", "1")));
         assertThrows(UnsupportedBlockStateException.class, () -> VanillaBlocks.byVanilla("minecraft:stone", Map.of("axis", "y")));
-        assertThrows(UnsupportedBlockStateException.class, () -> VanillaBlocks.byVanilla("minecraft:deepslate_copper_ore"));
+        assertThrows(UnsupportedBlockStateException.class, () -> VanillaBlocks.byVanilla("minecraft:redstone_ore", Map.of("lit", "true")));
+        assertThrows(UnsupportedBlockStateException.class, () -> VanillaBlocks.byVanilla("minecraft:infested_deepslate", Map.of("axis", "x")));
+        assertThrows(UnsupportedBlockStateException.class, () -> VanillaBlocks.byVanilla("minecraft:short_grass"));
         assertThrows(UnsupportedBlockStateException.class, () -> VanillaBlocks.byVanilla("minecraft:cave_air"));
         assertThrows(UnsupportedBlockStateException.class, () -> VanillaBlocks.byVanilla("minecraft:basalt"));
     }

@@ -185,18 +185,146 @@ public class World {
         }
     }
 
-    /** Generates a fresh chunk, or restores it from disk if it was previously saved. */
-    public void generateChunk(Chunk chunk) {
-        short[] saved = saveDir != null ? WorldIO.loadChunk(saveDir, chunk.chunkX, chunk.chunkZ) : null;
-        if (saved != null) {
-            chunk.importBlocks(saved);
-            fluids.chunkRestored(this, chunk);
-        } else {
-            generator.generate(chunk, this);
-            chunk.setFreshlyGenerated(true);
-            List<int[]> marks = generator.takePostProcessing(chunk);
-            if (!marks.isEmpty()) pendingPostProcessing.put(Chunk.key(chunk.chunkX, chunk.chunkZ), marks);
+    /** Chunks whose save file exists but cannot be read (legacy formats): they are generated again, never retried as saved. */
+    private final java.util.Set<Long> unreadableSaves = new java.util.HashSet<>();
+    /** Chunks that became FULL (generated or loaded) since the last {@link #drainNewlyReady}. */
+    private final List<Chunk> newlyReady = new java.util.ArrayList<>();
+    /** Wall time spent in {@link #generateStep} and how many chunks it made FULL (the amortised cost per FULL chunk). */
+    private long generationNanos;
+    private long generationFullChunks;
+
+    /** The chunks that became FULL since the last call, in that order (the game registers saplings and spawns animals for them). */
+    public List<Chunk> drainNewlyReady() {
+        List<Chunk> out = new java.util.ArrayList<>(newlyReady);
+        newlyReady.clear();
+        return out;
+    }
+
+    public long generationNanos() {
+        return generationNanos;
+    }
+
+    public long generationFullChunks() {
+        return generationFullChunks;
+    }
+
+    /** The saved blocks of a chunk, or null when it has no readable save. */
+    private short[] readSave(int cx, int cz) {
+        if (saveDir == null || unreadableSaves.contains(Chunk.key(cx, cz)) || !WorldIO.chunkExists(saveDir, cx, cz)) return null;
+        short[] saved = WorldIO.loadChunk(saveDir, cx, cz);
+        if (saved == null) unreadableSaves.add(Chunk.key(cx, cz));
+        return saved;
+    }
+
+    /**
+     * Loads chunk (cx, cz) from its save into the world when it is not loaded and has a readable save (it is FULL then): a neighbour a
+     * decoration reads or writes. Returns the loaded chunk, or null when there is no save.
+     */
+    Chunk loadSavedChunk(int cx, int cz) {
+        Chunk c = getChunk(cx, cz);
+        if (c != null && c.isGenerated()) return c;
+        if (generator.hasTerrain(cx, cz)) return null; // a proto exists only for a chunk without save
+        short[] saved = readSave(cx, cz);
+        if (saved == null) return null;
+        c = getOrCreateChunk(cx, cz);
+        restore(c, saved);
+        return c;
+    }
+
+    /**
+     * One unit of work towards making chunk (cx, cz) FULL: load it from its save, or load one saved neighbour or generate one TERRAIN
+     * chunk of its 5 x 5 neighbourhood ({@link WorldGenerator#dependencyRadius}), or - when they are all there - decorate it. Returns
+     * the chunk once it is FULL, null when more steps are needed. Used by the streaming to spread the work over frames.
+     */
+    public Chunk generateStep(int cx, int cz) {
+        Chunk c = getChunk(cx, cz);
+        if (c != null && c.isGenerated()) return c;
+        long start = System.nanoTime();
+        try {
+            if (!generator.hasTerrain(cx, cz)) {
+                Chunk loaded = loadSavedChunk(cx, cz);
+                if (loaded != null) return loaded;
+            }
+            if (prepareOneDependency(cx, cz)) return null;
+            c = getOrCreateChunk(cx, cz);
+            generateChunk(c);
+            return c;
+        } finally {
+            generationNanos += System.nanoTime() - start;
+            c = getChunk(cx, cz);
+            if (c != null && c.isGenerated()) generationFullChunks++;
         }
+    }
+
+    /** Offsets of the dependency square, nearest first (the centre first). */
+    private int[][] dependencyOffsets;
+
+    private int[][] dependencyOffsets(int r) {
+        if (dependencyOffsets == null || dependencyOffsets.length != (2 * r + 1) * (2 * r + 1)) {
+            List<int[]> list = new java.util.ArrayList<>();
+            for (int dz = -r; dz <= r; dz++) {
+                for (int dx = -r; dx <= r; dx++) list.add(new int[]{dx, dz});
+            }
+            list.sort(java.util.Comparator.comparingInt(o -> o[0] * o[0] + o[1] * o[1]));
+            dependencyOffsets = list.toArray(new int[0][]);
+        }
+        return dependencyOffsets;
+    }
+
+    /** Loads one saved neighbour or generates one TERRAIN chunk of chunk (cx, cz)'s dependency square; false when none is missing. */
+    private boolean prepareOneDependency(int cx, int cz) {
+        int r = generator.dependencyRadius();
+        if (r <= 0) return false;
+        for (int[] o : dependencyOffsets(r)) {
+            int nx = cx + o[0], nz = cz + o[1];
+            Chunk n = getChunk(nx, nz);
+            if (n != null && n.isGenerated()) continue;
+            if (generator.hasTerrain(nx, nz)) continue;
+            if ((o[0] != 0 || o[1] != 0) && loadSavedChunk(nx, nz) != null) return true;
+            if (generator.ensureTerrain(nx, nz, saveDir)) return true;
+        }
+        return false;
+    }
+
+    /** Lets the generator drop the TERRAIN chunks it holds farther than {@code radius} chunks (chessboard) from the given chunk. */
+    public void evictTerrain(int centerX, int centerZ, int radius) {
+        generator.evictTerrain(centerX, centerZ, radius, saveDir);
+    }
+
+    /** Saves the generator's state that must survive a save (decoration journals of TERRAIN chunks). */
+    public void saveGenerationState() {
+        generator.saveGenerationState(saveDir);
+    }
+
+    private void restore(Chunk chunk, short[] saved) {
+        chunk.importBlocks(saved);
+        fluids.chunkRestored(this, chunk);
+        finishChunk(chunk, List.of());
+    }
+
+    /**
+     * Makes a chunk FULL synchronously: restored from disk if it was saved, otherwise its saved neighbours are loaded and its 5 x 5
+     * TERRAIN neighbourhood generated as needed, then it is decorated ({@link WorldGenerator#generate}). Does nothing for a chunk that
+     * is FULL already.
+     */
+    public void generateChunk(Chunk chunk) {
+        if (chunk.isGenerated()) return;
+        short[] saved = generator.hasTerrain(chunk.chunkX, chunk.chunkZ) ? null : readSave(chunk.chunkX, chunk.chunkZ);
+        if (saved != null) {
+            restore(chunk, saved);
+            return;
+        }
+        while (prepareOneDependency(chunk.chunkX, chunk.chunkZ)) {
+            // load saved neighbours and generate the TERRAIN chunks the decoration needs
+        }
+        generator.generate(chunk, this);
+        chunk.setFreshlyGenerated(true);
+        List<int[]> marks = generator.takePostProcessing(chunk);
+        if (!marks.isEmpty()) pendingPostProcessing.put(Chunk.key(chunk.chunkX, chunk.chunkZ), marks);
+        finishChunk(chunk, generator.takeFluidTicks(chunk));
+    }
+
+    private void finishChunk(Chunk chunk, List<int[]> fluidTicks) {
         applyPendingSpill(chunk);
         generator.computeBiomes(chunk); // biomes and tint are not persisted, so these run on both the load and generate paths
         generator.computeTint(chunk, this);
@@ -206,9 +334,44 @@ public class World {
         // border faces were drawn against "air"). Now that real terrain exists here, those
         // neighbor meshes are stale and must be rebuilt or they'll show phantom/z-fighting faces.
         markNeighborChunksDirty(chunk.chunkX, chunk.chunkZ);
+        // ProtoChunkTicks: the fluid ticks the decoration scheduled run with the level's ticks (delay 0: on the next tick).
+        for (int[] t : fluidTicks) fluids.schedule(t[0], t[1], t[2], 0);
         for (int dx = -1; dx <= 1; dx++) {
             for (int dz = -1; dz <= 1; dz++) runPostProcessingIfReady(chunk.chunkX + dx, chunk.chunkZ + dz);
         }
+        newlyReady.add(chunk);
+    }
+
+    /**
+     * A post-processing mark a decoration made in a chunk that is FULL already (see {@code EngineFeatureChunk}): it waits with the
+     * chunk's other marks for its 3 x 3 neighbourhood and then gives the fluid there one tick, as the chunk's own marks do.
+     */
+    void addPostProcessingMark(Chunk chunk, int x, int y, int z) {
+        pendingPostProcessing.computeIfAbsent(Chunk.key(chunk.chunkX, chunk.chunkZ), k -> new java.util.ArrayList<>()).add(new int[]{x, y, z});
+    }
+
+    /**
+     * A block a decoration writes into a chunk that is FULL already ({@code WorldGenRegion.setBlock}, which makes no neighbour
+     * updates): the block is set, the light updated and the meshes (the chunk's and, on a border, the neighbour's) marked dirty; no
+     * {@link BlockSupport} or fluid update follows.
+     */
+    void setBlockFromFeature(int x, int y, int z, BlockType type) {
+        int cx = worldToChunk(x), cz = worldToChunk(z);
+        Chunk c = getChunk(cx, cz);
+        if (c == null || !c.isGenerated()) throw new IllegalStateException("chunk " + cx + "," + cz + " is not FULL");
+        int lx = worldToLocal(x), lz = worldToLocal(z);
+        BlockType previous = c.getLocal(lx, y, lz);
+        c.setLocal(lx, y, lz, type);
+        c.markMeshDirty();
+        if (previous != type) {
+            int oldOverride = lightEmissionOverride(x, y, z);
+            if (oldOverride > 0) emissionOverrides.remove(posKey(x, y, z));
+            if (c.isLightComputed()) LightEngine.onBlockChanged(this, x, y, z, previous, type, oldOverride);
+        }
+        if (lx == 0) markNeighborDirty(cx - 1, cz);
+        if (lx == Chunk.SIZE_X - 1) markNeighborDirty(cx + 1, cz);
+        if (lz == 0) markNeighborDirty(cx, cz - 1);
+        if (lz == Chunk.SIZE_Z - 1) markNeighborDirty(cx, cz + 1);
     }
 
     /**

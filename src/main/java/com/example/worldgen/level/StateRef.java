@@ -59,7 +59,8 @@ public record StateRef(String id, Map<String, String> properties) {
         if (properties.isEmpty()) return id;
         StringBuilder sb = new StringBuilder(id).append('[');
         boolean first = true;
-        for (Map.Entry<String, String> e : properties.entrySet()) {
+        // Map.copyOf's iteration order is randomised per JVM run, so the canonical string sorts the names explicitly
+        for (Map.Entry<String, String> e : new TreeMap<>(properties).entrySet()) {
             if (!first) sb.append(',');
             sb.append(e.getKey()).append('=').append(e.getValue());
             first = false;

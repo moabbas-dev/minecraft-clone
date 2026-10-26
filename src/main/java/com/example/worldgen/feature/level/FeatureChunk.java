@@ -52,6 +52,16 @@ public interface FeatureChunk {
      */
     void scheduleFluidTick(int x, int y, int z, String fluid);
 
+    /**
+     * {@code ProtoChunk.getBlockTicks().schedule(tick)} ({@code ProtoChunkTicks}): the block id, position and delay of a
+     * scheduled block tick (see {@code GenRegion.scheduleBlockTick}). A chunk that does not store block ticks keeps this
+     * default, which stops the calling top-level feature as an unported path ({@code UnportedFeature.Reached}) instead of
+     * dropping the tick.
+     */
+    default void scheduleBlockTick(int x, int y, int z, String block, int delay) {
+        throw new com.example.worldgen.feature.UnportedFeature.Reached("block ticks are not stored by " + getClass().getSimpleName());
+    }
+
     /** {@code ChunkAccess.getNoiseBiome(quartX, quartY, quartZ)} (quart Y clamped into the chunk). */
     String getNoiseBiome(int quartX, int quartY, int quartZ);
 

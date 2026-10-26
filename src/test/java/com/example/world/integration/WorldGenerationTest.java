@@ -51,15 +51,22 @@ class WorldGenerationTest {
         assertArrayEquals(generate(a, 3, -2).exportBlocks(), generate(b, 3, -2).exportBlocks());
     }
 
+    /**
+     * Feature decoration writes into the neighbours, so (as in vanilla) a chunk's blocks depend on the order its neighbours are
+     * decorated in; what must not matter is anything else. Chunks far enough apart that their decorations cannot touch (4 apart:
+     * one writes at most 1 chunk out, the other reads at most 2) come out the same in any order, and the same as alone.
+     */
     @Test
     void chunksDoNotDependOnTheOrderTheyAreGeneratedIn() {
         World forward = new World(77L, new VanillaChunkGenerator(77L));
         World backward = new World(77L, new VanillaChunkGenerator(77L));
         short[][] f = new short[3][];
         short[][] r = new short[3][];
-        for (int i = 0; i < 3; i++) f[i] = generate(forward, i - 1, 4).exportBlocks();
-        for (int i = 2; i >= 0; i--) r[i] = generate(backward, i - 1, 4).exportBlocks();
-        for (int i = 0; i < 3; i++) assertArrayEquals(f[i], r[i], "chunk " + (i - 1) + ",4");
+        for (int i = 0; i < 3; i++) generate(forward, (i - 1) * 4, 4);
+        for (int i = 2; i >= 0; i--) generate(backward, (i - 1) * 4, 4);
+        for (int i = 0; i < 3; i++) f[i] = forward.getChunk((i - 1) * 4, 4).exportBlocks();
+        for (int i = 0; i < 3; i++) r[i] = backward.getChunk((i - 1) * 4, 4).exportBlocks();
+        for (int i = 0; i < 3; i++) assertArrayEquals(f[i], r[i], "chunk " + (i - 1) * 4 + ",4");
         // and a chunk generated alone, with no neighbour ever generated, is the same too
         World alone = new World(77L, new VanillaChunkGenerator(77L));
         assertArrayEquals(f[1], generate(alone, 0, 4).exportBlocks());

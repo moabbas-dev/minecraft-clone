@@ -295,7 +295,33 @@ public enum BlockType {
     YELLOW_TERRACOTTA(274, "Yellow Terracotta", true, false, 1.25f, 0f),
     BROWN_TERRACOTTA(275, "Brown Terracotta", true, false, 1.25f, 0f),
     RED_TERRACOTTA(276, "Red Terracotta", true, false, 1.25f, 0f),
-    LIGHT_GRAY_TERRACOTTA(277, "Light Gray Terracotta", true, false, 1.25f, 0f);
+    LIGHT_GRAY_TERRACOTTA(277, "Light Gray Terracotta", true, false, 1.25f, 0f),
+
+    // ---- Blocks the ported features write (C1; docs/PARITY.md section 31) ----
+    // destroyTime from the 26.3 Blocks static initializer: the deepslate ores are ofLegacyCopy(<ore>).strength(4.5, 3); the infested
+    // blocks are InfestedBlock(host), whose constructor sets destroyTime host.defaultDestroyTime() / 2 and explosionResistance 0.75;
+    // magma is strength(0.5) with lightLevel 3; redstone ore is lightLevel(litBlockEmission(9)), 0 in its lit=false state (the only
+    // one the engine has). Names from assets/minecraft/lang/en_us.json.
+    ANDESITE(278, "Andesite", true, false, 1.5f, 0f),
+    DIORITE(279, "Diorite", true, false, 1.5f, 0f),
+    DEEPSLATE_COAL_ORE(280, "Deepslate Coal Ore", true, false, 4.5f, 0f),
+    DEEPSLATE_COPPER_ORE(281, "Deepslate Copper Ore", true, false, 4.5f, 0f),
+    DEEPSLATE_DIAMOND_ORE(282, "Deepslate Diamond Ore", true, false, 4.5f, 0f),
+    DEEPSLATE_EMERALD_ORE(283, "Deepslate Emerald Ore", true, false, 4.5f, 0f),
+    DEEPSLATE_GOLD_ORE(284, "Deepslate Gold Ore", true, false, 4.5f, 0f),
+    DEEPSLATE_LAPIS_ORE(285, "Deepslate Lapis Lazuli Ore", true, false, 4.5f, 0f),
+    DEEPSLATE_REDSTONE_ORE(286, "Deepslate Redstone Ore", true, false, 4.5f, 0f),
+    EMERALD_ORE(287, "Emerald Ore", true, false, 3.0f, 0f),
+    LAPIS_ORE(288, "Lapis Lazuli Ore", true, false, 3.0f, 0f),
+    REDSTONE_ORE(289, "Redstone Ore", true, false, 3.0f, 0f),
+    INFESTED_STONE(290, "Infested Stone", true, false, 0.75f, 0f),
+    // Vanilla: InfestedRotatedPillarBlock (axis x/y/z); only axis=y exists here, like deepslate.
+    INFESTED_DEEPSLATE(291, "Infested Deepslate", true, false, 1.5f, 0f),
+    MAGMA_BLOCK(292, "Magma Block", true, false, 0.5f, 3f),
+    // The ores' drop items (loot_table/blocks/*.json); inventory items only (redstone dust places no wire here).
+    LAPIS_LAZULI(293, "Lapis Lazuli", false, true, -1f, 0f),
+    REDSTONE(294, "Redstone Dust", false, true, -1f, 0f),
+    EMERALD(295, "Emerald", false, true, -1f, 0f);
 
     public final int id;
     public final String displayName;
@@ -409,6 +435,9 @@ public enum BlockType {
             // G28 terrain blocks. Powder snow has no block item in vanilla (it is placed from a powder snow bucket), so it is not here.
             CALCITE, CINNABAR, COARSE_DIRT, DEEPSLATE, COBBLED_DEEPSLATE, DEEPSLATE_IRON_ORE, GRANITE, MYCELIUM, PODZOL,
             PACKED_ICE, RAW_COPPER_BLOCK, RAW_IRON_BLOCK, RED_SANDSTONE, SULFUR, TUFF,
-            WHITE_TERRACOTTA, ORANGE_TERRACOTTA, YELLOW_TERRACOTTA, BROWN_TERRACOTTA, RED_TERRACOTTA, LIGHT_GRAY_TERRACOTTA
+            WHITE_TERRACOTTA, ORANGE_TERRACOTTA, YELLOW_TERRACOTTA, BROWN_TERRACOTTA, RED_TERRACOTTA, LIGHT_GRAY_TERRACOTTA,
+            // C1 feature blocks (all have block items in vanilla).
+            ANDESITE, DIORITE, DEEPSLATE_COAL_ORE, DEEPSLATE_COPPER_ORE, DEEPSLATE_DIAMOND_ORE, DEEPSLATE_EMERALD_ORE, DEEPSLATE_GOLD_ORE,
+            DEEPSLATE_LAPIS_ORE, DEEPSLATE_REDSTONE_ORE, EMERALD_ORE, LAPIS_ORE, REDSTONE_ORE, INFESTED_STONE, INFESTED_DEEPSLATE, MAGMA_BLOCK
     };
 }

@@ -41,6 +41,11 @@ public final class BlockTags {
         return new BlockTags(dataRoot);
     }
 
+    /** The data root the tags are read from (other tag registries, e.g. fluid tags, live next to it). */
+    public Path dataRoot() {
+        return dataRoot;
+    }
+
     /** {@code state.is(tag)}. */
     public boolean is(StateRef state, String tag) {
         return members(tag).contains(state.id());

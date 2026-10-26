@@ -16,16 +16,9 @@ import java.util.Map;
  * 16 types of {@code BlockPredicateType} (26.3). Field codecs from the bytecode: the state-testing types and
  * {@code has_sturdy_face}, {@code inside_world_bounds} take {@code Vec3i.offsetCodec(16).optionalFieldOf("offset", ZERO)};
  * {@code unobstructed} takes {@code Vec3i.CODEC.optionalFieldOf("offset", ZERO)}; {@code volume_match} requires
- * {@code min <= max} per axis. {@code would_survive} is not ported ({@link UnportedPredicateException}).
+ * {@code min <= max} per axis; {@code would_survive} takes the same offset field and {@code BlockState.CODEC} {@code state}.
  */
 public final class BlockPredicates {
-
-    /** A registered predicate type whose block behaviour is not ported yet. */
-    public static final class UnportedPredicateException extends IllegalArgumentException {
-        public UnportedPredicateException(String message) {
-            super(message);
-        }
-    }
 
     private static final Pos ZERO = new Pos(0, 0, 0);
 
@@ -54,7 +47,8 @@ public final class BlockPredicates {
             case "replaceable":
                 return new BlockPredicate.Replaceable(offset(m));
             case "would_survive":
-                throw new UnportedPredicateException("block predicate would_survive is not ported (needs BlockState.canSurvive): " + m);
+                return new BlockPredicate.WouldSurvive(offset(m), com.example.worldgen.feature.BlockStates.decode(CodecJson.field(m, "state")),
+                        com.example.worldgen.feature.level.BlockSurvival.of(tags));
             case "inside_world_bounds":
                 return new BlockPredicate.InsideWorldBounds(offset(m));
             case "any_of":
@@ -83,17 +77,6 @@ public final class BlockPredicates {
             default:
                 throw new CodecJson.CodecException("Unknown block predicate type: " + type);
         }
-    }
-
-    /** {@code true} when the JSON tree contains a predicate type that is not ported. */
-    public static boolean usesUnportedType(Object json) {
-        if (json instanceof Map<?, ?> m) {
-            if ("minecraft:would_survive".equals(m.get("type")) || "would_survive".equals(m.get("type"))) return true;
-            for (Object v : m.values()) if (usesUnportedType(v)) return true;
-        } else if (json instanceof List<?> l) {
-            for (Object v : l) if (usesUnportedType(v)) return true;
-        }
-        return false;
     }
 
     private static Pos offset(Map<String, Object> m) {

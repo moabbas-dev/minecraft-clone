@@ -502,7 +502,7 @@ public class Game implements GameAccess {
         }
         Chunk spawnChunk = world.getOrCreateChunk(World.worldToChunk((int) Math.floor(spawn.x)), World.worldToChunk((int) Math.floor(spawn.z)));
         if (!spawnChunk.isGenerated()) world.generateChunk(spawnChunk);
-        saplingGrowth.registerChunk(spawnChunk); // a no-op for a fresh world, kept for consistency with loadWorld
+        for (Chunk c : world.drainNewlyReady()) saplingGrowth.registerChunk(c); // a no-op for a fresh world, kept for consistency with loadWorld
         player = new Player(spawn);
         spawnPoint.set(player.position);
         player.setViewBobbing(options.viewBobbing);
@@ -555,7 +555,7 @@ public class Game implements GameAccess {
         int spawnCz = World.worldToChunk((int) Math.floor(meta.playerPos().z));
         Chunk spawnChunk = world.getOrCreateChunk(spawnCx, spawnCz);
         world.generateChunk(spawnChunk); // restores from disk since it was already saved
-        saplingGrowth.registerChunk(spawnChunk); // rescans for any saplings that were saved mid-growth
+        for (Chunk c : world.drainNewlyReady()) saplingGrowth.registerChunk(c); // rescans for any saplings that were saved mid-growth
 
         player = new Player(new Vector3f(meta.playerPos()));
         spawnPoint.set(player.position);
@@ -610,6 +610,7 @@ public class Game implements GameAccess {
         for (Chunk c : world.chunkMap().values()) {
             if (c.isGenerated()) WorldIO.saveChunk(dir, c);
         }
+        world.saveGenerationState(); // decoration journals of the TERRAIN chunks next to the saved ones
         WorldIO.saveCookingStations(dir, toWorldIoSnapshots(cookingStations.snapshotAll()));
         List<WorldIO.MobSnapshot> savedMobs = new java.util.ArrayList<>();
         for (Mob m : mobs.mobs()) {
@@ -998,30 +999,31 @@ public class Game implements GameAccess {
         int pcz = World.worldToChunk((int) Math.floor(player.position.z));
 
         int generated = 0;
-        // Nearest chunks first: a vanilla chunk costs ~15 ms, so the budget admits about one per frame and the order matters.
+        // Nearest chunks first. A FULL chunk needs its 5 x 5 neighbourhood at TERRAIN (~15 ms per terrain chunk) and then its
+        // decoration; World.generateStep does one of those units at a time, so the budget is checked between units.
         generation:
         for (int[] offset : streamingOffsets()) {
-            {
-                int dx = offset[0], dz = offset[1];
-                int cx = pcx + dx, cz = pcz + dz;
-                if (!world.hasChunk(cx, cz)) {
-                    Chunk c = world.getOrCreateChunk(cx, cz);
-                    world.generateChunk(c); // vanilla biomes + terrain (fill, surface, carvers), or a restore from disk
-                    saplingGrowth.registerChunk(c); // picks up any saplings this chunk had saved
-                    if (c.isFreshlyGenerated() && mobSpawner.isEnabled()) {
-                        com.example.entity.PassiveSpawner.spawnForNewChunk(world, mobs, c, gameplayRandom);
-                    }
-                    generated++;
-                    // Check the deadline only AFTER doing a chunk of work, never before, so a
-                    // frame is always guaranteed to make forward progress even if a single
-                    // chunk happens to cost more than the whole budget by itself.
-                    if (System.nanoTime() >= deadline) break generation;
-                }
+            int cx = pcx + offset[0], cz = pcz + offset[1];
+            Chunk existing = world.getChunk(cx, cz);
+            if (existing != null && existing.isGenerated()) continue;
+            while (true) {
+                Chunk done = world.generateStep(cx, cz); // a restore from disk, one dependency, or the decoration
+                generated++;
+                // Check the deadline only AFTER doing a unit of work, never before, so a frame always makes forward progress.
+                if (System.nanoTime() >= deadline) break generation;
+                if (done != null) break;
+            }
+        }
+        for (Chunk c : world.drainNewlyReady()) {
+            saplingGrowth.registerChunk(c); // picks up any saplings this chunk had saved
+            if (c.isFreshlyGenerated() && mobSpawner.isEnabled()) {
+                com.example.entity.PassiveSpawner.spawnForNewChunk(world, mobs, c, gameplayRandom);
             }
         }
 
         int unloaded = 0;
-        int unloadRadius = renderDistance + 2;
+        // FULL chunks loaded from disk as decoration neighbours reach 2 chunks (chessboard) past the render distance.
+        int unloadRadius = renderDistance + 3;
         Iterator<Map.Entry<Long, Chunk>> it = world.chunkMap().entrySet().iterator();
         while (it.hasNext()) {
             Map.Entry<Long, Chunk> entry = it.next();
@@ -1044,6 +1046,10 @@ public class Game implements GameAccess {
                 if (System.nanoTime() >= deadline) break;
             }
         }
+
+        // TERRAIN chunks are only needed within 2 of a chunk that streaming makes FULL; farther ones are dropped (their decoration
+        // journal is kept, see VanillaChunkGenerator).
+        world.evictTerrain(pcx, pcz, renderDistance + 4);
 
         int meshed = 0;
         if (System.nanoTime() < deadline) {
@@ -3765,12 +3771,11 @@ public class Game implements GameAccess {
         int tcx = World.worldToChunk((int) Math.floor(x)), tcz = World.worldToChunk((int) Math.floor(z));
         for (int dx = -1; dx <= 1; dx++) {
             for (int dz = -1; dz <= 1; dz++) {
-                if (world.hasChunk(tcx + dx, tcz + dz)) continue;
                 Chunk c = world.getOrCreateChunk(tcx + dx, tcz + dz);
-                world.generateChunk(c);
-                saplingGrowth.registerChunk(c);
+                world.generateChunk(c); // FULL: restored, or its TERRAIN neighbourhood generated and then decorated
             }
         }
+        for (Chunk c : world.drainNewlyReady()) saplingGrowth.registerChunk(c);
         player.teleport(x, y, z);
         if (yawDegrees != null) player.setYaw((float) Math.toRadians(yawDegrees));
         if (pitchDegrees != null) player.setPitch((float) Math.toRadians(pitchDegrees));
@@ -4224,6 +4229,11 @@ public class Game implements GameAccess {
         sb.append("mining.crackStage=").append(mining.crackStage()).append('\n');
         sb.append("chunks.loaded=").append(world.chunkMap().size()).append('\n');
         sb.append("chunks.meshDirty=").append(dirtyChunks).append('\n');
+        long full = world.generationFullChunks();
+        sb.append("gen.fullChunks=").append(full).append(" gen.ms=").append(world.generationNanos() / 1_000_000L)
+                .append(" gen.msPerFull=").append(full == 0 ? "0" : String.format(java.util.Locale.ROOT, "%.1f", world.generationNanos() / 1e6 / full));
+        if (world.generator() instanceof VanillaChunkGenerator v) sb.append(" gen.terrainProtos=").append(v.terrainProtoCount());
+        sb.append('\n');
         return sb.toString();
     }
 

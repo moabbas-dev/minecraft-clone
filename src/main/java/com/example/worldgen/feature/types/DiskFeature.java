@@ -26,7 +26,7 @@ public record DiskFeature(BlockStateProvider stateProvider, BlockPredicate targe
     }
 
     @Override
-    public boolean place(GenRegion level, RandomSource random, Pos origin) {
+    public boolean place(GenRegion level, com.example.worldgen.feature.DecorationGenerator generator, RandomSource random, Pos origin) {
         boolean placedAny = false;
         int originY = origin.y();
         int top = originY + halfHeight;

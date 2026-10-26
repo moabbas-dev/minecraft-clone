@@ -120,6 +120,7 @@ Not read by the game (documented in `docs/research/options-and-screens.md` but h
 - `acacia_leaves.png`
 - `acacia_log.png`
 - `acacia_log_top.png`
+- `andesite.png`
 - `bedrock.png`
 - `birch_leaves.png`
 - `birch_log.png`
@@ -143,7 +144,14 @@ Not read by the game (documented in `docs/research/options-and-screens.md` but h
 - `dark_oak_log.png`
 - `dark_oak_log_top.png`
 - `deepslate.png`
+- `deepslate_coal_ore.png`
+- `deepslate_copper_ore.png`
+- `deepslate_diamond_ore.png`
+- `deepslate_emerald_ore.png`
+- `deepslate_gold_ore.png`
 - `deepslate_iron_ore.png`
+- `deepslate_lapis_ore.png`
+- `deepslate_redstone_ore.png`
 - `deepslate_top.png`
 - `destroy_stage_0.png`
 - `destroy_stage_1.png`
@@ -157,7 +165,9 @@ Not read by the game (documented in `docs/research/options-and-screens.md` but h
 - `destroy_stage_9.png`
 - `diamond_block.png`
 - `diamond_ore.png`
+- `diorite.png`
 - `dirt.png`
+- `emerald_ore.png`
 - `furnace_side.png`
 - `furnace_top.png`
 - `glass.png`
@@ -174,7 +184,10 @@ Not read by the game (documented in `docs/research/options-and-screens.md` but h
 - `jungle_leaves.png`
 - `jungle_log.png`
 - `jungle_log_top.png`
+- `lapis_ore.png`
 - `light_gray_terracotta.png`
+- `magma.png.mcmeta`
+- `magma.png`
 - `mangrove_leaves.png`
 - `mangrove_log.png`
 - `mangrove_log_top.png`
@@ -205,6 +218,7 @@ Not read by the game (documented in `docs/research/options-and-screens.md` but h
 - `red_sandstone_bottom.png`
 - `red_sandstone_top.png`
 - `red_terracotta.png`
+- `redstone_ore.png`
 - `sand.png`
 - `sandstone.png`
 - `sandstone_bottom.png`
@@ -326,6 +340,7 @@ the old layout divided by the real file size, so the first look at the real file
 - `diamond_sword.png`
 - `dried_kelp.png`
 - `egg.png`
+- `emerald.png`
 - `feather.png`
 - `flint.png`
 - `glowstone_dust.png`
@@ -346,6 +361,7 @@ the old layout divided by the real file size, so the first look at the real file
 - `iron_shovel.png`
 - `iron_sword.png`
 - `kelp.png`
+- `lapis_lazuli.png`
 - `leather.png`
 - `leather_boots.png`
 - `leather_chestplate.png`
@@ -358,6 +374,7 @@ the old layout divided by the real file size, so the first look at the real file
 - `raw_copper.png`
 - `raw_gold.png`
 - `raw_iron.png`
+- `redstone.png`
 - `rotten_flesh.png`
 - `salmon.png`
 - `snowball.png`
